@@ -1,0 +1,135 @@
+{
+  "entities": {
+    "Category": {
+      "title": "Category",
+      "description": "Product categories (e.g., Drinks, Food, Snacks)",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Items available for sale",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "categoryId": { "type": "string" },
+        "subcategory": { "type": "string" },
+        "description": { "type": "string" },
+        "price": { "type": "number" },
+        "cost": { "type": "number" },
+        "stock": { "type": "number" },
+        "unit": { "type": "string" },
+        "active": { "type": "boolean" }
+      },
+      "required": ["name", "categoryId", "price", "cost", "stock"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "Customer records",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "address": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name"]
+    },
+    "Supplier": {
+      "title": "Supplier",
+      "description": "Product suppliers",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "contact": { "type": "string" },
+        "phone": { "type": "string" },
+        "category": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name"]
+    },
+    "GameModality": {
+      "title": "GameModality",
+      "description": "Types of games (Banca de Jogos)",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "price": { "type": "number" },
+        "active": { "type": "boolean" }
+      },
+      "required": ["name", "price"]
+    },
+    "GameSession": {
+      "title": "GameSession",
+      "description": "Recorded result of a game session",
+      "type": "object",
+      "properties": {
+        "modalityId": { "type": "string" },
+        "modalityName": { "type": "string" },
+        "amount": { "type": "number" },
+        "date": { "type": "string", "format": "date-time" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" }
+      },
+      "required": ["modalityId", "amount", "date", "userId"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Customer orders/tables",
+      "type": "object",
+      "properties": {
+        "customerName": { "type": "string" },
+        "status": { "type": "string", "enum": ["open", "closed", "cancelled"] },
+        "items": { "type": "array" },
+        "totalAmount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "closedAt": { "type": "string", "format": "date-time" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["customerName", "status", "totalAmount"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Income and expense records",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["income", "expense"] },
+        "category": { "type": "string" },
+        "amount": { "type": "number" },
+        "description": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "orderId": { "type": "string" }
+      },
+      "required": ["type", "amount", "date"]
+    },
+    "User": {
+      "title": "User",
+      "description": "Application users and roles",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "staff"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "role"]
+    }
+  },
+  "firestore": {
+    "/categories/{categoryId}": { "schema": "Category", "description": "Product categories" },
+    "/products/{productId}": { "schema": "Product", "description": "Available products" },
+    "/customers/{customerId}": { "schema": "Customer", "description": "Customer list" },
+    "/suppliers/{supplierId}": { "schema": "Supplier", "description": "Supplier list" },
+    "/game_modalities/{gameId}": { "schema": "GameModality", "description": "Game types" },
+    "/orders/{orderId}": { "schema": "Order", "description": "Customer orders" },
+    "/open_orders/{orderId}": { "schema": "Order", "description": "Specifically open orders" },
+    "/transactions/{transactionId}": { "schema": "Transaction", "description": "Financial records" },
+    "/expenses/{expenseId}": { "schema": "Transaction", "description": "Specific expense records" },
+    "/users/{userId}": { "schema": "User", "description": "User profiles and roles" }
+  }
+}

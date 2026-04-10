@@ -1,0 +1,78 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+@theme inline {
+    --font-sans: 'Inter', sans-serif;
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+    --color-popover: var(--popover);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-secondary: var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-destructive: var(--destructive);
+    --color-border: var(--border);
+    --color-input: var(--input);
+    --color-ring: var(--ring);
+    --color-sidebar: var(--sidebar);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-ring: var(--sidebar-ring);
+}
+
+:root {
+    --background: #0a1120;
+    --foreground: #ffffff;
+    --card: #111827;
+    --card-foreground: #ffffff;
+    --popover: #111827;
+    --popover-foreground: #ffffff;
+    --primary: #0080ff;
+    --primary-foreground: #ffffff;
+    --secondary: #1f2937;
+    --secondary-foreground: #ffffff;
+    --muted: #1f2937;
+    --muted-foreground: #94a3b8;
+    --accent: #0080ff;
+    --accent-foreground: #ffffff;
+    --destructive: #ef4444;
+    --border: #1f2937;
+    --input: #1f2937;
+    --ring: #0080ff;
+    --radius: 0.75rem;
+    
+    --sidebar: #060b16;
+    --sidebar-foreground: #94a3b8;
+    --sidebar-primary: #0080ff;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #1f2937;
+    --sidebar-accent-foreground: #ffffff;
+    --sidebar-border: #1f2937;
+    --sidebar-ring: #0080ff;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+}
+
+.cn-toast {
+  @apply !bg-card !text-card-foreground !border-border !shadow-xl;
+}

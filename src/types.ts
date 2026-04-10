@@ -1,0 +1,113 @@
+export interface Customer {
+  id: string;
+  name: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  createdAt: any;
+}
+
+export interface Supplier {
+  id: string;
+  name: string;
+  contact?: string;
+  phone?: string;
+  category?: string;
+  createdAt: any;
+}
+
+export interface GameModality {
+  id: string;
+  name: string;
+  price: number;
+  active: boolean;
+}
+
+export interface GameSession {
+  id: string;
+  modalityId: string;
+  modalityName: string;
+  amount: number;
+  date: any;
+  userId: string;
+  userName: string;
+}
+
+export interface Purchase {
+  id: string;
+  supplierId: string;
+  supplierName: string;
+  items: {
+    productName: string;
+    quantity: number;
+    price: number;
+    subtotal: number;
+  }[];
+  totalAmount: number;
+  date: any;
+}
+
+export interface RecurringExpense {
+  id: string;
+  description: string;
+  amount: number;
+  dueDate: number; // Day of month
+  category: string;
+  active: boolean;
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  createdAt?: any;
+}
+
+export interface Product {
+  id: string;
+  name: string;
+  categoryId: string;
+  subcategory?: string;
+  description?: string;
+  price: number;
+  cost: number;
+  stock: number;
+  unit?: string;
+  active?: boolean;
+}
+
+export interface OrderItem {
+  productId: string;
+  productName: string;
+  quantity: number;
+  price: number;
+  subtotal: number;
+}
+
+export interface Order {
+  id: string;
+  customerName: string;
+  status: 'open' | 'closed' | 'cancelled';
+  items: OrderItem[];
+  totalAmount: number;
+  createdAt: any;
+  closedAt?: any;
+  createdBy: string;
+}
+
+export interface Transaction {
+  id: string;
+  type: 'income' | 'expense';
+  category: string;
+  amount: number;
+  description?: string;
+  date: any;
+  orderId?: string;
+}
+
+export interface UserProfile {
+  uid: string;
+  email: string;
+  displayName: string | null;
+  role: 'admin' | 'staff';
+  createdAt: any;
+}
