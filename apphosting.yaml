@@ -1,0 +1,17 @@
+# apphosting.yaml
+# Configuração para o Firebase App Hosting
+kind: "AppHostingConfig"
+schemaVersion: "v1"
+
+# Configurações de ambiente para o build (opcional)
+# env:
+#   - variable: VITE_SOME_KEY
+#     value: "some-value"
+
+# Configurações de execução (Runtime)
+runConfig:
+  minInstances: 0
+  maxInstances: 10
+  concurrency: 80
+  cpu: 1
+  memoryMiB: 512
