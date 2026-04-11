@@ -93,6 +93,55 @@
       },
       "required": ["customerName", "status", "totalAmount"]
     },
+    "BISummary": {
+      "title": "BISummary",
+      "description": "Monthly business intelligence summaries",
+      "type": "object",
+      "properties": {
+        "month": { "type": "string" },
+        "salesCount": { "type": "number" },
+        "totalExpenses": { "type": "number" },
+        "totalRevenue": { "type": "number" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["month", "salesCount", "totalExpenses", "totalRevenue"]
+    },
+    "PaymentFee": {
+      "title": "PaymentFee",
+      "description": "Fees for different payment methods",
+      "type": "object",
+      "properties": {
+        "method": { "type": "string" },
+        "percentage": { "type": "number" },
+        "fixed": { "type": "number" }
+      },
+      "required": ["method", "percentage"]
+    },
+    "Purchase": {
+      "title": "Purchase",
+      "description": "Inventory purchases from suppliers",
+      "type": "object",
+      "properties": {
+        "supplierId": { "type": "string" },
+        "items": { "type": "array" },
+        "totalAmount": { "type": "number" },
+        "date": { "type": "string", "format": "date-time" },
+        "status": { "type": "string" }
+      },
+      "required": ["supplierId", "totalAmount", "date"]
+    },
+    "RecurringExpense": {
+      "title": "RecurringExpense",
+      "description": "Fixed monthly expenses",
+      "type": "object",
+      "properties": {
+        "description": { "type": "string" },
+        "amount": { "type": "number" },
+        "dayOfMonth": { "type": "number" },
+        "category": { "type": "string" }
+      },
+      "required": ["description", "amount", "dayOfMonth"]
+    },
     "Transaction": {
       "title": "Transaction",
       "description": "Income and expense records",
@@ -130,6 +179,10 @@
     "/open_orders/{orderId}": { "schema": "Order", "description": "Specifically open orders" },
     "/transactions/{transactionId}": { "schema": "Transaction", "description": "Financial records" },
     "/expenses/{expenseId}": { "schema": "Transaction", "description": "Specific expense records" },
+    "/recurring_expenses/{expenseId}": { "schema": "RecurringExpense", "description": "Fixed monthly expenses" },
+    "/purchases/{purchaseId}": { "schema": "Purchase", "description": "Inventory purchases" },
+    "/payment_fees/{feeId}": { "schema": "PaymentFee", "description": "Payment method fees" },
+    "/bi_summaries/{summaryId}": { "schema": "BISummary", "description": "Monthly BI summaries" },
     "/users/{userId}": { "schema": "User", "description": "User profiles and roles" }
   }
 }

@@ -12,12 +12,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { toast } from 'sonner';
 import { addDoc, updateDoc, doc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../lib/firebase-utils';
+import { ConfirmDialog } from './ConfirmDialog';
 
 export function Suppliers({ user }: { user: UserProfile }) {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [supplierToDelete, setSupplierToDelete] = useState<Supplier | null>(null);
 
   // Form states
   const [name, setName] = useState('');
@@ -73,6 +76,17 @@ export function Suppliers({ user }: { user: UserProfile }) {
     setPhone(supplier.phone || '');
     setCategory(supplier.category || '');
     setIsModalOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!supplierToDelete) return;
+    try {
+      await deleteDoc(doc(db, 'suppliers', supplierToDelete.id));
+      toast.success('Fornecedor removido');
+      setSupplierToDelete(null);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `suppliers/${supplierToDelete.id}`);
+    }
   };
 
   const filtered = suppliers.filter(s => 
@@ -209,15 +223,9 @@ export function Suppliers({ user }: { user: UserProfile }) {
                     <Button 
                       variant="ghost" 
                       size="icon" 
-                      onClick={async () => {
-                        if (confirm(`Excluir ${supplier.name}?`)) {
-                          try {
-                            await deleteDoc(doc(db, 'suppliers', supplier.id));
-                            toast.success('Fornecedor excluído');
-                          } catch (error) {
-                            handleFirestoreError(error, OperationType.DELETE, 'suppliers');
-                          }
-                        }
+                      onClick={() => {
+                        setSupplierToDelete(supplier);
+                        setIsDeleteConfirmOpen(true);
                       }}
                       className="hover:bg-red-500/10 hover:text-red-500"
                     >
@@ -238,6 +246,16 @@ export function Suppliers({ user }: { user: UserProfile }) {
           </TableBody>
         </Table>
       </Card>
+
+      <ConfirmDialog 
+        isOpen={isDeleteConfirmOpen}
+        onOpenChange={setIsDeleteConfirmOpen}
+        title="Excluir Fornecedor"
+        description={`Deseja realmente excluir o fornecedor ${supplierToDelete?.name}? Esta ação não pode ser desfeita.`}
+        onConfirm={handleDelete}
+        variant="destructive"
+        confirmText="Excluir"
+      />
     </div>
   );
 }

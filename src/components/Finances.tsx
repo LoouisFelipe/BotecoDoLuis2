@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, query, onSnapshot, addDoc, serverTimestamp, orderBy, limit } from 'firebase/firestore';
+import { collection, query, onSnapshot, addDoc, serverTimestamp, orderBy, limit, getDocs } from 'firebase/firestore';
 import { Transaction, UserProfile } from '../types';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -25,19 +25,42 @@ export function Finances({ user }: { user: UserProfile }) {
   const [description, setDescription] = useState('');
 
   useEffect(() => {
-    const q = query(collection(db, 'transactions'), orderBy('date', 'desc'), limit(50));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setTransactions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction)));
+    const qTransactions = query(collection(db, 'transactions'), orderBy('date', 'desc'), limit(50));
+    const qExpenses = query(collection(db, 'expenses'), orderBy('date', 'desc'), limit(50));
+
+    let transData: Transaction[] = [];
+    let expData: Transaction[] = [];
+
+    const updateMerged = () => {
+      const merged = [...transData, ...expData].sort((a, b) => {
+        const dateA = a.date?.toDate ? a.date.toDate().getTime() : 0;
+        const dateB = b.date?.toDate ? b.date.toDate().getTime() : 0;
+        return dateB - dateA;
+      }).slice(0, 50);
+      setTransactions(merged);
+    };
+
+    const unsubTransactions = onSnapshot(qTransactions, (snapshot) => {
+      transData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction));
+      updateMerged();
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'transactions'));
 
-    return () => unsubscribe();
+    const unsubExpenses = onSnapshot(qExpenses, (snapshot) => {
+      expData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), type: 'expense' } as Transaction));
+      updateMerged();
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'expenses'));
+
+    return () => {
+      unsubTransactions();
+      unsubExpenses();
+    };
   }, []);
 
   const handleAddExpense = async () => {
     if (!amount || !category) return;
     try {
-      await addDoc(collection(db, 'transactions'), {
-        type: 'expense',
+      // Write to 'expenses' collection to match user's Firestore structure
+      await addDoc(collection(db, 'expenses'), {
         category,
         amount: parseFloat(amount),
         description,
@@ -49,7 +72,7 @@ export function Finances({ user }: { user: UserProfile }) {
       setDescription('');
       toast.success('Despesa registrada');
     } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, 'transactions');
+      handleFirestoreError(error, OperationType.CREATE, 'expenses');
     }
   };
 
@@ -211,8 +234,8 @@ export function Finances({ user }: { user: UserProfile }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {transactions.map(t => (
-              <TableRow key={t.id} className="border-border hover:bg-white/5 transition-colors">
+            {transactions.map((t, idx) => (
+              <TableRow key={`${t.id}-${idx}`} className="border-border hover:bg-white/5 transition-colors">
                 <TableCell className="py-4 text-xs font-bold text-muted-foreground uppercase tracking-widest">
                   {t.date?.toDate ? format(t.date.toDate(), 'dd MMM, HH:mm') : '...'}
                 </TableCell>

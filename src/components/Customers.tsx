@@ -4,19 +4,22 @@ import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { Customer, UserProfile } from '../types';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
-import { Users, Plus, Search, Phone, Mail, MapPin, Edit2, Trash2 } from 'lucide-react';
+import { Users, Plus, Search, Phone, Mail, MapPin, Edit2, Trash2, TrendingUp, Star, Clock } from 'lucide-react';
 import { Input } from './ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from './ui/dialog';
 import { toast } from 'sonner';
 import { addDoc, updateDoc, doc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../lib/firebase-utils';
+import { ConfirmDialog } from './ConfirmDialog';
 
 export function Customers({ user }: { user: UserProfile }) {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
 
   // Form states
   const [name, setName] = useState('');
@@ -74,6 +77,17 @@ export function Customers({ user }: { user: UserProfile }) {
     setIsModalOpen(true);
   };
 
+  const handleDelete = async () => {
+    if (!customerToDelete) return;
+    try {
+      await deleteDoc(doc(db, 'customers', customerToDelete.id));
+      toast.success('Cliente removido');
+      setCustomerToDelete(null);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `customers/${customerToDelete.id}`);
+    }
+  };
+
   const filtered = customers.filter(c => 
     c.name.toLowerCase().includes(search.toLowerCase()) ||
     c.phone?.includes(search)
@@ -81,6 +95,52 @@ export function Customers({ user }: { user: UserProfile }) {
 
   return (
     <div className="space-y-8">
+      {/* Customer Insights */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="bg-card border-border">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
+              <Users className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Total de Clientes</p>
+              <p className="text-sm font-black uppercase tracking-tighter">{customers.length} Cadastrados</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-card border-border">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center text-yellow-500 border border-yellow-500/20">
+              <Star className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Clientes VIP</p>
+              <p className="text-sm font-black uppercase tracking-tighter">Top 5% Ativos</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-card border-border">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center text-green-500 border border-green-500/20">
+              <TrendingUp className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Novos este Mês</p>
+              <p className="text-sm font-black uppercase tracking-tighter">
+                {customers.filter(c => {
+                  const createdAt = (c as any).createdAt?.toDate?.();
+                  if (!createdAt) return false;
+                  const now = new Date();
+                  return createdAt.getMonth() === now.getMonth() && createdAt.getFullYear() === now.getFullYear();
+                }).length} Novos
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       <div className="flex flex-col md:flex-row justify-between items-center gap-6">
         <div className="relative flex-1 w-full max-w-2xl group">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
@@ -216,15 +276,9 @@ export function Customers({ user }: { user: UserProfile }) {
                     <Button 
                       variant="ghost" 
                       size="icon" 
-                      onClick={async () => {
-                        if (confirm(`Excluir ${customer.name}?`)) {
-                          try {
-                            await deleteDoc(doc(db, 'customers', customer.id));
-                            toast.success('Cliente excluído');
-                          } catch (error) {
-                            handleFirestoreError(error, OperationType.DELETE, 'customers');
-                          }
-                        }
+                      onClick={() => {
+                        setCustomerToDelete(customer);
+                        setIsDeleteConfirmOpen(true);
                       }}
                       className="hover:bg-red-500/10 hover:text-red-500"
                     >
@@ -245,6 +299,16 @@ export function Customers({ user }: { user: UserProfile }) {
           </TableBody>
         </Table>
       </Card>
+
+      <ConfirmDialog 
+        isOpen={isDeleteConfirmOpen}
+        onOpenChange={setIsDeleteConfirmOpen}
+        title="Excluir Cliente"
+        description={`Deseja realmente excluir o cliente ${customerToDelete?.name}? Esta ação não pode ser desfeita.`}
+        onConfirm={handleDelete}
+        variant="destructive"
+        confirmText="Excluir"
+      />
     </div>
   );
 }

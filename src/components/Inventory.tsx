@@ -9,10 +9,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from './ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Badge } from './ui/badge';
-import { Plus, Edit2, Trash2, Package, Tag, Search, Filter, ChevronDown, ChevronRight, Layers, Info, AlertCircle } from 'lucide-react';
+import { Plus, Edit2, Trash2, Package, Tag, Search, Filter, ChevronDown, ChevronRight, Layers, Info, AlertCircle, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { handleFirestoreError, OperationType } from '../lib/firebase-utils';
 import { cn } from '../lib/utils';
+import { ConfirmDialog } from './ConfirmDialog';
 
 export function Inventory({ user }: { user: UserProfile }) {
   const [products, setProducts] = useState<Product[]>([]);
@@ -35,6 +36,9 @@ export function Inventory({ user }: { user: UserProfile }) {
   const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
   const [expandedSubcategories, setExpandedSubcategories] = useState<string[]>([]);
 
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+
   const toggleCategory = (id: string) => {
     setExpandedCategories(prev => 
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
@@ -50,10 +54,12 @@ export function Inventory({ user }: { user: UserProfile }) {
   useEffect(() => {
     const unsubProducts = onSnapshot(collection(db, 'products'), (snapshot) => {
       setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product)));
-    });
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'products'));
+
     const unsubCategories = onSnapshot(collection(db, 'categories'), (snapshot) => {
       setCategories(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category)));
-    });
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'categories'));
+
     return () => {
       unsubProducts();
       unsubCategories();
@@ -75,7 +81,7 @@ export function Inventory({ user }: { user: UserProfile }) {
     };
 
     try {
-      if (editingProduct) {
+      if (editingProduct && editingProduct.id) {
         await updateDoc(doc(db, 'products', editingProduct.id), data);
         toast.success('Produto atualizado');
       } else {
@@ -117,14 +123,25 @@ export function Inventory({ user }: { user: UserProfile }) {
 
   const openEditProduct = (product: Product) => {
     setEditingProduct(product);
-    setProductName(product.name);
+    setProductName(product.name || '');
     setProductPrice((product.price || 0).toString());
     setProductCost((product.cost || 0).toString());
     setProductStock((product.stock || 0).toString());
-    setProductCategoryId(product.categoryId);
+    setProductCategoryId(product.categoryId || '');
     setProductSubcategory(product.subcategory || '');
     setProductDescription(product.description || '');
     setIsProductModalOpen(true);
+  };
+
+  const handleDeleteProduct = async () => {
+    if (!productToDelete) return;
+    try {
+      await deleteDoc(doc(db, 'products', productToDelete.id));
+      toast.success('Produto excluído');
+      setProductToDelete(null);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `products/${productToDelete.id}`);
+    }
   };
 
   const filteredProducts = products.filter(p => 
@@ -133,6 +150,49 @@ export function Inventory({ user }: { user: UserProfile }) {
 
   return (
     <div className="space-y-8">
+      {/* Inventory Insights */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="bg-card border-border">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center text-red-500">
+              <AlertCircle className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Estoque Crítico</p>
+              <p className="text-sm font-black uppercase tracking-tighter">
+                {products.filter(p => (p.stock || 0) <= 5).length} Itens em Alerta
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-card border-border">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500">
+              <Package className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Total de Produtos</p>
+              <p className="text-sm font-black uppercase tracking-tighter">{products.length} Cadastrados</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-card border-border">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center text-green-500">
+              <TrendingUp className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Valor em Estoque</p>
+              <p className="text-sm font-black uppercase tracking-tighter">
+                R$ {products.reduce((sum, p) => sum + ((p.cost || 0) * (p.stock || 0)), 0).toFixed(2)}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       <div className="flex flex-col md:flex-row justify-between items-center gap-6">
         <div className="relative flex-1 w-full max-w-2xl group">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
@@ -172,8 +232,8 @@ export function Inventory({ user }: { user: UserProfile }) {
                 <div className="max-h-60 overflow-y-auto border border-border rounded-xl bg-background/50">
                   <Table>
                     <TableBody>
-                      {categories.map(cat => (
-                        <TableRow key={cat.id} className="border-border hover:bg-white/5">
+                      {categories.map((cat, idx) => (
+                        <TableRow key={`cat-table-${cat.id}-${idx}`} className="border-border hover:bg-white/5">
                           <TableCell className="font-bold uppercase tracking-wider">{cat.name}</TableCell>
                         </TableRow>
                       ))}
@@ -234,8 +294,8 @@ export function Inventory({ user }: { user: UserProfile }) {
                             <SelectValue placeholder="Selecionar" />
                           </SelectTrigger>
                           <SelectContent className="bg-[#111827] border-border">
-                            {categories.map(cat => (
-                              <SelectItem key={cat.id} value={cat.id} className="uppercase font-bold tracking-widest text-xs">{cat.name}</SelectItem>
+                            {categories.map((cat, idx) => (
+                              <SelectItem key={`cat-select-${cat.id}-${idx}`} value={cat.id} className="uppercase font-bold tracking-widest text-xs">{cat.name}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -299,6 +359,23 @@ export function Inventory({ user }: { user: UserProfile }) {
                       />
                     </div>
                   </div>
+
+                  {productPrice && productCost && parseFloat(productCost) > 0 && (
+                    <div className="p-4 bg-primary/5 rounded-xl border border-primary/20 flex items-center justify-between animate-in fade-in zoom-in duration-300">
+                      <div>
+                        <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Margem de Lucro Estimada</p>
+                        <p className="text-lg font-black text-primary">
+                          {((parseFloat(productPrice) - parseFloat(productCost)) / parseFloat(productCost) * 100).toFixed(1)}%
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Lucro por Unidade</p>
+                        <p className="text-lg font-black text-green-500">
+                          R$ {(parseFloat(productPrice) - parseFloat(productCost)).toFixed(2)}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -312,7 +389,7 @@ export function Inventory({ user }: { user: UserProfile }) {
       </div>
 
       <div className="space-y-4">
-        {categories.map(category => {
+        {categories.map((category, catIdx) => {
           const categoryProducts = filteredProducts.filter(p => p.categoryId === category.id);
           const subcategories = Array.from(new Set(categoryProducts.map(p => p.subcategory || 'Sem Subcategoria')));
           const isExpanded = expandedCategories.includes(category.id);
@@ -320,7 +397,7 @@ export function Inventory({ user }: { user: UserProfile }) {
           if (categoryProducts.length === 0 && search) return null;
 
           return (
-            <div key={category.id} className="border border-border bg-card/30 rounded-2xl overflow-hidden transition-all">
+            <div key={`${category.id}-${catIdx}`} className="border border-border bg-card/30 rounded-2xl overflow-hidden transition-all">
               <button 
                 onClick={() => toggleCategory(category.id)}
                 className="w-full flex items-center justify-between p-6 hover:bg-white/5 transition-colors group"
@@ -342,9 +419,9 @@ export function Inventory({ user }: { user: UserProfile }) {
 
               {isExpanded && (
                 <div className="px-6 pb-6 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                  {subcategories.map(subName => {
+                  {subcategories.map((subName, subIdx) => {
                     const subProducts = categoryProducts.filter(p => (p.subcategory || 'Sem Subcategoria') === subName);
-                    const subId = `${category.id}-${subName}`;
+                    const subId = `${category.id}-${subName}-${subIdx}`;
                     const isSubExpanded = expandedSubcategories.includes(subId);
 
                     return (
@@ -370,10 +447,10 @@ export function Inventory({ user }: { user: UserProfile }) {
 
                         {isSubExpanded && (
                           <div className="p-2 space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
-                            {subProducts.map(product => {
+                            {subProducts.map((product, prodIdx) => {
                               const margin = product.cost > 0 ? ((product.price - product.cost) / product.cost) * 100 : 0;
                               return (
-                                <div key={product.id} className="flex items-center justify-between p-4 bg-card/40 border border-border/30 rounded-xl hover:border-primary/30 transition-all group/item">
+                                <div key={`${product.id}-${prodIdx}`} className="flex items-center justify-between p-4 bg-card/40 border border-border/30 rounded-xl hover:border-primary/30 transition-all group/item">
                                   <div className="flex items-center gap-4">
                                     <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center border border-border/50 group-hover/item:border-primary/30 transition-all">
                                       <Package className="w-5 h-5 text-muted-foreground group-hover/item:text-primary" />
@@ -430,15 +507,9 @@ export function Inventory({ user }: { user: UserProfile }) {
                                       <Button 
                                         variant="ghost" 
                                         size="icon" 
-                                        onClick={async () => {
-                                          if (confirm(`Excluir ${product.name}?`)) {
-                                            try {
-                                              await deleteDoc(doc(db, 'products', product.id));
-                                              toast.success('Produto excluído');
-                                            } catch (error) {
-                                              handleFirestoreError(error, OperationType.DELETE, 'products');
-                                            }
-                                          }
+                                        onClick={() => {
+                                          setProductToDelete(product);
+                                          setIsDeleteConfirmOpen(true);
                                         }}
                                         className="w-8 h-8 rounded-lg hover:bg-red-500/10 hover:text-red-500 transition-all"
                                       >
@@ -460,6 +531,60 @@ export function Inventory({ user }: { user: UserProfile }) {
           );
         })}
 
+        {/* Fallback for products without category or if categories collection is empty */}
+        {(() => {
+          const uncategorizedProducts = filteredProducts.filter(p => !categories.find(c => c.id === p.categoryId));
+          if (uncategorizedProducts.length === 0) return null;
+
+          return (
+            <div className="border border-border bg-card/30 rounded-2xl overflow-hidden transition-all">
+              <div className="p-6 border-b border-border bg-white/5">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-white/5 border border-border flex items-center justify-center text-muted-foreground">
+                    <AlertCircle className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-black uppercase tracking-tighter text-lg">Outros / Sem Categoria</h3>
+                    <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">{uncategorizedProducts.length} ITENS</p>
+                  </div>
+                </div>
+              </div>
+              <div className="p-6 space-y-2">
+                {uncategorizedProducts.map((product, idx) => (
+                  <div key={`${product.id}-${idx}`} className="flex items-center justify-between p-4 bg-card/40 border border-border/30 rounded-xl hover:border-primary/30 transition-all group/item">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center border border-border/50 group-hover/item:border-primary/30 transition-all">
+                        <Package className="w-5 h-5 text-muted-foreground group-hover/item:text-primary" />
+                      </div>
+                      <div>
+                        <h5 className="font-black uppercase tracking-tighter text-sm">{product.name}</h5>
+                        <p className="text-[9px] font-bold tracking-widest uppercase text-muted-foreground">{product.subcategory || 'Sem Categoria'}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-6">
+                      <div className="text-right">
+                        <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Preço</p>
+                        <p className="text-sm font-black text-primary">R$ {(product.price || 0).toFixed(2)}</p>
+                      </div>
+                      <div className="flex gap-1 opacity-0 group-hover/item:opacity-100 transition-all">
+                        <Button variant="ghost" size="icon" onClick={() => openEditProduct(product)} className="w-8 h-8 rounded-lg hover:bg-primary/10 hover:text-primary">
+                          <Edit2 className="w-4 h-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => {
+                          setProductToDelete(product);
+                          setIsDeleteConfirmOpen(true);
+                        }} className="w-8 h-8 rounded-lg hover:bg-red-500/10 hover:text-red-500">
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
         {filteredProducts.length === 0 && (
           <div className="text-center py-32 bg-card/20 rounded-3xl border border-dashed border-border">
             <Package className="w-20 h-20 mx-auto mb-6 opacity-10" />
@@ -468,6 +593,16 @@ export function Inventory({ user }: { user: UserProfile }) {
           </div>
         )}
       </div>
+
+      <ConfirmDialog 
+        isOpen={isDeleteConfirmOpen}
+        onOpenChange={setIsDeleteConfirmOpen}
+        title="Excluir Produto"
+        description={`Deseja realmente excluir o produto ${productToDelete?.name}? Esta ação não pode ser desfeita.`}
+        onConfirm={handleDeleteProduct}
+        variant="destructive"
+        confirmText="Excluir"
+      />
     </div>
   );
 }

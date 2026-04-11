@@ -1,57 +1,90 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, Timestamp, doc, getDoc } from 'firebase/firestore';
 import { Transaction, UserProfile } from '../types';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, AreaChart, Area } from 'recharts';
 import { startOfDay, endOfDay, subDays, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Loader2, TrendingUp, TrendingDown, DollarSign, BarChart3, Calendar } from 'lucide-react';
+import { Loader2, TrendingUp, TrendingDown, DollarSign, BarChart3, Calendar, Activity } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 export function Reports({ user }: { user: UserProfile }) {
   const [loading, setLoading] = useState(true);
   const [dailyData, setDailyData] = useState<any[]>([]);
   const [stats, setStats] = useState({ income: 0, expense: 0, profit: 0 });
+  const [monthlySummary, setMonthlySummary] = useState<any | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
-      const last7Days = [];
-      let totalIncome = 0;
-      let totalExpense = 0;
+      
+      // Fetch Monthly Summary
+      const currentMonth = format(new Date(), 'yyyy-MM');
+      try {
+        const summaryDoc = await getDoc(doc(db, 'bi_summaries', currentMonth));
+        if (summaryDoc.exists()) {
+          setMonthlySummary(summaryDoc.data());
+        }
+      } catch (error) {
+        console.error("Error fetching monthly summary:", error);
+      }
 
-      for (let i = 6; i >= 0; i--) {
+      const fetchDays = Array.from({ length: 7 }, (_, i) => {
         const date = subDays(new Date(), i);
         const start = startOfDay(date);
         const end = endOfDay(date);
 
-        const q = query(
+        const qTrans = query(
           collection(db, 'transactions'),
           where('date', '>=', Timestamp.fromDate(start)),
           where('date', '<=', Timestamp.fromDate(end))
         );
 
-        const snapshot = await getDocs(q);
-        const dayTransactions = snapshot.docs.map(doc => doc.data() as Transaction);
-        
-        const income = dayTransactions.filter(t => t.type === 'income').reduce((s, t) => s + (t.amount || 0), 0);
-        const expense = dayTransactions.filter(t => t.type === 'expense').reduce((s, t) => s + (t.amount || 0), 0);
+        const qExp = query(
+          collection(db, 'expenses'),
+          where('date', '>=', Timestamp.fromDate(start)),
+          where('date', '<=', Timestamp.fromDate(end))
+        );
 
-        last7Days.push({
-          name: format(date, 'EEE', { locale: ptBR }).toUpperCase(),
-          fullDate: format(date, 'dd/MM'),
-          income,
-          expense,
-          profit: income - expense
+        return Promise.all([getDocs(qTrans), getDocs(qExp)]).then(([transSnapshot, expSnapshot]) => {
+          const dayTransactions = transSnapshot.docs.map(doc => doc.data() as Transaction);
+          const dayExpenses = expSnapshot.docs.map(doc => doc.data() as Transaction);
+          
+          const income = dayTransactions.filter(t => t.type === 'income').reduce((s, t) => s + (t.amount || 0), 0);
+          const expenseFromTrans = dayTransactions.filter(t => t.type === 'expense').reduce((s, t) => s + (t.amount || 0), 0);
+          const expenseFromExp = dayExpenses.reduce((s, t) => s + (t.amount || 0), 0);
+
+          const totalDayExpense = expenseFromTrans + expenseFromExp;
+
+          return {
+            date,
+            name: format(date, 'EEE', { locale: ptBR }).toUpperCase(),
+            fullDate: format(date, 'dd/MM'),
+            income,
+            expense: totalDayExpense,
+            profit: income - totalDayExpense
+          };
+        });
+      });
+
+      try {
+        const results = await Promise.all(fetchDays);
+        const sortedResults = results.sort((a, b) => a.date.getTime() - b.date.getTime());
+        
+        let totalIncome = 0;
+        let totalExpense = 0;
+        
+        sortedResults.forEach(r => {
+          totalIncome += r.income;
+          totalExpense += r.expense;
         });
 
-        totalIncome += income;
-        totalExpense += expense;
+        setDailyData(sortedResults);
+        setStats({ income: totalIncome, expense: totalExpense, profit: totalIncome - totalExpense });
+      } catch (error) {
+        console.error("Error fetching daily data:", error);
       }
-
-      setDailyData(last7Days);
-      setStats({ income: totalIncome, expense: totalExpense, profit: totalIncome - totalExpense });
       setLoading(false);
     };
 
@@ -69,6 +102,37 @@ export function Reports({ user }: { user: UserProfile }) {
 
   return (
     <div className="space-y-8">
+      {monthlySummary && (
+        <Card className="border-primary/20 bg-primary/5 rounded-2xl overflow-hidden">
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <Activity className="w-4 h-4 text-primary" />
+              <CardTitle className="text-xs font-bold uppercase tracking-widest text-primary">Resumo Consolidado: {monthlySummary.month}</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Vendas</p>
+                <p className="text-xl font-black">{monthlySummary.salesCount}</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Receita</p>
+                <p className="text-xl font-black text-green-500">R$ {monthlySummary.totalRevenue?.toFixed(2)}</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Despesas</p>
+                <p className="text-xl font-black text-red-500">R$ {monthlySummary.totalExpenses?.toFixed(2)}</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Saldo</p>
+                <p className="text-xl font-black text-primary">R$ {(monthlySummary.totalRevenue - monthlySummary.totalExpenses).toFixed(2)}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <StatCard title="Receita Total (7d)" value={stats.income} icon={<TrendingUp className="text-green-500" />} color="text-green-500" />
         <StatCard title="Despesa Total (7d)" value={stats.expense} icon={<TrendingDown className="text-red-500" />} color="text-red-500" />

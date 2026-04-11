@@ -12,13 +12,17 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAuthenticated() && 
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-         (request.auth.token.email == "louisfelipecabral@gmail.com" && request.auth.token.email_verified == true));
+        (request.auth.token.email == "louisfelipecabral@gmail.com" ||
+         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'));
     }
 
     function isStaff() {
       return isAuthenticated() && 
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'staff']);
+        (request.auth.token.email == "louisfelipecabral@gmail.com" ||
+         isAdmin() || 
+         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'staff'));
     }
 
     function hasRequiredFields(fields) {
@@ -96,7 +100,12 @@ service cloud.firestore {
 
     match /bi_summaries/{summaryId} {
       allow read: if isAdmin();
-      allow write: if false; // Only system/cloud functions should write here usually
+      allow write: if isAdmin(); 
+    }
+
+    match /payment_fees/{feeId} {
+      allow read: if isStaff();
+      allow write: if isAdmin();
     }
 
     // Default deny

@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { toast } from 'sonner';
 import { addDoc, updateDoc, doc, deleteDoc, serverTimestamp, query, orderBy, limit } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../lib/firebase-utils';
+import { ConfirmDialog } from './ConfirmDialog';
 import { format } from 'date-fns';
 
 export function Games({ user }: { user: UserProfile }) {
@@ -19,6 +20,8 @@ export function Games({ user }: { user: UserProfile }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isResultModalOpen, setIsResultModalOpen] = useState(false);
   const [editingGame, setEditingGame] = useState<GameModality | null>(null);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [gameToDelete, setGameToDelete] = useState<GameModality | null>(null);
 
   // Modality Form states
   const [name, setName] = useState('');
@@ -120,6 +123,18 @@ export function Games({ user }: { user: UserProfile }) {
     setSelectedModality(game);
     setResultAmount(game.price.toString());
     setIsResultModalOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!gameToDelete) return;
+    try {
+      await deleteDoc(doc(db, 'game_modalities', gameToDelete.id));
+      toast.success('Modalidade removida');
+      setGameToDelete(null);
+      setIsDeleteConfirmOpen(false);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `game_modalities/${gameToDelete.id}`);
+    }
   };
 
   const filtered = modalities.filter(g => 
@@ -257,15 +272,9 @@ export function Games({ user }: { user: UserProfile }) {
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          onClick={async () => {
-                            if (confirm(`Excluir ${game.name}?`)) {
-                              try {
-                                await deleteDoc(doc(db, 'game_modalities', game.id));
-                                toast.success('Modalidade excluída');
-                              } catch (error) {
-                                handleFirestoreError(error, OperationType.DELETE, 'game_modalities');
-                              }
-                            }
+                          onClick={() => {
+                            setGameToDelete(game);
+                            setIsDeleteConfirmOpen(true);
                           }}
                           className="w-8 h-8 rounded-lg hover:bg-red-500/10 hover:text-red-500"
                         >
@@ -335,8 +344,18 @@ export function Games({ user }: { user: UserProfile }) {
             <p className="text-muted-foreground font-bold tracking-widest uppercase">Nenhuma modalidade cadastrada</p>
           </div>
         )}
-    </div>
-  );
+
+        <ConfirmDialog 
+          isOpen={isDeleteConfirmOpen}
+          onOpenChange={setIsDeleteConfirmOpen}
+          title="Excluir Modalidade"
+          description={`Deseja realmente excluir a modalidade ${gameToDelete?.name}? Esta ação não pode ser desfeita.`}
+          onConfirm={handleDelete}
+          variant="destructive"
+          confirmText="Excluir"
+        />
+      </div>
+    );
 }
 
 // Helper for cn if not imported

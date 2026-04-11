@@ -13,7 +13,10 @@ import { Reports } from './components/Reports';
 import { Games } from './components/Games';
 import { Customers } from './components/Customers';
 import { Suppliers } from './components/Suppliers';
-import { LayoutDashboard, Package, Receipt, BarChart3, LogOut, Shield, Users, Truck, Settings, Gamepad2, User } from 'lucide-react';
+import { MigrationTool } from './components/MigrationTool';
+import { AIAssistant } from './components/AIAssistant';
+import { Settings as SettingsComponent } from './components/Settings';
+import { LayoutDashboard, Package, Receipt, BarChart3, LogOut, Shield, Users, Truck, Settings, Gamepad2, User, Sparkles, Activity, Globe, Database } from 'lucide-react';
 import { auth } from './firebase';
 import { Button } from './components/ui/button';
 import { useState } from 'react';
@@ -27,6 +30,7 @@ export default function App() {
     { id: 'finances', label: 'FINANCEIRO', icon: Receipt },
     { id: 'inventory', label: 'PRODUTOS', icon: Package },
     { id: 'reports', label: 'RELATÓRIOS', icon: BarChart3 },
+    { id: 'ai', label: 'ASSISTENTE IA', icon: Sparkles },
   ];
 
   const secondaryItems = [
@@ -34,6 +38,7 @@ export default function App() {
     { id: 'clients', label: 'CLIENTES', icon: Users },
     { id: 'suppliers', label: 'FORNECEDORES', icon: Truck },
     { id: 'users', label: 'USUÁRIOS', icon: User },
+    { id: 'migration', label: 'MIGRAÇÃO', icon: Database },
     { id: 'settings', label: 'AJUSTES', icon: Settings },
   ];
 
@@ -60,7 +65,7 @@ export default function App() {
                   <div className="space-y-1">
                     {menuItems.map((item) => (
                       <button
-                        key={item.id}
+                        key={`nav-main-${item.id}`}
                         onClick={() => setActiveTab(item.id)}
                         className={cn(
                           "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all",
@@ -79,7 +84,7 @@ export default function App() {
                 <div className="space-y-1">
                   {secondaryItems.map((item) => (
                     <button
-                      key={item.id}
+                      key={`nav-sec-${item.id}`}
                       onClick={() => setActiveTab(item.id)}
                       className={cn(
                         "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all",
@@ -95,13 +100,27 @@ export default function App() {
                 </div>
               </nav>
 
-              <div className="p-4 border-t border-border">
+              <div className="p-4 border-t border-border space-y-4">
                 <div className="bg-card/50 rounded-xl p-4 border border-border">
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex items-center gap-2 mb-2">
                     <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                    <p className="text-[10px] font-bold tracking-widest uppercase">Status do Sistema</p>
+                    <p className="text-[10px] font-bold tracking-widest uppercase">Data Hub Ativo</p>
                   </div>
-                  <p className="text-[10px] text-muted-foreground">Sincronizado</p>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-[9px] text-muted-foreground uppercase font-bold">
+                      <span className="flex items-center gap-1"><Database className="w-3 h-3" /> Firestore</span>
+                      <span className="text-green-500">Online</span>
+                    </div>
+                    <div className="flex items-center justify-between text-[9px] text-muted-foreground uppercase font-bold">
+                      <span className="flex items-center gap-1"><Globe className="w-3 h-3" /> API Gateway</span>
+                      <span className="text-green-500">Stable</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="px-2">
+                  <p className="text-[8px] text-muted-foreground font-bold tracking-[0.2em] uppercase mb-1 opacity-50">Versão do Sistema</p>
+                  <p className="text-[10px] font-mono text-muted-foreground">v2.4.0-PROD</p>
                 </div>
               </div>
             </aside>
@@ -149,9 +168,12 @@ export default function App() {
                 {activeTab === 'inventory' && <Inventory user={user} />}
                 {activeTab === 'finances' && <Finances user={user} />}
                 {activeTab === 'reports' && <Reports user={user} />}
+                {activeTab === 'ai' && <AIAssistant user={user} />}
                 {activeTab === 'games' && <Games user={user} />}
                 {activeTab === 'clients' && <Customers user={user} />}
                 {activeTab === 'suppliers' && <Suppliers user={user} />}
+                {activeTab === 'migration' && <MigrationTool />}
+                {activeTab === 'settings' && <SettingsComponent user={user} />}
               </main>
             </div>
             <Toaster position="top-right" />
