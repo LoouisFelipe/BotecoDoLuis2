@@ -13,17 +13,22 @@ import { Reports } from './components/Reports';
 import { Games } from './components/Games';
 import { Customers } from './components/Customers';
 import { Suppliers } from './components/Suppliers';
-import { MigrationTool } from './components/MigrationTool';
 import { AIAssistant } from './components/AIAssistant';
 import { Settings as SettingsComponent } from './components/Settings';
-import { LayoutDashboard, Package, Receipt, BarChart3, LogOut, Shield, Users, Truck, Settings, Gamepad2, User, Sparkles, Activity, Globe, Database } from 'lucide-react';
+import { LayoutDashboard, Package, Receipt, BarChart3, LogOut, Shield, Users, Truck, Settings, Gamepad2, User, Sparkles, Activity, Globe, Database, Menu, X as CloseIcon } from 'lucide-react';
 import { auth } from './firebase';
 import { Button } from './components/ui/button';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { cn } from './lib/utils';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Close sidebar when tab changes on mobile
+  useEffect(() => {
+    setIsSidebarOpen(false);
+  }, [activeTab]);
 
   const menuItems = [
     { id: 'dashboard', label: 'CONTROLE DIÁRIO', icon: LayoutDashboard },
@@ -38,7 +43,6 @@ export default function App() {
     { id: 'clients', label: 'CLIENTES', icon: Users },
     { id: 'suppliers', label: 'FORNECEDORES', icon: Truck },
     { id: 'users', label: 'USUÁRIOS', icon: User },
-    { id: 'migration', label: 'MIGRAÇÃO', icon: Database },
     { id: 'settings', label: 'AJUSTES', icon: Settings },
   ];
 
@@ -46,20 +50,41 @@ export default function App() {
     <ErrorBoundary>
       <AuthWrapper>
         {(user) => (
-          <div className="min-h-screen bg-background flex text-foreground">
+          <div className="min-h-screen bg-background flex text-foreground relative overflow-x-hidden">
+            {/* Sidebar Overlay for Mobile */}
+            {isSidebarOpen && (
+              <div 
+                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
+                onClick={() => setIsSidebarOpen(false)}
+              />
+            )}
+
             {/* Sidebar */}
-            <aside className="w-64 bg-sidebar border-r border-border flex flex-col sticky top-0 h-screen">
-              <div className="p-6 flex items-center gap-3">
-                <div className="bg-primary p-2 rounded-lg">
-                  <Shield className="text-white w-6 h-6" />
+            <aside className={cn(
+              "fixed inset-y-0 left-0 z-50 w-64 bg-sidebar border-r border-border flex flex-col transition-transform duration-300 lg:translate-x-0 lg:static lg:h-screen",
+              isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+            )}>
+              <div className="p-6 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="bg-primary p-2 rounded-lg">
+                    <Shield className="text-white w-6 h-6" />
+                  </div>
+                  <div>
+                    <h1 className="font-bold text-lg leading-tight">BarDoLuis</h1>
+                    <p className="text-[10px] text-sidebar-foreground tracking-widest uppercase font-semibold">Gestão Estratégica</p>
+                  </div>
                 </div>
-                <div>
-                  <h1 className="font-bold text-lg leading-tight">BarDoLuis</h1>
-                  <p className="text-[10px] text-sidebar-foreground tracking-widest uppercase font-semibold">Gestão Estratégica</p>
-                </div>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="lg:hidden" 
+                  onClick={() => setIsSidebarOpen(false)}
+                >
+                  <CloseIcon className="w-5 h-5" />
+                </Button>
               </div>
 
-              <nav className="flex-1 px-4 py-4 space-y-8 overflow-y-auto">
+              <nav className="flex-1 px-4 py-4 space-y-8 overflow-y-auto custom-scrollbar">
                 <div>
                   <p className="text-[10px] font-bold text-sidebar-foreground mb-4 px-2 tracking-widest uppercase">Menu Principal</p>
                   <div className="space-y-1">
@@ -126,44 +151,52 @@ export default function App() {
             </aside>
 
             {/* Main Content */}
-            <div className="flex-1 flex flex-col min-w-0">
-              <header className="h-20 border-b border-border flex items-center justify-between px-8 bg-background/50 backdrop-blur-sm sticky top-0 z-10">
-                <div className="flex items-center gap-4">
-                  <div className="bg-white/5 p-2 rounded-lg">
+            <div className="flex-1 flex flex-col min-w-0 w-full">
+              <header className="h-20 border-b border-border flex items-center justify-between px-4 md:px-8 bg-background/50 backdrop-blur-sm sticky top-0 z-30">
+                <div className="flex items-center gap-3 md:gap-4">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="lg:hidden" 
+                    onClick={() => setIsSidebarOpen(true)}
+                  >
+                    <Menu className="w-6 h-6" />
+                  </Button>
+                  <div className="bg-white/5 p-2 rounded-lg hidden sm:block">
                     <LayoutDashboard className="text-primary w-5 h-5" />
                   </div>
                   <div>
-                    <h2 className="font-bold text-lg uppercase tracking-wider">
+                    <h2 className="font-bold text-sm md:text-lg uppercase tracking-wider truncate max-w-[150px] md:max-w-none">
                       {menuItems.find(i => i.id === activeTab)?.label || 
                        secondaryItems.find(i => i.id === activeTab)?.label || 
                        'CONTROLE DIÁRIO'}
                     </h2>
-                    <p className="text-[10px] text-muted-foreground tracking-widest uppercase font-semibold">Data Hub Ativo</p>
+                    <p className="text-[9px] md:text-[10px] text-muted-foreground tracking-widest uppercase font-semibold">Data Hub Ativo</p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-6">
-                  <div className="flex items-center gap-3">
-                    <div className="text-right">
-                      <p className="text-sm font-bold">{user.displayName || user.email}</p>
-                      <p className="text-[10px] text-primary font-bold uppercase tracking-widest">ADM</p>
+                <div className="flex items-center gap-3 md:gap-6">
+                  <div className="flex items-center gap-2 md:gap-3">
+                    <div className="text-right hidden xs:block">
+                      <p className="text-xs md:text-sm font-bold truncate max-w-[80px] md:max-w-none">{user.displayName || user.email}</p>
+                      <p className="text-[9px] md:text-[10px] text-primary font-bold uppercase tracking-widest">ADM</p>
                     </div>
-                    <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center border border-white/10">
-                      <User className="w-5 h-5 text-muted-foreground" />
+                    <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-white/10 flex items-center justify-center border border-white/10">
+                      <User className="w-4 h-4 md:w-5 md:h-5 text-muted-foreground" />
                     </div>
                   </div>
                   <Button 
                     variant="ghost" 
                     size="icon" 
                     onClick={() => auth.signOut()}
-                    className="hover:bg-red-500/10 hover:text-red-500"
+                    className="hover:bg-red-500/10 hover:text-red-500 h-8 w-8 md:h-10 md:w-10"
                   >
-                    <LogOut className="w-5 h-5" />
+                    <LogOut className="w-4 h-4 md:w-5 md:h-5" />
                   </Button>
                 </div>
               </header>
 
-              <main className="flex-1 p-8 overflow-y-auto">
+              <main className="flex-1 p-4 md:p-8 overflow-y-auto custom-scrollbar">
                 {activeTab === 'dashboard' && <Dashboard user={user} />}
                 {activeTab === 'inventory' && <Inventory user={user} />}
                 {activeTab === 'finances' && <Finances user={user} />}
@@ -172,7 +205,6 @@ export default function App() {
                 {activeTab === 'games' && <Games user={user} />}
                 {activeTab === 'clients' && <Customers user={user} />}
                 {activeTab === 'suppliers' && <Suppliers user={user} />}
-                {activeTab === 'migration' && <MigrationTool />}
                 {activeTab === 'settings' && <SettingsComponent user={user} />}
               </main>
             </div>

@@ -108,7 +108,7 @@ export function AIAssistant({ user }: { user: any }) {
                   className="flex-1"
                   disabled={loading}
                 />
-                <Button type="submit" disabled={loading || !prompt.trim()}>
+                <Button type="submit" disabled={loading || !prompt.trim()} aria-label="Enviar pergunta">
                   {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 </Button>
               </form>

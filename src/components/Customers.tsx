@@ -4,14 +4,17 @@ import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { Customer, UserProfile } from '../types';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
-import { Users, Plus, Search, Phone, Mail, MapPin, Edit2, Trash2, TrendingUp, Star, Clock } from 'lucide-react';
+import { Users, Plus, Search, Phone, Mail, MapPin, Edit2, Trash2, TrendingUp, Star, Clock, History, Receipt, ChevronRight, X } from 'lucide-react';
 import { Input } from './ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from './ui/dialog';
 import { toast } from 'sonner';
-import { addDoc, updateDoc, doc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { addDoc, updateDoc, doc, deleteDoc, serverTimestamp, getDocs, where } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../lib/firebase-utils';
 import { ConfirmDialog } from './ConfirmDialog';
+import { Badge } from './ui/badge';
+import { format } from 'date-fns';
+import { Order } from '../types';
 
 export function Customers({ user }: { user: UserProfile }) {
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -20,6 +23,11 @@ export function Customers({ user }: { user: UserProfile }) {
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [selectedCustomerForHistory, setSelectedCustomerForHistory] = useState<Customer | null>(null);
+  const [customerHistory, setCustomerHistory] = useState<Order[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Form states
   const [name, setName] = useState('');
@@ -37,6 +45,7 @@ export function Customers({ user }: { user: UserProfile }) {
 
   const handleSave = async () => {
     if (!name) return;
+    setIsSaving(true);
     const data = {
       name,
       phone,
@@ -57,6 +66,8 @@ export function Customers({ user }: { user: UserProfile }) {
       resetForm();
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'customers');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -75,6 +86,27 @@ export function Customers({ user }: { user: UserProfile }) {
     setEmail(customer.email || '');
     setAddress(customer.address || '');
     setIsModalOpen(true);
+  };
+
+  const openHistory = async (customer: Customer) => {
+    setSelectedCustomerForHistory(customer);
+    setIsHistoryOpen(true);
+    setIsLoadingHistory(true);
+    try {
+      const q = query(
+        collection(db, 'open_orders'), 
+        where('customerId', '==', customer.id),
+        where('status', '==', 'closed'),
+        orderBy('closedAt', 'desc')
+      );
+      const snapshot = await getDocs(q);
+      setCustomerHistory(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order)));
+    } catch (error) {
+      console.error("Error fetching history:", error);
+      toast.error("Erro ao carregar histórico");
+    } finally {
+      setIsLoadingHistory(false);
+    }
   };
 
   const handleDelete = async () => {
@@ -139,14 +171,12 @@ export function Customers({ user }: { user: UserProfile }) {
             </div>
           </CardContent>
         </Card>
-      </div>
-
-      <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+      </div>      <div className="flex flex-col md:flex-row justify-between items-center gap-4 md:gap-6">
         <div className="relative flex-1 w-full max-w-2xl group">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 md:w-5 md:h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
           <Input 
             placeholder="PESQUISAR CLIENTE..." 
-            className="pl-12 h-14 bg-card/50 border-border rounded-xl text-sm font-bold tracking-widest focus:ring-primary/20 focus:border-primary transition-all"
+            className="pl-10 md:pl-12 h-12 md:h-14 bg-card/50 border-border rounded-xl text-xs md:text-sm font-bold tracking-widest focus:ring-primary/20 focus:border-primary transition-all"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -159,31 +189,42 @@ export function Customers({ user }: { user: UserProfile }) {
           <DialogTrigger
             nativeButton={true}
             render={
-              <Button className="h-14 px-8 rounded-xl gap-3 font-bold tracking-widest uppercase shadow-lg shadow-primary/20">
-                <Plus className="w-5 h-5" />
+              <Button className="w-full md:w-auto h-12 md:h-14 px-6 md:px-8 rounded-xl gap-2 md:gap-3 font-bold tracking-widest uppercase shadow-lg shadow-primary/20 text-[10px] md:text-sm">
+                <Plus className="w-4 h-4 md:w-5 md:h-5" />
                 Novo Cliente
               </Button>
             }
           />
-          <DialogContent className="bg-[#0b1120] border-border max-w-lg text-white">
-            <DialogHeader>
-              <DialogTitle className="text-xl font-black uppercase tracking-tighter">
-                {editingCustomer ? 'Editar Cliente' : 'Novo Cliente'}
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-6 py-6">
+          <DialogContent className="bg-[#0b1224] border-border max-w-lg text-white p-0 overflow-hidden flex flex-col max-h-[95vh] md:max-h-[90vh]">
+            <div className="p-6 md:p-8 border-b border-border/50 relative flex-shrink-0">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 md:w-14 md:h-14 rounded-xl md:rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20">
+                  <Users className="w-5 h-5 md:w-7 md:h-7 text-primary" />
+                </div>
+                <div>
+                  <DialogTitle className="text-xl md:text-3xl font-black uppercase tracking-tighter leading-none mb-1">
+                    {editingCustomer ? 'Editar Cliente' : 'Novo Cliente'}
+                  </DialogTitle>
+                  <p className="text-[9px] md:text-[10px] font-bold tracking-widest uppercase text-primary/60 flex items-center gap-2">
+                    <Star className="w-3 h-3" /> Gestão de Freguesia
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 md:p-8 space-y-6 md:space-y-8 overflow-y-auto custom-scrollbar flex-1">
               <div className="space-y-2">
-                <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Nome Completo</label>
+                <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Nome Completo</label>
                 <Input 
-                  className="h-12 bg-[#111827] border-border"
+                  className="h-12 bg-[#111827] border-border font-bold"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Ex: João Silva"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Telefone</label>
+                  <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Telefone / WhatsApp</label>
                   <Input 
                     className="h-12 bg-[#111827] border-border"
                     value={phone}
@@ -192,7 +233,7 @@ export function Customers({ user }: { user: UserProfile }) {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">E-mail</label>
+                  <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">E-mail (Opcional)</label>
                   <Input 
                     className="h-12 bg-[#111827] border-border"
                     value={email}
@@ -202,102 +243,194 @@ export function Customers({ user }: { user: UserProfile }) {
                 </div>
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Endereço</label>
+                <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Endereço / Localização</label>
                 <Input 
                   className="h-12 bg-[#111827] border-border"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  placeholder="Rua, Número, Bairro"
+                  placeholder="Ex: Rua das Flores, 123"
                 />
               </div>
             </div>
-            <DialogFooter>
-              <Button variant="ghost" onClick={() => setIsModalOpen(false)} className="font-bold uppercase tracking-widest">Cancelar</Button>
-              <Button onClick={handleSave} className="font-bold uppercase tracking-widest bg-primary hover:bg-primary/90">Salvar Cliente</Button>
+            <DialogFooter className="p-6 md:p-8 border-t border-border/50 bg-[#0b1120] flex-shrink-0">
+              <Button variant="ghost" onClick={() => setIsModalOpen(false)} disabled={isSaving} className="font-bold uppercase tracking-widest text-xs">Cancelar</Button>
+              <Button onClick={handleSave} disabled={isSaving} className="h-12 px-8 font-bold uppercase tracking-widest bg-primary hover:bg-primary/90 text-xs">
+                {isSaving ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Salvando...</span>
+                  </div>
+                ) : (editingCustomer ? 'Salvar Alterações' : 'Salvar Cliente')}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
-        </div>
+      </div>
 
         <Card className="border-border bg-card/50 rounded-2xl overflow-hidden">
-        <Table>
-          <TableHeader className="bg-white/5">
-            <TableRow className="border-border hover:bg-transparent">
-              <TableHead className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground h-14">Cliente</TableHead>
-              <TableHead className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground h-14">Contato</TableHead>
-              <TableHead className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground h-14">Endereço</TableHead>
-              <TableHead className="text-right text-[10px] font-bold tracking-widest uppercase text-muted-foreground h-14">Ações</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.map(customer => (
-              <TableRow key={customer.id} className="border-border hover:bg-white/5 transition-colors">
-                <TableCell className="py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
-                      <Users className="w-5 h-5 text-primary" />
+        {/* Desktop View */}
+        <div className="hidden md:block">
+          <Table>
+            <TableHeader className="bg-white/5">
+              <TableRow className="border-border hover:bg-transparent">
+                <TableHead className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground h-14">Cliente</TableHead>
+                <TableHead className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground h-14">Contato</TableHead>
+                <TableHead className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground h-14">Consumo</TableHead>
+                <TableHead className="text-right text-[10px] font-bold tracking-widest uppercase text-muted-foreground h-14">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.map(customer => (
+                <TableRow key={customer.id} className="border-border hover:bg-white/5 transition-colors">
+                  <TableCell className="py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
+                        <Users className="w-5 h-5 text-primary" />
+                      </div>
+                      <span className="font-bold uppercase tracking-wider">{customer.name}</span>
                     </div>
-                    <span className="font-bold uppercase tracking-wider">{customer.name}</span>
+                  </TableCell>
+                  <TableCell>
+                    <div className="space-y-1">
+                      {customer.phone && (
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Phone className="w-3 h-3" /> {customer.phone}
+                        </div>
+                      )}
+                      {customer.email && (
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Mail className="w-3 h-3" /> {customer.email}
+                        </div>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="space-y-1">
+                      <p className="text-sm font-black text-primary">R$ {(customer.totalSpent || 0).toFixed(2)}</p>
+                      <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">
+                        {customer.orderCount || 0} Comandas
+                      </p>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={() => openHistory(customer)}
+                        className="hover:bg-blue-500/10 hover:text-blue-500"
+                        aria-label="Ver Histórico"
+                        title="Ver Histórico"
+                      >
+                        <History className="w-4 h-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={() => openEdit(customer)}
+                        className="hover:bg-primary/10 hover:text-primary"
+                        aria-label="Editar Cliente"
+                        title="Editar Cliente"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={() => {
+                          setCustomerToDelete(customer);
+                          setIsDeleteConfirmOpen(true);
+                        }}
+                        className="hover:bg-red-500/10 hover:text-red-500"
+                        aria-label="Excluir Cliente"
+                        title="Excluir Cliente"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+
+        {/* Mobile View */}
+        <div className="md:hidden divide-y divide-border/50">
+          {filtered.map(customer => (
+            <div key={`mobile-customer-${customer.id}`} className="p-4 space-y-4">
+              <div className="flex justify-between items-start">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
+                    <Users className="w-5 h-5 text-primary" />
                   </div>
-                </TableCell>
-                <TableCell>
-                  <div className="space-y-1">
+                  <div className="min-w-0">
+                    <h4 className="font-bold uppercase tracking-wider text-sm truncate">{customer.name}</h4>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Badge variant="outline" className="bg-primary/10 border-none text-primary text-[8px] font-bold uppercase tracking-widest">
+                        {customer.orderCount || 0} Comandas
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex gap-1">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={() => openHistory(customer)}
+                    className="w-8 h-8 rounded-lg hover:bg-blue-500/10 hover:text-blue-500"
+                  >
+                    <History className="w-4 h-4" />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={() => openEdit(customer)}
+                    className="w-8 h-8 rounded-lg hover:bg-primary/10 hover:text-primary"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={() => {
+                      setCustomerToDelete(customer);
+                      setIsDeleteConfirmOpen(true);
+                    }}
+                    className="w-8 h-8 rounded-lg hover:bg-red-500/10 hover:text-red-500"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 pt-2 border-t border-border/30">
+                <div className="space-y-1">
+                  <p className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest">Total Gasto</p>
+                  <p className="text-sm font-black text-primary">R$ {(customer.totalSpent || 0).toFixed(2)}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest">Contato</p>
+                  <div className="flex flex-col gap-1">
                     {customer.phone && (
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <Phone className="w-3 h-3" /> {customer.phone}
+                      <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-medium">
+                        <Phone className="w-2.5 h-2.5 text-primary" /> {customer.phone}
                       </div>
                     )}
-                    {customer.email && (
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <Mail className="w-3 h-3" /> {customer.email}
-                      </div>
-                    )}
+                    {!customer.phone && <p className="text-[10px] text-muted-foreground italic">Sem contato</p>}
                   </div>
-                </TableCell>
-                <TableCell>
-                  {customer.address ? (
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <MapPin className="w-3 h-3" /> {customer.address}
-                    </div>
-                  ) : (
-                    <span className="text-xs text-muted-foreground italic">Não informado</span>
-                  )}
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex justify-end gap-2">
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      onClick={() => openEdit(customer)}
-                      className="hover:bg-primary/10 hover:text-primary"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      onClick={() => {
-                        setCustomerToDelete(customer);
-                        setIsDeleteConfirmOpen(true);
-                      }}
-                      className="hover:bg-red-500/10 hover:text-red-500"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-            {filtered.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={4} className="text-center py-24 text-muted-foreground">
-                  <Users className="w-16 h-16 mx-auto mb-4 opacity-10" />
-                  <p className="font-bold tracking-widest uppercase">Nenhum cliente encontrado</p>
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {filtered.length === 0 && (
+          <div className="text-center py-24 text-muted-foreground">
+            <Users className="w-16 h-16 mx-auto mb-4 opacity-10" />
+            <p className="font-bold tracking-widest uppercase">Nenhum cliente encontrado</p>
+          </div>
+        )}
       </Card>
 
       <ConfirmDialog 
@@ -309,6 +442,84 @@ export function Customers({ user }: { user: UserProfile }) {
         variant="destructive"
         confirmText="Excluir"
       />
+
+      {/* History Modal */}
+      <Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
+        <DialogContent className="bg-[#0b1224] border-border max-w-2xl text-white p-0 overflow-hidden flex flex-col h-[95vh] md:h-[80vh]">
+          <div className="p-6 md:p-8 border-b border-border/50 flex items-center justify-between bg-[#0b1224] z-10 flex-shrink-0">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 md:w-14 md:h-14 rounded-xl md:rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20">
+                <History className="w-5 h-5 md:w-7 md:h-7 text-primary" />
+              </div>
+              <div>
+                <DialogTitle className="text-lg md:text-2xl font-black uppercase tracking-tighter leading-none mb-1">Histórico de Consumo</DialogTitle>
+                <p className="text-[9px] md:text-[10px] font-bold tracking-widest uppercase text-primary/60 truncate max-w-[150px] md:max-w-none">{selectedCustomerForHistory?.name}</p>
+              </div>
+            </div>
+            <button onClick={() => setIsHistoryOpen(false)} className="text-muted-foreground hover:text-white transition-colors">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="flex-1 p-4 md:p-8 overflow-y-auto min-h-0 custom-scrollbar">
+            {isLoadingHistory ? (
+              <div className="flex flex-col items-center justify-center py-20 gap-4">
+                <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Carregando histórico...</p>
+              </div>
+            ) : customerHistory.length > 0 ? (
+              <div className="space-y-4 md:space-y-6">
+                {customerHistory.map((order) => (
+                  <div key={order.id} className="bg-[#111827]/50 border border-border/50 rounded-2xl overflow-hidden">
+                    <div className="p-4 md:p-6 border-b border-border/50 flex items-center justify-between bg-white/5">
+                      <div className="flex items-center gap-3 md:gap-4">
+                        <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-white/5 flex items-center justify-center border border-white/5">
+                          <Receipt className="w-4 h-4 md:w-5 md:h-5 text-muted-foreground" />
+                        </div>
+                        <div>
+                          <p className="text-xs md:text-sm font-black uppercase tracking-widest">
+                            {order.closedAt?.toDate ? format(order.closedAt.toDate(), 'dd/MM/yyyy HH:mm') : 'Data desconhecida'}
+                          </p>
+                          <p className="text-[9px] md:text-[10px] font-bold tracking-widest uppercase text-muted-foreground">
+                            {order.items.reduce((sum, i) => sum + i.quantity, 0)} ITENS
+                          </p>
+                        </div>
+                      </div>
+                      <p className="text-lg md:text-xl font-black text-primary tracking-tighter">R$ {order.totalAmount.toFixed(2)}</p>
+                    </div>
+                    <div className="p-4 md:p-6 space-y-3">
+                      {order.items.map((item, iIdx) => (
+                        <div key={`${order.id}-hist-${iIdx}`} className="flex justify-between items-center text-[10px] md:text-xs">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-muted-foreground font-bold">{item.quantity}x</span>
+                            <span className="font-bold uppercase tracking-wider truncate">{item.productName}</span>
+                          </div>
+                          <span className="font-mono text-muted-foreground flex-shrink-0 ml-2">R$ {item.subtotal.toFixed(2)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="py-20 text-center">
+                <Receipt className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-10" />
+                <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Nenhum consumo registrado</p>
+              </div>
+            )}
+          </div>
+
+          <div className="p-6 md:p-8 border-t border-border/50 bg-[#0b1224] flex-shrink-0">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[9px] md:text-[10px] font-bold tracking-widest uppercase text-muted-foreground">TOTAL ACUMULADO</p>
+                <p className="text-2xl md:text-3xl font-black text-primary tracking-tighter">R$ {(selectedCustomerForHistory?.totalSpent || 0).toFixed(2)}</p>
+              </div>
+              <Button onClick={() => setIsHistoryOpen(false)} className="h-10 md:h-12 px-6 md:px-8 font-black uppercase tracking-widest bg-white/5 hover:bg-white/10 border border-border rounded-xl text-[10px] md:text-sm">Fechar</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

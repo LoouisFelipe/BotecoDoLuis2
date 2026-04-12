@@ -4,6 +4,8 @@ export interface Customer {
   phone?: string;
   email?: string;
   address?: string;
+  totalSpent?: number;
+  orderCount?: number;
   createdAt: any;
 }
 
@@ -71,6 +73,7 @@ export interface Product {
   price: number;
   cost: number;
   stock: number;
+  minStock?: number;
   unit?: string;
   active?: boolean;
 }
@@ -86,6 +89,8 @@ export interface OrderItem {
 export interface Order {
   id: string;
   customerName: string;
+  customerId?: string;
+  type: 'table' | 'customer';
   status: 'open' | 'closed' | 'cancelled';
   items: OrderItem[];
   totalAmount: number;
@@ -102,6 +107,7 @@ export interface Transaction {
   description?: string;
   date: any;
   orderId?: string;
+  paymentMethod?: string;
 }
 
 export interface UserProfile {

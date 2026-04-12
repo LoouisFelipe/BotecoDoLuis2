@@ -26,6 +26,8 @@ export function Settings({ user }: { user: UserProfile }) {
                 
                 <Button 
                   variant="outline" 
+                  aria-label="Sair da Conta"
+                  title="Sair da Conta"
                   className="mt-6 w-full border-red-500/20 text-red-500 hover:bg-red-500/10"
                   onClick={() => auth.signOut()}
                 >
@@ -83,7 +85,7 @@ export function Settings({ user }: { user: UserProfile }) {
                   <p className="text-sm font-bold uppercase tracking-tight">Logs de Atividade</p>
                   <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Histórico de ações no sistema</p>
                 </div>
-                <Button variant="ghost" size="sm" className="text-[10px] font-bold uppercase tracking-widest">Ver Logs</Button>
+                <Button variant="ghost" size="sm" aria-label="Ver Logs de Atividade" className="text-[10px] font-bold uppercase tracking-widest">Ver Logs</Button>
               </div>
             </CardContent>
           </Card>
@@ -102,14 +104,14 @@ export function Settings({ user }: { user: UserProfile }) {
                   <p className="text-sm font-bold uppercase tracking-tight">Exportar Dados (JSON)</p>
                   <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Baixar backup completo do banco</p>
                 </div>
-                <Button variant="outline" size="sm" className="text-[10px] font-bold uppercase tracking-widest">Exportar</Button>
+                <Button variant="outline" size="sm" aria-label="Exportar Dados em JSON" className="text-[10px] font-bold uppercase tracking-widest">Exportar</Button>
               </div>
               <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-border">
                 <div>
                   <p className="text-sm font-bold uppercase tracking-tight">Limpeza de Cache</p>
                   <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Otimizar performance local</p>
                 </div>
-                <Button variant="ghost" size="sm" className="text-[10px] font-bold uppercase tracking-widest">Limpar</Button>
+                <Button variant="ghost" size="sm" aria-label="Limpar Cache Local" className="text-[10px] font-bold uppercase tracking-widest">Limpar</Button>
               </div>
             </CardContent>
           </Card>
