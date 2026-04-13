@@ -2,12 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { db } from '../firebase';
 import { collection, onSnapshot, query, where, addDoc, serverTimestamp, updateDoc, doc, orderBy, deleteDoc, setDoc } from 'firebase/firestore';
-import { Order, Product, UserProfile, Customer, Category } from '../types';
+import { Order, Product, UserProfile, Customer, Category, GameModality } from '../types';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
-import { Plus, Search, ShoppingCart, CheckCircle2, ChevronRight, LayoutGrid, List, Zap, Activity, Clock, TrendingUp, TrendingDown, Trash2, ShieldCheck, UserPlus, Menu, X, Receipt, Package, Calendar, Minus } from 'lucide-react';
+import { Plus, Search, ShoppingCart, CheckCircle2, ChevronRight, LayoutGrid, List, Zap, Activity, Clock, TrendingUp, TrendingDown, Trash2, ShieldCheck, UserPlus, Menu, X, Receipt, Package, Calendar, Minus, Gamepad2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle, DialogTrigger, DialogFooter } from './ui/dialog';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -21,6 +21,7 @@ export function Dashboard({ user }: { user: UserProfile }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [gameModalities, setGameModalities] = useState<GameModality[]>([]);
   const [search, setSearch] = useState('');
   const [isNewOrderOpen, setIsNewOrderOpen] = useState(false);
   const [newOrderTab, setNewOrderTab] = useState<'table' | 'fiel' | 'new'>('table');
@@ -52,11 +53,16 @@ export function Dashboard({ user }: { user: UserProfile }) {
       setCategories(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Category)));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'categories'));
 
+    const unsubGames = onSnapshot(collection(db, 'game_modalities'), (snapshot) => {
+      setGameModalities(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as GameModality)));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'game_modalities'));
+
     return () => {
       unsubscribe();
       unsubProducts();
       unsubCustomers();
       unsubCategories();
+      unsubGames();
     };
   }, []);
 
@@ -251,92 +257,91 @@ export function Dashboard({ user }: { user: UserProfile }) {
                 <Plus className="w-8 h-8" />
               </button>
             } />
-            <DialogContent className="bg-[#05070a] border-none max-w-2xl text-white p-0 overflow-hidden flex flex-col max-h-[90vh] shadow-2xl">
-              <div className="p-8 border-b border-white/5 relative flex-shrink-0">
+            <DialogContent className="bg-[#05070a] border-none max-w-2xl text-white p-0 overflow-hidden flex flex-col max-h-[90vh] shadow-2xl rounded-3xl">
+              <div className="p-6 md:p-8 border-b border-white/5 relative flex-shrink-0 bg-[#05070a]">
                 <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-2xl bg-[#0070f3]/10 flex items-center justify-center border border-[#0070f3]/20">
+                  <div className="w-14 h-14 rounded-2xl bg-[#0070f3]/10 flex items-center justify-center border border-[#0070f3]/20 shadow-lg">
                     <UserPlus className="w-7 h-7 text-[#0070f3]" />
                   </div>
                   <div>
-                    <DialogTitle className="text-3xl font-black uppercase tracking-tighter leading-none mb-1">Nova Comanda</DialogTitle>
+                    <DialogTitle className="text-2xl md:text-3xl font-black uppercase tracking-tighter leading-none mb-1">Nova Comanda</DialogTitle>
                     <p className="text-[10px] font-bold tracking-widest uppercase text-[#0070f3]/60 flex items-center gap-2">
                       <Zap className="w-3 h-3" /> Inicie o atendimento operacional
                     </p>
                   </div>
                 </div>
-                <button onClick={() => setIsNewOrderOpen(false)} className="absolute right-6 top-6 text-muted-foreground hover:text-white transition-colors">
+                <button onClick={() => setIsNewOrderOpen(false)} className="absolute right-6 top-6 text-muted-foreground hover:text-white transition-colors p-2 hover:bg-white/5 rounded-full">
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              <div className="flex px-8 py-4 bg-[#05070a] border-b border-white/5 gap-8">
-                <button 
-                  onClick={() => setNewOrderTab('table')}
-                  className={cn(
-                    "flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-widest transition-all relative",
-                    newOrderTab === 'table' ? "bg-[#161b22] text-[#0070f3]" : "text-muted-foreground hover:text-white"
-                  )}
-                >
-                  MESA
-                  {newOrderTab === 'table' && (
-                    <motion.div layoutId="newOrderTab" className="absolute -bottom-4 left-0 right-0 h-1 bg-[#0070f3] rounded-full" />
-                  )}
-                </button>
-                <button 
-                  onClick={() => setNewOrderTab('fiel')}
-                  className={cn(
-                    "flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-widest transition-all relative",
-                    newOrderTab === 'fiel' ? "bg-[#161b22] text-[#0070f3]" : "text-muted-foreground hover:text-white"
-                  )}
-                >
-                  FIEL
-                  {newOrderTab === 'fiel' && (
-                    <motion.div layoutId="newOrderTab" className="absolute -bottom-4 left-0 right-0 h-1 bg-[#0070f3] rounded-full" />
-                  )}
-                </button>
-                <button 
-                  onClick={() => setNewOrderTab('new')}
-                  className={cn(
-                    "flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-widest transition-all relative",
-                    newOrderTab === 'new' ? "bg-[#161b22] text-[#0070f3]" : "text-muted-foreground hover:text-white"
-                  )}
-                >
-                  + CLIENTE
-                  {newOrderTab === 'new' && (
-                    <motion.div layoutId="newOrderTab" className="absolute -bottom-4 left-0 right-0 h-1 bg-[#0070f3] rounded-full" />
-                  )}
-                </button>
+              <div className="flex px-6 md:px-8 py-4 bg-[#05070a] border-b border-white/5 gap-4 md:gap-8">
+                {[
+                  { id: 'table', label: 'MESA / BALCÃO' },
+                  { id: 'fiel', label: 'CLIENTE FIEL' },
+                  { id: 'new', label: '+ NOVO CLIENTE' }
+                ].map((tab) => (
+                  <button 
+                    key={tab.id}
+                    onClick={() => setNewOrderTab(tab.id as any)}
+                    className={cn(
+                      "flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all relative",
+                      newOrderTab === tab.id ? "bg-[#161b22] text-[#0070f3]" : "text-muted-foreground hover:text-white hover:bg-white/5"
+                    )}
+                  >
+                    {tab.label}
+                    {newOrderTab === tab.id && (
+                      <motion.div layoutId="newOrderTab" className="absolute -bottom-4 left-0 right-0 h-1 bg-[#0070f3] rounded-full" />
+                    )}
+                  </button>
+                ))}
               </div>
 
-              <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+              <div className="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar space-y-8">
                 {newOrderTab === 'table' && (
-                  <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Identificação</label>
-                      <Input 
-                        placeholder="Ex: Mesa 05, Balcão..." 
-                        className="h-16 bg-[#0d1117] border-white/5 focus:ring-[#0070f3]/20 focus:border-[#0070f3] text-lg font-bold rounded-xl uppercase"
-                        value={newCustomerName}
-                        onChange={(e) => setNewCustomerName(e.target.value)}
-                        autoFocus
-                      />
+                  <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Identificação do Local</label>
+                      <div className="relative group">
+                        <Package className="absolute left-4 top-1/2 -translate-y-1/2 w-6 h-6 text-muted-foreground group-focus-within:text-[#0070f3] transition-colors" />
+                        <Input 
+                          placeholder="EX: MESA 05, BALCÃO 02, ÁREA EXTERNA..." 
+                          className="h-20 pl-14 bg-[#0d1117] border-white/5 focus:ring-[#0070f3]/20 focus:border-[#0070f3] text-xl font-black rounded-2xl uppercase tracking-tight"
+                          value={newCustomerName}
+                          onChange={(e) => setNewCustomerName(e.target.value)}
+                          autoFocus
+                        />
+                      </div>
+                      <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest ml-1">Use nomes curtos e fáceis de identificar no painel</p>
+                    </div>
+
+                    <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
+                      {['MESA 01', 'MESA 02', 'MESA 03', 'MESA 04', 'BALCÃO'].map(sug => (
+                        <button 
+                          key={sug}
+                          onClick={() => setNewCustomerName(sug)}
+                          className="py-3 px-2 bg-[#0d1117] hover:bg-[#161b22] border border-white/5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all"
+                        >
+                          {sug}
+                        </button>
+                      ))}
                     </div>
                   </div>
                 )}
 
                 {newOrderTab === 'fiel' && (
-                  <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                    <div className="space-y-3">
-                      <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Busca Rápida (A-Z)</label>
-                      <div className="bg-[#0d1117] p-4 rounded-xl border border-white/5">
-                        <div className="grid grid-cols-7 gap-1">
+                  <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <div className="space-y-4">
+                      <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Busca Rápida por Inicial</label>
+                      <div className="bg-[#0d1117] p-5 rounded-2xl border border-white/5 shadow-inner">
+                        <div className="grid grid-cols-7 sm:grid-cols-9 gap-1.5">
                           {['TODOS', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')].map(letter => (
                             <button
                               key={letter}
                               onClick={() => setLetterFilter(letter)}
                               className={cn(
-                                "aspect-square rounded-md text-[10px] font-black transition-all flex items-center justify-center min-w-[32px] min-h-[32px]",
-                                letterFilter === letter ? "bg-[#0070f3] text-white shadow-[0_0_15px_rgba(0,112,243,0.5)]" : "text-muted-foreground hover:text-white"
+                                "aspect-square rounded-lg text-[10px] font-black transition-all flex items-center justify-center min-w-[32px] min-h-[32px]",
+                                letterFilter === letter ? "bg-[#0070f3] text-white shadow-[0_0_15px_rgba(0,112,243,0.4)]" : "text-muted-foreground hover:text-white hover:bg-white/5"
                               )}
                             >
                               {letter === 'TODOS' ? 'T' : letter}
@@ -346,24 +351,27 @@ export function Dashboard({ user }: { user: UserProfile }) {
                       </div>
                     </div>
 
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Selecionar Cliente Fiel</label>
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Selecionar Cliente Fiel</label>
                       <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
                         <SelectTrigger className={cn(
-                          "h-16 bg-[#0d1117] border-white/5 text-lg font-bold rounded-xl transition-all",
-                          selectedCustomerId && "border-[#0070f3] ring-1 ring-[#0070f3]/50"
+                          "h-20 bg-[#0d1117] border-white/5 text-xl font-black rounded-2xl transition-all px-6",
+                          selectedCustomerId && "border-[#0070f3] ring-2 ring-[#0070f3]/20"
                         )}>
-                          <SelectValue placeholder="Selecione um cliente..." />
+                          <SelectValue placeholder="BUSCAR NA LISTA..." />
                         </SelectTrigger>
-                        <SelectContent className="bg-[#05070a] border-white/5 max-h-[300px] custom-scrollbar">
+                        <SelectContent className="bg-[#05070a] border-white/10 max-h-[350px] custom-scrollbar rounded-2xl">
                           {customers
                             .filter(c => letterFilter === 'TODOS' || c.name.toUpperCase().startsWith(letterFilter))
                             .sort((a, b) => a.name.localeCompare(b.name))
                             .map(customer => (
-                              <SelectItem key={customer.id} value={customer.id} className="text-sm font-bold uppercase tracking-widest py-3">
+                              <SelectItem key={customer.id} value={customer.id} className="text-sm font-black uppercase tracking-widest py-4 focus:bg-[#0070f3]/10 focus:text-[#0070f3]">
                                 {customer.name}
                               </SelectItem>
                             ))}
+                          {customers.length === 0 && (
+                            <div className="p-8 text-center text-muted-foreground uppercase text-[10px] font-black tracking-widest">Nenhum cliente cadastrado</div>
+                          )}
                         </SelectContent>
                       </Select>
                     </div>
@@ -371,29 +379,33 @@ export function Dashboard({ user }: { user: UserProfile }) {
                 )}
 
                 {newOrderTab === 'new' && (
-                  <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Nome do Novo Cliente</label>
-                      <Input 
-                        placeholder="Nome completo" 
-                        className="h-16 bg-[#0d1117] border-white/5 focus:ring-[#0070f3]/20 focus:border-[#0070f3] text-lg font-bold rounded-xl"
-                        value={newCustomerName}
-                        onChange={(e) => setNewCustomerName(e.target.value)}
-                        autoFocus
-                      />
+                  <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Cadastro de Novo Cliente</label>
+                      <div className="relative group">
+                        <UserPlus className="absolute left-4 top-1/2 -translate-y-1/2 w-6 h-6 text-muted-foreground group-focus-within:text-[#0070f3] transition-colors" />
+                        <Input 
+                          placeholder="NOME COMPLETO DO CLIENTE" 
+                          className="h-20 pl-14 bg-[#0d1117] border-white/5 focus:ring-[#0070f3]/20 focus:border-[#0070f3] text-xl font-black rounded-2xl uppercase tracking-tight"
+                          value={newCustomerName}
+                          onChange={(e) => setNewCustomerName(e.target.value)}
+                          autoFocus
+                        />
+                      </div>
+                      <p className="text-[9px] font-bold text-[#0070f3]/60 uppercase tracking-widest ml-1">O cliente será adicionado automaticamente à sua base de fiéis</p>
                     </div>
                   </div>
                 )}
               </div>
 
-              <DialogFooter className="p-8 border-t border-white/5 bg-[#05070a] flex-row gap-4 flex-shrink-0">
-                <Button variant="ghost" onClick={() => setIsNewOrderOpen(false)} disabled={isCreatingOrder} className="flex-1 h-14 font-black uppercase tracking-widest text-muted-foreground hover:text-white">Cancelar</Button>
+              <DialogFooter className="p-6 md:p-8 border-t border-white/5 bg-[#05070a] flex-row gap-4 flex-shrink-0">
+                <Button variant="ghost" onClick={() => setIsNewOrderOpen(false)} disabled={isCreatingOrder} className="flex-1 h-16 font-black uppercase tracking-widest text-muted-foreground hover:text-white rounded-2xl">Cancelar</Button>
                 <Button 
                   onClick={handleCreateOrder} 
                   disabled={isCreatingOrder || (newOrderTab === 'fiel' ? !selectedCustomerId : !newCustomerName.trim())}
-                  className="flex-1 h-14 font-black uppercase tracking-widest bg-[#0070f3] hover:bg-[#0070f3]/90 shadow-[0_0_20px_rgba(0,112,243,0.3)] rounded-xl"
+                  className="flex-1 h-16 font-black uppercase tracking-widest bg-[#0070f3] hover:bg-[#0070f3]/90 shadow-[0_0_25px_rgba(0,112,243,0.3)] rounded-2xl transition-all active:scale-95"
                 >
-                  {isCreatingOrder ? 'Abrindo...' : 'Abrir Comanda'}
+                  {isCreatingOrder ? 'PROCESSANDO...' : 'ABRIR COMANDA'}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -434,7 +446,7 @@ export function Dashboard({ user }: { user: UserProfile }) {
               exit={{ opacity: 0, scale: 0.95 }}
               transition={{ duration: 0.2 }}
             >
-              <OrderCard order={order} products={products} customers={customers} categories={categories} viewMode={viewMode} />
+              <OrderCard order={order} products={products} customers={customers} categories={categories} gameModalities={gameModalities} viewMode={viewMode} />
             </motion.div>
           ))}
         </AnimatePresence>
@@ -449,7 +461,7 @@ export function Dashboard({ user }: { user: UserProfile }) {
   );
 }
 
-const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Customer[]; categories: Category[]; viewMode: 'grid' | 'list' }> = ({ order, products, customers, categories, viewMode }) => {
+const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Customer[]; categories: Category[]; gameModalities: GameModality[]; viewMode: 'grid' | 'list' }> = ({ order, products, customers, categories, gameModalities, viewMode }) => {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
@@ -464,6 +476,10 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
   const [checkoutLetterFilter, setCheckoutLetterFilter] = useState('TODOS');
   const [isProcessing, setIsProcessing] = useState(false);
   const [detailTab, setDetailTab] = useState<'menu' | 'cart'>('menu');
+  const [menuSubTab, setMenuSubTab] = useState<'products' | 'games'>('products');
+  const [isGameValueModalOpen, setIsGameValueModalOpen] = useState(false);
+  const [selectedGame, setSelectedGame] = useState<GameModality | null>(null);
+  const [gameValue, setGameValue] = useState('');
 
   // Checkout states
   const [checkoutAmount, setCheckoutAmount] = useState(order.totalAmount);
@@ -560,6 +576,38 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
         items: newItems,
         totalAmount: newTotal
       });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `open_orders/${order.id}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleAddGame = async (game: GameModality, customPrice?: number) => {
+    const finalPrice = customPrice !== undefined ? customPrice : game.price;
+    const gameId = `game_${game.id}_${Date.now()}`; // Unique ID for each game entry
+    
+    let newItems = [...order.items];
+    newItems.push({
+      productId: gameId,
+      productName: `[JOGO] ${game.name}`,
+      quantity: 1,
+      price: finalPrice,
+      subtotal: finalPrice
+    });
+
+    const newTotal = newItems.reduce((sum, item) => sum + item.subtotal, 0);
+
+    setIsProcessing(true);
+    try {
+      await updateDoc(doc(db, 'open_orders', order.id), {
+        items: newItems,
+        totalAmount: newTotal
+      });
+      toast.success(`Adicionado: ${game.name}`);
+      setIsGameValueModalOpen(false);
+      setGameValue('');
+      setSelectedGame(null);
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `open_orders/${order.id}`);
     } finally {
@@ -794,263 +842,377 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
               </CardContent>
             </Card>
           )} />
-        <DialogContent className="max-w-7xl bg-[#05070a] border-none text-white p-0 overflow-hidden h-screen md:h-[90vh] flex flex-col shadow-2xl">
-          {/* Header */}
-          <div className="p-6 md:p-8 border-b border-white/5 flex flex-col sm:flex-row sm:items-center justify-between bg-[#05070a] z-20 gap-4 flex-shrink-0 relative">
+        <DialogContent className="max-w-[95vw] md:max-w-7xl bg-[#05070a] border-none text-white p-0 overflow-hidden h-[95vh] md:h-[90vh] flex flex-col shadow-2xl rounded-3xl">
+          {/* Header - Optimized for all screens */}
+          <div className="p-4 md:p-8 border-b border-white/5 flex flex-col sm:flex-row sm:items-center justify-between bg-[#05070a] z-20 gap-4 flex-shrink-0 relative">
             <div className="flex items-center gap-4 md:gap-6">
               <div className="w-12 h-12 md:w-16 md:h-16 rounded-2xl bg-[#0d1117] flex items-center justify-center border border-white/5 shadow-lg">
                 <Receipt className="w-6 h-6 md:w-8 md:h-8 text-[#0070f3]" />
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-3 mb-1">
-                  <DialogTitle className="text-2xl md:text-5xl font-black uppercase tracking-tighter leading-none truncate max-w-[200px] md:max-w-none">
+                  <DialogTitle className="text-xl md:text-4xl font-black uppercase tracking-tighter leading-none truncate max-w-[180px] md:max-w-none">
                     {order.customerName}
                   </DialogTitle>
+                  {order.type === 'customer' && (
+                    <Badge className="bg-[#0070f3]/10 text-[#0070f3] border-[#0070f3]/20 text-[10px] font-black uppercase tracking-widest">FIEL</Badge>
+                  )}
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-[10px] md:text-xs font-black tracking-widest uppercase text-muted-foreground">
-                    {order.type === 'table' ? 'AVULSO' : 'FIEL'}
+                  <span className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground flex items-center gap-1">
+                    <Clock className="w-3 h-3" /> {order.createdAt?.toDate ? format(order.createdAt.toDate(), 'HH:mm') : 'AGORA'}
                   </span>
                   {order.type === 'table' && (
                     <button 
-                      className="text-[10px] md:text-xs font-black tracking-widest uppercase text-[#0070f3] hover:text-[#0070f3]/80 transition-colors"
+                      className="text-[10px] font-black tracking-widest uppercase text-[#0070f3] hover:underline transition-all"
                       onClick={() => setIsLinkCustomerOpen(true)}
                     >
-                      VINCULAR FIEL
+                      VINCULAR CLIENTE
                     </button>
                   )}
                 </div>
               </div>
             </div>
 
-            <div className="flex flex-col items-end">
+            <div className="flex flex-col items-start sm:items-end">
               <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground mb-1">TOTAL ACUMULADO</p>
-              <p className="text-3xl md:text-5xl font-black tracking-tighter text-[#0070f3]">
-                <span className="text-sm md:text-xl mr-1">R$</span>
+              <p className="text-3xl md:text-5xl font-black tracking-tighter text-[#0070f3] flex items-baseline gap-1">
+                <span className="text-sm md:text-xl font-bold">R$</span>
                 {(order.totalAmount || 0).toFixed(2)}
               </p>
             </div>
 
             <button 
               onClick={() => setIsDetailOpen(false)} 
-              className="absolute right-6 top-6 text-muted-foreground hover:text-white transition-colors"
+              className="absolute right-4 top-4 md:right-8 md:top-8 text-muted-foreground hover:text-white transition-colors p-2 hover:bg-white/5 rounded-full"
             >
               <X className="w-6 h-6" />
             </button>
           </div>
 
-          {/* Tabs */}
-          <div className="flex px-6 md:px-8 py-4 bg-[#05070a] border-b border-white/5 gap-8">
-            <button 
-              onClick={() => setDetailTab('menu')}
-              className={cn(
-                "flex items-center gap-2 py-2 text-xs font-black uppercase tracking-widest transition-all relative",
-                detailTab === 'menu' ? "text-[#0070f3]" : "text-muted-foreground hover:text-white"
-              )}
-            >
-              <Menu className="w-4 h-4" />
-              CARDÁPIO
-              {detailTab === 'menu' && (
-                <motion.div layoutId="detailTab" className="absolute -bottom-4 left-0 right-0 h-1 bg-[#0070f3] rounded-full" />
-              )}
-            </button>
-            <button 
-              onClick={() => setDetailTab('cart')}
-              className={cn(
-                "flex items-center gap-2 py-2 text-xs font-black uppercase tracking-widest transition-all relative",
-                detailTab === 'cart' ? "text-[#0070f3]" : "text-muted-foreground hover:text-white"
-              )}
-            >
-              <ShoppingCart className="w-4 h-4" />
-              SACOLA
-              <span className="bg-[#0070f3] text-white text-[10px] px-2 py-0.5 rounded-full ml-1">
-                {order.items.reduce((sum, i) => sum + i.quantity, 0)}
-              </span>
-              {detailTab === 'cart' && (
-                <motion.div layoutId="detailTab" className="absolute -bottom-4 left-0 right-0 h-1 bg-[#0070f3] rounded-full" />
-              )}
-            </button>
-          </div>
-
-          <div className="flex-1 overflow-hidden flex flex-col bg-[#05070a]">
-            <AnimatePresence mode="wait">
-              {detailTab === 'menu' ? (
-                <motion.div 
-                  key="menu"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
-                  className="flex-1 flex flex-col p-6 md:p-8 space-y-6 overflow-hidden"
+          {/* Main Content Area - Split View on Desktop, Tabs on Mobile */}
+          <div className="flex-1 overflow-hidden flex flex-col lg:flex-row bg-[#05070a]">
+            
+            {/* Left Side: Menu/Catalog (Always visible on Desktop, Tabbed on Mobile) */}
+            <div className={cn(
+              "flex-1 flex flex-col border-r border-white/5 overflow-hidden",
+              detailTab !== 'menu' && "hidden lg:flex"
+            )}>
+              {/* Mobile Tabs (Only visible on Mobile) */}
+              <div className="flex lg:hidden px-4 md:px-8 py-4 bg-[#05070a] border-b border-white/5 gap-8">
+                <button 
+                  onClick={() => setDetailTab('menu')}
+                  className={cn(
+                    "flex items-center gap-2 py-2 text-xs font-black uppercase tracking-widest transition-all relative",
+                    detailTab === 'menu' ? "text-[#0070f3]" : "text-muted-foreground hover:text-white"
+                  )}
                 >
-                  <div className="relative group">
+                  <Menu className="w-4 h-4" />
+                  CARDÁPIO
+                  {detailTab === 'menu' && (
+                    <motion.div layoutId="detailTab" className="absolute -bottom-4 left-0 right-0 h-1 bg-[#0070f3] rounded-full" />
+                  )}
+                </button>
+                <button 
+                  onClick={() => setDetailTab('cart')}
+                  className={cn(
+                    "flex items-center gap-2 py-2 text-xs font-black uppercase tracking-widest transition-all relative",
+                    detailTab === 'cart' ? "text-[#0070f3]" : "text-muted-foreground hover:text-white"
+                  )}
+                >
+                  <ShoppingCart className="w-4 h-4" />
+                  SACOLA
+                  <span className="bg-[#0070f3] text-white text-[10px] px-2 py-0.5 rounded-full ml-1">
+                    {order.items.reduce((sum, i) => sum + i.quantity, 0)}
+                  </span>
+                  {detailTab === 'cart' && (
+                    <motion.div layoutId="detailTab" className="absolute -bottom-4 left-0 right-0 h-1 bg-[#0070f3] rounded-full" />
+                  )}
+                </button>
+              </div>
+
+              <div className="flex-1 flex flex-col p-4 md:p-8 space-y-6 overflow-hidden">
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <div className="relative group flex-1">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-[#0070f3] transition-colors" />
                     <Input 
-                      placeholder="Buscar item..." 
-                      className="pl-12 h-16 bg-[#0d1117] border-white/5 rounded-2xl text-sm font-bold tracking-widest focus:ring-[#0070f3]/20 focus:border-[#0070f3] transition-all uppercase"
+                      placeholder="BUSCAR ITEM NO CARDÁPIO..." 
+                      className="pl-12 h-14 bg-[#0d1117] border-white/5 rounded-2xl text-sm font-bold tracking-widest focus:ring-[#0070f3]/20 focus:border-[#0070f3] transition-all uppercase"
                       value={itemSearch}
                       onChange={(e) => setItemSearch(e.target.value)}
                     />
                   </div>
+                  {/* Quick Add Toggle or Category Filter could go here */}
+                </div>
 
-                  <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3">
-                    {sortedCategories.map(category => (
-                      <div key={category.id} className="bg-[#0d1117] border border-white/5 rounded-2xl overflow-hidden">
-                        <button 
-                          onClick={() => {
-                            setExpandedCategories(prev => 
-                              prev.includes(category.id) ? prev.filter(id => id !== category.id) : [...prev, category.id]
-                            );
-                          }}
-                          className="w-full p-5 flex items-center justify-between hover:bg-white/5 transition-colors"
-                        >
-                          <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-muted-foreground">
-                              <Package className="w-5 h-5" />
-                            </div>
-                            <span className="font-black text-sm uppercase tracking-widest">{category.name}</span>
-                            <span className="text-[10px] font-bold text-muted-foreground">
-                              {products.filter(p => (p.categoryId || 'Outros') === category.id).length} ITENS
-                            </span>
-                          </div>
-                          <ChevronRight className={cn("w-5 h-5 text-muted-foreground transition-transform", expandedCategories.includes(category.id) && "rotate-90")} />
-                        </button>
-                        
-                        <AnimatePresence>
-                          {expandedCategories.includes(category.id) && (
-                            <motion.div 
-                              initial={{ height: 0 }}
-                              animate={{ height: 'auto' }}
-                              exit={{ height: 0 }}
-                              className="overflow-hidden border-t border-white/5"
-                            >
-                              <div className="p-2 space-y-1">
-                                {products
-                                  .filter(p => (p.categoryId || 'Outros') === category.id)
-                                  .filter(p => p.name.toLowerCase().includes(itemSearch.toLowerCase()))
-                                  .map(product => (
-                                    <button
-                                      key={product.id}
-                                      onClick={() => handleAddItem(product)}
-                                      className="w-full p-4 flex items-center justify-between rounded-xl hover:bg-white/5 transition-all text-left group"
-                                    >
-                                      <div>
-                                        <p className="font-bold text-sm uppercase tracking-wider group-hover:text-[#0070f3] transition-colors">{product.name}</p>
-                                        <p className="text-xs text-muted-foreground font-bold tracking-widest">R$ {product.price.toFixed(2)}</p>
-                                      </div>
-                                      <Plus className="w-5 h-5 text-muted-foreground group-hover:text-[#0070f3] transition-all" />
-                                    </button>
-                                  ))}
-                              </div>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </div>
-                    ))}
-                  </div>
-                </motion.div>
-              ) : (
-                <motion.div 
-                  key="cart"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  className="flex-1 flex flex-col p-6 md:p-8 space-y-6 overflow-hidden"
-                >
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-black uppercase tracking-widest text-muted-foreground">SACOLA ({order.items.length})</h4>
+                <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-4">
+                  {/* Menu Sub-tabs */}
+                  <div className="flex gap-2 mb-4">
                     <button 
-                      onClick={() => setIsClearConfirmOpen(true)}
-                      className="text-muted-foreground hover:text-red-500 transition-colors"
+                      onClick={() => setMenuSubTab('products')}
+                      className={cn(
+                        "flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                        menuSubTab === 'products' ? "bg-[#161b22] text-[#0070f3] border border-[#0070f3]/20" : "text-muted-foreground hover:text-white hover:bg-white/5 border border-transparent"
+                      )}
                     >
-                      <Trash2 className="w-5 h-5" />
+                      Cardápio Geral
+                    </button>
+                    <button 
+                      onClick={() => setMenuSubTab('games')}
+                      className={cn(
+                        "flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                        menuSubTab === 'games' ? "bg-[#161b22] text-[#0070f3] border border-[#0070f3]/20" : "text-muted-foreground hover:text-white hover:bg-white/5 border border-transparent"
+                      )}
+                    >
+                      Banca / Jogos
                     </button>
                   </div>
 
-                  <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3">
-                    <AnimatePresence mode="popLayout">
-                      {order.items.map(item => (
-                        <motion.div 
-                          key={item.productId}
-                          layout
-                          initial={{ opacity: 0, x: -20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          exit={{ opacity: 0, x: 20 }}
-                          className="bg-[#0d1117] border border-white/5 rounded-2xl p-5 flex items-center justify-between gap-4"
-                        >
-                          <div className="min-w-0">
-                            <p className="font-black text-sm md:text-lg uppercase tracking-tight truncate leading-none mb-1">{item.productName}</p>
-                            <p className="text-xs text-muted-foreground font-bold tracking-widest">R$ {item.price.toFixed(2)}</p>
+                  {menuSubTab === 'products' ? (
+                    <>
+                      {/* Quick Add Section (Intelligent Feature) */}
+                      {!itemSearch && (
+                        <div className="mb-8">
+                          <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-4 flex items-center gap-2">
+                            <Zap className="w-3 h-3 text-yellow-500" /> Itens Mais Pedidos
+                          </p>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
+                            {products.slice(0, 4).map(product => (
+                              <button
+                                key={`quick-${product.id}`}
+                                onClick={() => handleAddItem(product)}
+                                className="p-4 bg-[#0d1117] hover:bg-[#161b22] border border-white/5 rounded-2xl text-left transition-all group relative overflow-hidden active:scale-95"
+                              >
+                                <div className="absolute top-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <Plus className="w-4 h-4 text-[#0070f3]" />
+                                </div>
+                                <p className="font-bold text-[11px] uppercase tracking-wider mb-1 truncate">{product.name}</p>
+                                <p className="text-xs font-black text-[#0070f3]">R$ {product.price.toFixed(2)}</p>
+                              </button>
+                            ))}
                           </div>
+                        </div>
+                      )}
 
-                          <div className="flex items-center gap-4">
-                            <div className="flex items-center bg-[#161b22] rounded-xl p-1 border border-white/5">
-                              <button 
-                                onClick={() => handleUpdateQuantity(item.productId, -1)}
-                                className="w-10 h-10 flex items-center justify-center text-muted-foreground hover:text-white transition-colors"
-                              >
-                                <Minus className="w-4 h-4" />
-                              </button>
-                              <span className="w-8 text-center font-black text-lg">{item.quantity}</span>
-                              <button 
-                                onClick={() => handleUpdateQuantity(item.productId, 1)}
-                                className="w-10 h-10 flex items-center justify-center text-muted-foreground hover:text-white transition-colors"
-                              >
-                                <Plus className="w-4 h-4" />
-                              </button>
-                            </div>
+                      <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-2">Categorias</p>
+                      <div className="space-y-3">
+                        {sortedCategories.map(category => (
+                          <div key={category.id} className="bg-[#0d1117] border border-white/5 rounded-2xl overflow-hidden shadow-sm">
                             <button 
                               onClick={() => {
-                                setItemToRemove(item.productId);
-                                setIsRemoveItemConfirmOpen(true);
+                                setExpandedCategories(prev => 
+                                  prev.includes(category.id) ? prev.filter(id => id !== category.id) : [...prev, category.id]
+                                );
                               }}
-                              className="w-10 h-10 rounded-xl bg-red-500/10 text-red-500 flex items-center justify-center hover:bg-red-500/20 transition-colors"
+                              className="w-full p-5 flex items-center justify-between hover:bg-white/5 transition-colors"
                             >
-                              <Trash2 className="w-4 h-4" />
+                              <div className="flex items-center gap-4">
+                                <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-muted-foreground group-hover:text-white transition-colors">
+                                  <Package className="w-5 h-5" />
+                                </div>
+                                <div className="text-left">
+                                  <span className="font-black text-sm uppercase tracking-widest block">{category.name}</span>
+                                  <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">
+                                    {products.filter(p => (p.categoryId || 'Outros') === category.id).length} Produtos Disponíveis
+                                  </span>
+                                </div>
+                              </div>
+                              <ChevronRight className={cn("w-5 h-5 text-muted-foreground transition-transform", expandedCategories.includes(category.id) && "rotate-90")} />
+                            </button>
+                            
+                            <AnimatePresence>
+                              {expandedCategories.includes(category.id) && (
+                                <motion.div 
+                                  initial={{ height: 0, opacity: 0 }}
+                                  animate={{ height: 'auto', opacity: 1 }}
+                                  exit={{ height: 0, opacity: 0 }}
+                                  className="overflow-hidden border-t border-white/5 bg-black/20"
+                                >
+                                  <div className="p-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    {products
+                                      .filter(p => (p.categoryId || 'Outros') === category.id)
+                                      .filter(p => p.name.toLowerCase().includes(itemSearch.toLowerCase()))
+                                      .map(product => (
+                                        <button
+                                          key={product.id}
+                                          onClick={() => handleAddItem(product)}
+                                          className="w-full p-4 flex items-center justify-between rounded-xl hover:bg-white/10 transition-all text-left group border border-transparent hover:border-white/5"
+                                        >
+                                          <div className="min-w-0">
+                                            <p className="font-bold text-xs uppercase tracking-wider group-hover:text-[#0070f3] transition-colors truncate">{product.name}</p>
+                                            <p className="text-[10px] text-muted-foreground font-black tracking-widest">R$ {product.price.toFixed(2)}</p>
+                                          </div>
+                                          <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center group-hover:bg-[#0070f3] group-hover:text-white transition-all">
+                                            <Plus className="w-4 h-4" />
+                                          </div>
+                                        </button>
+                                      ))}
+                                  </div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {gameModalities
+                          .filter(g => g.active)
+                          .filter(g => g.name.toLowerCase().includes(itemSearch.toLowerCase()))
+                          .map(game => (
+                            <button
+                              key={game.id}
+                              onClick={() => {
+                                if (game.isOpenValue) {
+                                  setSelectedGame(game);
+                                  setIsGameValueModalOpen(true);
+                                } else {
+                                  handleAddGame(game);
+                                }
+                              }}
+                              className="p-6 bg-[#0d1117] hover:bg-[#161b22] border border-white/5 rounded-2xl text-left transition-all group relative overflow-hidden active:scale-95 flex items-center gap-4"
+                            >
+                              <div className="w-12 h-12 rounded-xl bg-[#0070f3]/10 flex items-center justify-center text-[#0070f3] group-hover:bg-[#0070f3] group-hover:text-white transition-all">
+                                <Gamepad2 className="w-6 h-6" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-black text-sm uppercase tracking-wider truncate mb-1">{game.name}</p>
+                                <p className="text-xs font-bold text-[#0070f3] uppercase tracking-widest">
+                                  {game.isOpenValue ? 'Valor Aberto' : `R$ ${game.price.toFixed(2)}`}
+                                </p>
+                              </div>
+                              <Plus className="w-5 h-5 text-muted-foreground group-hover:text-white transition-colors" />
+                            </button>
+                          ))}
+                        {gameModalities.filter(g => g.active).length === 0 && (
+                          <div className="col-span-full py-20 text-center opacity-40">
+                            <Gamepad2 className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                            <p className="text-[10px] font-black tracking-widest uppercase">Nenhuma modalidade de jogo ativa</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Right Side: Cart/Sacola (Always visible on Desktop, Tabbed on Mobile) */}
+            <div className={cn(
+              "w-full lg:w-[450px] flex flex-col bg-[#0d1117]/50 lg:bg-[#0d1117] overflow-hidden",
+              detailTab !== 'cart' && "hidden lg:flex"
+            )}>
+              <div className="p-6 md:p-8 flex-1 flex flex-col overflow-hidden">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-[#0070f3]/10 flex items-center justify-center text-[#0070f3]">
+                      <ShoppingCart className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-black uppercase tracking-widest">Sua Sacola</h4>
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                        {order.items.reduce((sum, i) => sum + i.quantity, 0)} Itens Selecionados
+                      </p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setIsClearConfirmOpen(true)}
+                    className="p-2 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all"
+                    title="Limpar Sacola"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3">
+                  <AnimatePresence mode="popLayout">
+                    {order.items.map(item => (
+                      <motion.div 
+                        key={item.productId}
+                        layout
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        className="bg-[#161b22] border border-white/5 rounded-2xl p-4 flex items-center justify-between gap-4 shadow-sm"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="font-black text-sm uppercase tracking-tight truncate leading-none mb-1">{item.productName}</p>
+                          <p className="text-[10px] text-muted-foreground font-bold tracking-widest">R$ {item.price.toFixed(2)} / UN</p>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center bg-[#05070a] rounded-xl p-1 border border-white/5">
+                            <button 
+                              onClick={() => handleUpdateQuantity(item.productId, -1)}
+                              className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-white transition-colors rounded-lg hover:bg-white/5"
+                            >
+                              <Minus className="w-3 h-3" />
+                            </button>
+                            <span className="w-8 text-center font-black text-sm">{item.quantity}</span>
+                            <button 
+                              onClick={() => handleUpdateQuantity(item.productId, 1)}
+                              className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-white transition-colors rounded-lg hover:bg-white/5"
+                            >
+                              <Plus className="w-3 h-3" />
                             </button>
                           </div>
-                        </motion.div>
-                      ))}
-                    </AnimatePresence>
-                    {order.items.length === 0 && (
-                      <div className="py-24 text-center">
-                        <ShoppingCart className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-10" />
-                        <p className="text-muted-foreground font-bold tracking-widest uppercase">Sacola vazia</p>
-                      </div>
-                    )}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+                          <button 
+                            onClick={() => {
+                              setItemToRemove(item.productId);
+                              setIsRemoveItemConfirmOpen(true);
+                            }}
+                            className="w-8 h-8 rounded-lg bg-red-500/10 text-red-500 flex items-center justify-center hover:bg-red-500/20 transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                  {order.items.length === 0 && (
+                    <div className="py-20 text-center opacity-40">
+                      <ShoppingCart className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-[10px] font-black tracking-widest uppercase">Nenhum item na sacola</p>
+                    </div>
+                  )}
+                </div>
 
-          {/* Footer */}
-          <div className="p-6 md:p-8 border-t border-white/5 bg-[#0d1117] flex flex-col space-y-4 flex-shrink-0">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">TOTAL ACUMULADO</p>
-              <motion.p 
-                key={order.totalAmount}
-                initial={{ scale: 1.1, color: '#0070f3' }}
-                animate={{ scale: 1, color: '#0070f3' }}
-                className="text-3xl font-black tracking-tighter"
-              >
-                <span className="text-sm mr-1">R$</span>
-                {(order.totalAmount || 0).toFixed(2)}
-              </motion.p>
-            </div>
-            <div className="flex gap-4">
-              <Button 
-                onClick={() => setIsCheckoutOpen(true)}
-                className="flex-1 h-16 bg-[#161b22] hover:bg-[#1f2937] text-green-500 font-black uppercase tracking-widest rounded-2xl border border-green-500/20 gap-2"
-              >
-                <Receipt className="w-5 h-5" />
-                RECEBER
-              </Button>
-              <Button 
-                onClick={() => setIsDetailOpen(false)}
-                className="flex-1 h-16 bg-[#28a745] hover:bg-[#218838] text-white font-black uppercase tracking-widest rounded-2xl shadow-lg shadow-green-500/20"
-              >
-                SALVAR COMANDA
-              </Button>
+                {/* Summary in Cart Side */}
+                <div className="mt-6 pt-6 border-t border-white/5 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground">Subtotal</p>
+                    <p className="font-bold text-sm">R$ {(order.totalAmount || 0).toFixed(2)}</p>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground">Taxas / Outros</p>
+                    <p className="font-bold text-sm">R$ 0.00</p>
+                  </div>
+                  <div className="flex items-center justify-between pt-2">
+                    <p className="text-xs font-black tracking-widest uppercase text-[#0070f3]">Total Geral</p>
+                    <p className="text-2xl font-black tracking-tighter text-[#0070f3]">R$ {(order.totalAmount || 0).toFixed(2)}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons - Sticky at bottom of cart */}
+              <div className="p-6 md:p-8 bg-[#0d1117] border-t border-white/5 grid grid-cols-2 gap-3">
+                <Button 
+                  onClick={() => setIsCheckoutOpen(true)}
+                  variant="outline"
+                  className="h-14 bg-transparent border-green-500/30 text-green-500 hover:bg-green-500/10 font-black uppercase tracking-widest rounded-2xl gap-2 text-xs"
+                >
+                  <Receipt className="w-4 h-4" />
+                  RECEBER
+                </Button>
+                <Button 
+                  onClick={() => setIsDetailOpen(false)}
+                  className="h-14 bg-green-600 hover:bg-green-700 text-white font-black uppercase tracking-widest rounded-2xl shadow-lg shadow-green-600/20 text-xs"
+                >
+                  SALVAR
+                </Button>
+              </div>
             </div>
           </div>
         </DialogContent>
@@ -1128,62 +1290,102 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
         </DialogContent>
       </Dialog>
 
-      {/* Checkout Modal */}
       <Dialog open={isCheckoutOpen} onOpenChange={setIsCheckoutOpen}>
-        <DialogContent className="bg-[#05070a] border-none max-w-lg text-white p-0 overflow-hidden flex flex-col max-h-[95vh] shadow-2xl">
-          <div className="p-8 border-b border-white/5 relative flex-shrink-0">
+        <DialogContent className="bg-[#05070a] border-none max-w-2xl text-white p-0 overflow-hidden flex flex-col max-h-[95vh] shadow-2xl rounded-3xl">
+          <div className="p-6 md:p-8 border-b border-white/5 relative flex-shrink-0 bg-[#05070a]">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-green-500/10 flex items-center justify-center border border-green-500/20">
+              <div className="w-14 h-14 rounded-2xl bg-green-500/10 flex items-center justify-center border border-green-500/20 shadow-lg">
                 <CheckCircle2 className="w-7 h-7 text-green-500" />
               </div>
               <div>
-                <DialogTitle className="text-2xl font-black uppercase tracking-tighter leading-none mb-1">{order.customerName}</DialogTitle>
+                <DialogTitle className="text-2xl md:text-3xl font-black uppercase tracking-tighter leading-none mb-1">{order.customerName}</DialogTitle>
                 <p className="text-[10px] font-bold tracking-widest uppercase text-green-500/60 flex items-center gap-2">
-                  <Receipt className="w-3 h-3" /> Checkout & Conciliação
+                  <Receipt className="w-3 h-3" /> Finalização de Atendimento
                 </p>
               </div>
             </div>
-            <button onClick={() => setIsCheckoutOpen(false)} className="absolute right-6 top-6 text-muted-foreground hover:text-white transition-colors">
+            <button onClick={() => setIsCheckoutOpen(false)} className="absolute right-6 top-6 text-muted-foreground hover:text-white transition-colors p-2 hover:bg-white/5 rounded-full">
               <X className="w-5 h-5" />
             </button>
           </div>
 
-          <div className="p-8 space-y-6 overflow-y-auto custom-scrollbar flex-1">
-            <div className="bg-[#0d1117] p-8 rounded-2xl border border-dashed border-green-500/30 text-center space-y-2">
-              <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Valor a Receber</p>
-              <p className="text-5xl font-black text-[#0070f3] tracking-tighter leading-none">R$ {checkoutAmount.toFixed(2)}</p>
+          <div className="p-6 md:p-8 space-y-8 overflow-y-auto custom-scrollbar flex-1">
+            {/* Main Total Display */}
+            <div className="bg-[#0d1117] p-8 rounded-3xl border border-white/5 text-center space-y-3 shadow-inner relative overflow-hidden group">
+              <div className="absolute inset-0 bg-gradient-to-br from-[#0070f3]/5 to-transparent opacity-50" />
+              <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground relative z-10">Valor Total a Receber</p>
+              <p className="text-5xl md:text-7xl font-black text-[#0070f3] tracking-tighter leading-none relative z-10 flex items-center justify-center gap-2">
+                <span className="text-xl md:text-2xl font-bold text-[#0070f3]/60">R$</span>
+                {checkoutAmount.toFixed(2)}
+              </p>
+              {checkoutDiscount > 0 && (
+                <p className="text-xs font-bold text-green-500 relative z-10 uppercase tracking-widest">
+                  Desconto Aplicado: R$ {checkoutDiscount.toFixed(2)}
+                </p>
+              )}
             </div>
 
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Valor a Pagar Agora</label>
-                <Input 
-                  type="number" 
-                  step="0.01"
-                  className="h-16 bg-[#0d1117] border-white/5 text-2xl font-black text-center focus:ring-[#0070f3]/20 focus:border-[#0070f3]"
-                  value={checkoutAmount}
-                  onChange={(e) => setCheckoutAmount(parseFloat(e.target.value) || 0)}
-                />
+            {/* Quick Actions */}
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {['DINHEIRO', 'PIX', 'CARTÃO'].map((method) => (
+                <Button
+                  key={`quick-pay-${method}`}
+                  variant="outline"
+                  onClick={() => {
+                    setCheckoutPayments([{ method: method === 'CARTÃO' ? 'CARTÃO DE DÉBITO' : method, amount: checkoutAmount }]);
+                  }}
+                  className="h-14 bg-[#0d1117] border-white/5 hover:border-[#0070f3]/50 hover:bg-[#0070f3]/5 text-[10px] font-black uppercase tracking-widest rounded-2xl transition-all"
+                >
+                  Pagar Tudo ({method})
+                </Button>
+              ))}
+            </div>
+
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Valor do Checkout</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">R$</span>
+                    <Input 
+                      type="number" 
+                      step="0.01"
+                      className="h-16 pl-12 bg-[#0d1117] border-white/5 text-2xl font-black focus:ring-[#0070f3]/20 focus:border-[#0070f3] rounded-2xl"
+                      value={checkoutAmount}
+                      onChange={(e) => setCheckoutAmount(parseFloat(e.target.value) || 0)}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Data do Atendimento</label>
+                  <Input 
+                    type="date"
+                    className="h-16 bg-[#0d1117] border-white/5 font-bold rounded-2xl uppercase tracking-widest text-xs"
+                    value={checkoutDate}
+                    onChange={(e) => setCheckoutDate(e.target.value)}
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Desconto</label>
+                  <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Desconto (R$)</label>
                   <Input 
                     type="number" 
                     step="0.01"
-                    className="h-14 bg-[#0d1117] border-white/5 font-bold"
+                    className="h-14 bg-[#0d1117] border-white/5 font-bold rounded-xl"
                     value={checkoutDiscount}
                     onChange={(e) => setCheckoutDiscount(parseFloat(e.target.value) || 0)}
                     placeholder="0.00"
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Ajuste</label>
+                  <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Ajuste (R$)</label>
                   <Input 
                     type="number" 
                     step="0.01"
-                    className="h-14 bg-[#0d1117] border-white/5 font-bold"
+                    className="h-14 bg-[#0d1117] border-white/5 font-bold rounded-xl"
                     value={checkoutAdjustment}
                     onChange={(e) => setCheckoutAdjustment(parseFloat(e.target.value) || 0)}
                     placeholder="0.00"
@@ -1191,33 +1393,29 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Data do Atendimento</label>
-                <Input 
-                  type="date"
-                  className="h-14 bg-[#0d1117] border-white/5 font-bold"
-                  value={checkoutDate}
-                  onChange={(e) => setCheckoutDate(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-4">
+              <div className="space-y-4 pt-4">
                 <div className="flex items-center justify-between">
-                  <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Pagamentos / Divisão</label>
+                  <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Divisão de Pagamento</label>
                   <Button 
-                    variant="outline" 
+                    variant="ghost" 
                     size="sm" 
                     onClick={() => setCheckoutPayments([...checkoutPayments, { method: 'DINHEIRO', amount: 0 }])}
-                    className="h-8 text-[10px] font-bold uppercase tracking-widest border-white/5 hover:bg-white/5"
+                    className="h-10 text-[10px] font-black uppercase tracking-widest text-[#0070f3] hover:bg-[#0070f3]/10 rounded-xl"
                   >
-                    <Plus className="w-3 h-3 mr-1" /> Adicionar
+                    <Plus className="w-4 h-4 mr-2" /> Adicionar Método
                   </Button>
                 </div>
                 
                 <div className="space-y-3">
                   {checkoutPayments.map((payment, index) => (
-                    <div key={index} className="flex gap-3 items-end animate-in fade-in slide-in-from-top-1 duration-200">
-                      <div className="flex-1 space-y-1">
+                    <motion.div 
+                      key={index}
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="flex gap-3 items-end p-4 bg-[#0d1117] rounded-2xl border border-white/5"
+                    >
+                      <div className="flex-1 space-y-2">
+                        <label className="text-[9px] font-black tracking-widest uppercase text-muted-foreground">Método</label>
                         <Select 
                           value={payment.method} 
                           onValueChange={(val) => {
@@ -1226,63 +1424,69 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                             setCheckoutPayments(newPayments);
                           }}
                         >
-                          <SelectTrigger className="h-12 bg-[#0d1117] border-white/5 font-bold text-xs uppercase">
+                          <SelectTrigger className="h-12 bg-[#161b22] border-white/5 font-bold text-xs uppercase rounded-xl">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent className="bg-[#05070a] border-white/5">
                             {['DINHEIRO', 'PIX', 'CARTÃO DE CRÉDITO', 'CARTÃO DE DÉBITO', 'VALE REFEIÇÃO', 'FIADO'].map(method => (
-                              <SelectItem key={method} value={method} className="font-bold uppercase tracking-widest text-xs">{method}</SelectItem>
+                              <SelectItem key={method} value={method} className="font-bold uppercase tracking-widest text-xs py-3">{method}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="w-32 space-y-1">
-                        <Input 
-                          type="number" 
-                          step="0.01"
-                          className="h-12 bg-[#0d1117] border-white/5 font-bold text-xs"
-                          value={payment.amount}
-                          onChange={(e) => {
-                            const newPayments = [...checkoutPayments];
-                            newPayments[index].amount = parseFloat(e.target.value) || 0;
-                            setCheckoutPayments(newPayments);
-                          }}
-                        />
+                      <div className="w-36 space-y-2">
+                        <label className="text-[9px] font-black tracking-widest uppercase text-muted-foreground">Valor</label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground font-bold">R$</span>
+                          <Input 
+                            type="number" 
+                            step="0.01"
+                            className="h-12 pl-8 bg-[#161b22] border-white/5 font-black text-sm rounded-xl"
+                            value={payment.amount}
+                            onChange={(e) => {
+                              const newPayments = [...checkoutPayments];
+                              newPayments[index].amount = parseFloat(e.target.value) || 0;
+                              setCheckoutPayments(newPayments);
+                            }}
+                          />
+                        </div>
                       </div>
                       {checkoutPayments.length > 1 && (
                         <Button 
                           variant="ghost" 
                           size="icon" 
                           onClick={() => setCheckoutPayments(checkoutPayments.filter((_, i) => i !== index))}
-                          className="h-12 w-12 text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
+                          className="h-12 w-12 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-xl"
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
                       )}
-                    </div>
+                    </motion.div>
                   ))}
                 </div>
                 
                 <div className={cn(
-                  "p-3 rounded-xl text-center text-[10px] font-black uppercase tracking-widest transition-colors",
+                  "p-5 rounded-2xl text-center text-xs font-black uppercase tracking-widest transition-all shadow-lg",
                   checkoutPayments.reduce((sum, p) => sum + p.amount, 0).toFixed(2) === checkoutAmount.toFixed(2) 
                     ? "bg-green-500/10 text-green-500 border border-green-500/20" 
-                    : "bg-red-500/10 text-red-500 border border-red-500/20"
+                    : "bg-red-500/10 text-red-500 border border-red-500/20 animate-pulse"
                 )}>
-                  Total Pago: R$ {checkoutPayments.reduce((sum, p) => sum + p.amount, 0).toFixed(2)} / R$ {checkoutAmount.toFixed(2)}
+                  {checkoutPayments.reduce((sum, p) => sum + p.amount, 0).toFixed(2) === checkoutAmount.toFixed(2) 
+                    ? "✓ Conferência de Valores OK" 
+                    : `⚠️ Faltam R$ ${(checkoutAmount - checkoutPayments.reduce((sum, p) => sum + p.amount, 0)).toFixed(2)}`}
                 </div>
               </div>
             </div>
           </div>
 
-          <DialogFooter className="p-8 border-t border-white/5 bg-[#05070a] flex-row gap-4">
-            <Button variant="ghost" onClick={() => setIsCheckoutOpen(false)} className="flex-1 h-16 font-black uppercase tracking-widest">Voltar</Button>
+          <DialogFooter className="p-6 md:p-8 border-t border-white/5 bg-[#05070a] flex-row gap-4 flex-shrink-0">
+            <Button variant="ghost" onClick={() => setIsCheckoutOpen(false)} className="flex-1 h-16 font-black uppercase tracking-widest text-muted-foreground hover:text-white rounded-2xl">Voltar</Button>
             <Button 
               onClick={handleFinalizeCheckout} 
-              disabled={isProcessing}
-              className="flex-1 h-16 font-black uppercase tracking-widest bg-green-600 hover:bg-green-700 shadow-lg shadow-green-600/20"
+              disabled={isProcessing || checkoutPayments.reduce((sum, p) => sum + p.amount, 0).toFixed(2) !== checkoutAmount.toFixed(2)}
+              className="flex-1 h-16 font-black uppercase tracking-widest bg-green-600 hover:bg-green-700 shadow-lg shadow-green-600/20 rounded-2xl"
             >
-              {isProcessing ? 'Finalizando...' : 'Finalizar'}
+              {isProcessing ? 'Processando...' : 'Finalizar Recebimento'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1311,6 +1515,50 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
         title="Remover Item"
         description="Deseja remover este item da comanda?"
       />
+
+      {/* Game Value Modal */}
+      <Dialog open={isGameValueModalOpen} onOpenChange={setIsGameValueModalOpen}>
+        <DialogContent className="bg-[#05070a] border-none max-w-md text-white p-0 overflow-hidden shadow-2xl rounded-3xl">
+          <div className="p-8 border-b border-white/5 relative bg-[#05070a]">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-[#0070f3]/10 flex items-center justify-center border border-[#0070f3]/20 shadow-lg">
+                <Gamepad2 className="w-7 h-7 text-[#0070f3]" />
+              </div>
+              <div>
+                <DialogTitle className="text-2xl font-black uppercase tracking-tighter leading-none mb-1">{selectedGame?.name}</DialogTitle>
+                <p className="text-[10px] font-bold tracking-widest uppercase text-[#0070f3]/60">Defina o valor do jogo</p>
+              </div>
+            </div>
+          </div>
+          <div className="p-8 space-y-6">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Valor do Lançamento (R$)</label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">R$</span>
+                <Input 
+                  type="number" 
+                  step="0.01"
+                  autoFocus
+                  className="h-20 pl-12 bg-[#0d1117] border-white/5 text-3xl font-black focus:ring-[#0070f3]/20 focus:border-[#0070f3] rounded-2xl"
+                  value={gameValue}
+                  onChange={(e) => setGameValue(e.target.value)}
+                  placeholder="0.00"
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="p-8 border-t border-white/5 bg-[#05070a] flex-row gap-4">
+            <Button variant="ghost" onClick={() => setIsGameValueModalOpen(false)} className="flex-1 h-14 font-black uppercase tracking-widest text-muted-foreground hover:text-white rounded-xl">Cancelar</Button>
+            <Button 
+              onClick={() => handleAddGame(selectedGame!, parseFloat(gameValue) || 0)} 
+              disabled={!gameValue || isProcessing}
+              className="flex-1 h-14 font-black uppercase tracking-widest bg-[#0070f3] hover:bg-[#0070f3]/90 rounded-xl shadow-lg shadow-[#0070f3]/20"
+            >
+              Confirmar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };
