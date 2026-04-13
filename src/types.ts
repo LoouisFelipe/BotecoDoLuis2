@@ -24,6 +24,7 @@ export interface GameModality {
   name: string;
   price: number;
   active: boolean;
+  isOpenValue?: boolean;
 }
 
 export interface GameSession {

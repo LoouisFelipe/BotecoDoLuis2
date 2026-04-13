@@ -27,6 +27,7 @@ export function Games({ user }: { user: UserProfile }) {
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
   const [active, setActive] = useState(true);
+  const [isOpenValue, setIsOpenValue] = useState(false);
 
   // Result Form states
   const [selectedModality, setSelectedModality] = useState<GameModality | null>(null);
@@ -52,8 +53,9 @@ export function Games({ user }: { user: UserProfile }) {
     if (!name || !price) return;
     const data = {
       name,
-      price: parseFloat(price),
+      price: parseFloat(price) || 0,
       active,
+      isOpenValue,
       updatedAt: serverTimestamp()
     };
 
@@ -109,6 +111,7 @@ export function Games({ user }: { user: UserProfile }) {
     setName('');
     setPrice('');
     setActive(true);
+    setIsOpenValue(false);
   };
 
   const openEdit = (game: GameModality) => {
@@ -116,12 +119,13 @@ export function Games({ user }: { user: UserProfile }) {
     setName(game.name);
     setPrice((game.price || 0).toString());
     setActive(game.active);
+    setIsOpenValue(game.isOpenValue || false);
     setIsModalOpen(true);
   };
 
   const openPostResult = (game: GameModality) => {
     setSelectedModality(game);
-    setResultAmount(game.price.toString());
+    setResultAmount(game.isOpenValue ? '' : game.price.toString());
     setIsResultModalOpen(true);
   };
 
@@ -192,17 +196,34 @@ export function Games({ user }: { user: UserProfile }) {
                   value={price}
                   onChange={(e) => setPrice(e.target.value)}
                   placeholder="0,00"
+                  disabled={isOpenValue}
                 />
+                {isOpenValue && <p className="text-[10px] text-primary font-bold uppercase tracking-widest">Valor será definido no lançamento</p>}
               </div>
-              <div className="flex items-center gap-2">
-                <input 
-                  type="checkbox" 
-                  id="active" 
-                  checked={active} 
-                  onChange={(e) => setActive(e.target.checked)}
-                  className="w-4 h-4 rounded border-border bg-[#111827] text-primary focus:ring-primary/20"
-                />
-                <label htmlFor="active" className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Modalidade Ativa</label>
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="checkbox" 
+                    id="isOpenValue" 
+                    checked={isOpenValue} 
+                    onChange={(e) => {
+                      setIsOpenValue(e.target.checked);
+                      if (e.target.checked) setPrice('0');
+                    }}
+                    className="w-4 h-4 rounded border-border bg-[#111827] text-primary focus:ring-primary/20"
+                  />
+                  <label htmlFor="isOpenValue" className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Valor Aberto (Variável)</label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="checkbox" 
+                    id="active" 
+                    checked={active} 
+                    onChange={(e) => setActive(e.target.checked)}
+                    className="w-4 h-4 rounded border-border bg-[#111827] text-primary focus:ring-primary/20"
+                  />
+                  <label htmlFor="active" className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Modalidade Ativa</label>
+                </div>
               </div>
             </div>
             <DialogFooter>
@@ -288,8 +309,14 @@ export function Games({ user }: { user: UserProfile }) {
                   <div>
                     <h3 className="text-xl font-black uppercase tracking-wider mb-1">{game.name}</h3>
                     <div className="text-2xl font-black text-primary">
-                      <span className="text-sm font-bold mr-1">R$</span>
-                      {(game.price || 0).toFixed(2)}
+                      {game.isOpenValue ? (
+                        <span className="text-sm font-bold uppercase tracking-widest">Valor Aberto</span>
+                      ) : (
+                        <>
+                          <span className="text-sm font-bold mr-1">R$</span>
+                          {(game.price || 0).toFixed(2)}
+                        </>
+                      )}
                     </div>
                   </div>
                   <Button 

@@ -4,20 +4,20 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import { getAnalytics } from 'firebase/analytics';
 
-// Configuração do Firebase (Manual)
+// Configuração do Firebase
 const firebaseConfig = {
-  apiKey: "AIzaSyBWMVE765V8nqz7gKwyBE2-SQ5_hNAPkDM",
-  authDomain: "botecodoluis2.firebaseapp.com",
-  projectId: "botecodoluis2",
-  storageBucket: "botecodoluis2.firebasestorage.app",
-  messagingSenderId: "959264021711",
-  appId: "1:959264021711:web:d96d3d6efd985680092bba",
-  measurementId: "G-3LEXX8S4X8"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyBWMVE765V8nqz7gKwyBE2-SQ5_hNAPkDM",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "botecodoluis2.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "botecodoluis2",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "botecodoluis2.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "959264021711",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:959264021711:web:d96d3d6efd985680092bba",
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-3LEXX8S4X8"
 };
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app, "botecodoluis");
+export const db = getFirestore(app, import.meta.env.VITE_FIREBASE_DATABASE_ID || "botecodoluis");
 export const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
 
 // Connection test
