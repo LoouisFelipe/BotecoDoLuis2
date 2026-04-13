@@ -17,7 +17,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app, import.meta.env.VITE_FIREBASE_DATABASE_ID || "botecodoluis");
+export const db = getFirestore(app, import.meta.env.VITE_FIREBASE_DATABASE_ID || import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || "botecodoluis");
 export const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
 
 // Connection test

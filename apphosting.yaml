@@ -22,8 +22,18 @@ env:
     availability:
       - BUILD
       - RUNTIME
+  - variable: VITE_FIREBASE_DATABASE_ID
+    value: botecodoluis
+    availability:
+      - BUILD
+      - RUNTIME
   - variable: VITE_FIREBASE_FIRESTORE_DATABASE_ID
-    value: ai-studio-5d74a4cb-a26f-4cb6-87b2-03611bc14928
+    value: botecodoluis
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: VITE_FIREBASE_MEASUREMENT_ID
+    value: G-3LEXX8S4X8
     availability:
       - BUILD
       - RUNTIME
