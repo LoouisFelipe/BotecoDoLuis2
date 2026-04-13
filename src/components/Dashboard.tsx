@@ -38,19 +38,19 @@ export function Dashboard({ user }: { user: UserProfile }) {
       orderBy('createdAt', 'desc')
     );
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      setOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order)));
+      setOrders(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Order)));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'open_orders'));
 
     const unsubProducts = onSnapshot(collection(db, 'products'), (snapshot) => {
-      setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product)));
+      setProducts(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Product)));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'products'));
 
     const unsubCustomers = onSnapshot(collection(db, 'customers'), (snapshot) => {
-      setCustomers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer)));
+      setCustomers(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Customer)));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'customers'));
 
     const unsubCategories = onSnapshot(collection(db, 'categories'), (snapshot) => {
-      setCategories(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category)));
+      setCategories(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Category)));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'categories'));
 
     return () => {
@@ -737,29 +737,39 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                     </button>
                   }
                 />
-                <DialogContent className="max-w-6xl bg-[#0b1224] border-border text-white p-0 overflow-hidden h-[95vh] md:h-[90vh] flex flex-col">
+                <DialogContent className="max-w-7xl bg-[#0b1224] border-border text-white p-0 overflow-hidden h-[98vh] md:h-[90vh] flex flex-col shadow-2xl">
                   {/* Header */}
-                  <div className="p-4 md:p-8 border-b border-border/50 flex flex-col md:flex-row md:items-center justify-between bg-[#0b1224] z-10 gap-4 flex-shrink-0 relative">
-                    <div className="flex items-center gap-3 md:gap-4">
-                      <div className="w-10 h-10 md:w-14 md:h-14 rounded-xl md:rounded-2xl bg-[#111827] flex items-center justify-center border border-[#1e293b] shadow-lg">
-                        <Receipt className="w-5 h-5 md:w-7 md:h-7 text-[#0070f3]" />
+                  <div className="p-4 md:p-8 border-b border-border/50 flex flex-col sm:flex-row sm:items-center justify-between bg-[#0b1224] z-20 gap-4 flex-shrink-0 relative">
+                    <div className="flex items-center gap-3 md:gap-6">
+                      <div className="w-10 h-10 md:w-16 md:h-16 rounded-xl md:rounded-2xl bg-[#111827] flex items-center justify-center border border-[#1e293b] shadow-lg">
+                        <Receipt className="w-5 h-5 md:w-8 md:h-8 text-[#0070f3]" />
                       </div>
                       <div className="min-w-0">
-                        <div className="flex items-center gap-3 mb-1">
-                          <DialogTitle className="text-xl md:text-5xl font-black uppercase tracking-tighter leading-none truncate max-w-[180px] md:max-w-none">{order.customerName}</DialogTitle>
+                        <div className="flex items-center gap-3 mb-1 md:mb-2">
+                          <DialogTitle className="text-xl md:text-5xl font-black uppercase tracking-tighter leading-none truncate max-w-[150px] md:max-w-none">
+                            {order.customerName}
+                          </DialogTitle>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="text-[8px] md:text-[10px] font-bold tracking-widest uppercase border-border bg-[#111827] text-muted-foreground px-2 md:px-3 py-0.5 md:py-1">
+                          <Badge variant="outline" className={cn(
+                            "text-[9px] md:text-[12px] font-black tracking-widest uppercase px-2 md:px-3 py-0.5 md:py-1 rounded-md",
+                            order.type === 'table' ? "bg-white/10 text-white border-white/20" : "bg-green-500/10 text-green-500 border-green-500/20"
+                          )}>
                             {order.type === 'table' ? 'AVULSO' : 'FIEL'}
                           </Badge>
                           {order.type === 'table' && (
                             <Dialog open={isLinkCustomerOpen} onOpenChange={setIsLinkCustomerOpen}>
                               <DialogTrigger
                                 render={
-                                  <button className="text-[8px] md:text-[10px] font-bold tracking-widest uppercase text-[#0070f3] hover:underline">VINCULAR</button>
+                                  <button 
+                                    className="text-[9px] md:text-[12px] font-black tracking-widest uppercase text-[#0070f3] hover:text-[#0070f3]/80 transition-colors h-8 flex items-center px-2"
+                                    aria-label="Vincular cliente fiel a esta comanda"
+                                  >
+                                    VINCULAR FIEL
+                                  </button>
                                 }
                               />
-                              <DialogContent className="bg-[#0b1224] border-border max-w-md text-white p-0 overflow-hidden flex flex-col max-h-[80vh]">
+                              <DialogContent className="bg-[#0b1224] border-border max-w-md text-white p-0 overflow-hidden flex flex-col max-h-[85vh] shadow-2xl">
                                 <DialogHeader className="p-6 border-b border-border/50">
                                   <DialogTitle className="text-xl font-black uppercase tracking-tighter">Vincular Cliente Fiel</DialogTitle>
                                 </DialogHeader>
@@ -773,11 +783,11 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                                             key={letter}
                                             onClick={() => setLinkLetterFilter(letter)}
                                             className={cn(
-                                              "aspect-square rounded-md text-[10px] font-black transition-all flex items-center justify-center",
+                                              "aspect-square rounded-md text-[10px] font-black transition-all flex items-center justify-center min-w-[32px] min-h-[32px]",
                                               linkLetterFilter === letter ? "bg-[#0070f3] text-white shadow-[0_0_15px_rgba(0,112,243,0.5)]" : "text-muted-foreground hover:text-white"
                                             )}
                                           >
-                                            {letter === 'TODOS' ? 'TODOS' : letter}
+                                            {letter === 'TODOS' ? 'T' : letter}
                                           </button>
                                         ))}
                                       </div>
@@ -813,14 +823,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                                     disabled={!linkCustomerId || isProcessing}
                                     className="flex-1 h-12 font-black uppercase tracking-widest text-xs bg-[#0070f3] hover:bg-[#0070f3]/90"
                                   >
-                                    {isProcessing ? (
-                                      <div className="flex items-center gap-2">
-                                        <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                        <span>Vinculando...</span>
-                                      </div>
-                                    ) : (
-                                      'Vincular'
-                                    )}
+                                    {isProcessing ? 'Vinculando...' : 'Vincular'}
                                   </Button>
                                 </DialogFooter>
                               </DialogContent>
@@ -830,36 +833,38 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                       </div>
                     </div>
 
-                    <div className="text-right flex flex-col items-end">
-                      <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground mb-1">TOTAL ACUMULADO</p>
-                      <p className="text-4xl md:text-6xl font-black text-[#0070f3] tracking-tighter leading-none">R$ {(order.totalAmount || 0).toFixed(2)}</p>
+                    <div className="text-left sm:text-right flex flex-col items-start sm:items-end">
+                      <p className="text-[9px] md:text-[10px] font-bold tracking-widest uppercase text-muted-foreground mb-1">TOTAL ACUMULADO</p>
+                      <p className="text-3xl md:text-7xl font-black text-[#0070f3] tracking-tighter leading-none">R$ {(order.totalAmount || 0).toFixed(2)}</p>
                     </div>
                     
                     <button 
                       onClick={() => setIsAddItemsOpen(false)} 
-                      aria-label="Fechar"
-                      className="absolute right-6 top-6 text-muted-foreground hover:text-white transition-colors"
+                      aria-label="Fechar comanda"
+                      className="absolute right-4 top-4 md:right-6 md:top-6 text-muted-foreground hover:text-white transition-colors p-2 rounded-full hover:bg-white/5"
                     >
-                      <X className="w-5 h-5" />
+                      <X className="w-5 h-5 md:w-6 md:h-6" />
                     </button>
                   </div>
 
-                  <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+                  <div className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
                     {/* Left Side: Products */}
-                    <div className="flex-1 flex flex-col border-b lg:border-b-0 lg:border-r border-border/50 min-h-0">
-                      <div className="p-4 md:p-6 flex-shrink-0">
+                    <div className="flex-1 flex flex-col border-b lg:border-b-0 lg:border-r border-border/50 min-h-0 bg-[#0b1224]">
+                      <div className="p-4 md:p-6 flex-shrink-0 bg-[#0b1224] z-10">
                         <div className="flex gap-3">
                           <div className="relative flex-1 group">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 md:w-5 md:h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 md:w-5 md:h-5 text-muted-foreground group-focus-within:text-[#0070f3] transition-colors" />
                             <Input 
                               placeholder="Buscar item..." 
-                              className="pl-10 md:pl-12 h-12 md:h-14 bg-[#111827]/50 border-border rounded-xl text-xs md:text-sm font-bold tracking-widest focus:ring-primary/20 focus:border-primary transition-all"
+                              className="pl-10 md:pl-12 h-12 md:h-14 bg-[#111827]/50 border-border rounded-xl text-xs md:text-sm font-bold tracking-widest focus:ring-[#0070f3]/20 focus:border-[#0070f3] transition-all"
                               value={itemSearch}
                               onChange={(e) => setItemSearch(e.target.value)}
+                              aria-label="Buscar produtos no cardápio"
                             />
                           </div>
                           <Button 
                             variant="outline" 
+                            aria-label="Acesso rápido"
                             className="w-12 h-12 md:w-14 md:h-14 rounded-xl bg-[#111827]/50 border-border hover:bg-orange-500/10 hover:border-orange-500/50 group transition-all flex-shrink-0"
                           >
                             <Zap className="w-5 h-5 md:w-6 md:h-6 text-orange-500 group-hover:scale-110 transition-transform" />
@@ -868,7 +873,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                       </div>
 
                       <div className="flex-1 px-4 md:px-6 pb-4 md:pb-6 overflow-y-auto min-h-0 custom-scrollbar">
-                        <div className="space-y-4">
+                        <div className="space-y-3">
                           {sortedCategories.map(category => {
                             const categoryProducts = products.filter(p => 
                               (p.categoryId === category.id || (category.id === 'Outros' && (!p.categoryId || !categories.find(c => c.id === p.categoryId)))) && 
@@ -880,12 +885,13 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                             const isExpanded = expandedCategories.includes(category.id);
 
                             return (
-                              <div key={category.id} className="bg-[#111827]/30 border border-border/50 rounded-2xl overflow-hidden transition-all hover:border-[#0070f3]/30">
+                              <div key={category.id} className="bg-[#111827]/30 border border-border/50 rounded-xl overflow-hidden transition-all hover:border-[#0070f3]/30">
                                 <button 
                                   onClick={() => setExpandedCategories(prev => isExpanded ? prev.filter(c => c !== category.id) : [...prev, category.id])}
-                                  className="w-full p-4 md:p-6 flex items-center justify-between hover:bg-white/5 transition-colors"
+                                  className="w-full p-4 md:p-5 flex items-center justify-between hover:bg-white/5 transition-colors"
+                                  aria-expanded={isExpanded}
                                 >
-                                  <div className="flex items-center gap-3 md:gap-4">
+                                  <div className="flex items-center gap-4">
                                     <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-[#111827] flex items-center justify-center border border-[#1e293b]">
                                       <Package className="w-5 h-5 md:w-6 md:h-6 text-muted-foreground" />
                                     </div>
@@ -903,14 +909,22 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                                       <button
                                         key={product.id}
                                         onClick={() => handleAddItem(product)}
-                                        className="flex items-center justify-between p-3 md:p-4 rounded-xl bg-[#111827]/50 border border-border/50 hover:border-primary/50 hover:bg-primary/5 transition-all group"
+                                        className="flex items-center justify-between p-3 md:p-4 rounded-xl bg-[#111827]/50 border border-border/50 hover:border-[#0070f3]/50 hover:bg-[#0070f3]/5 transition-all group min-h-[56px]"
+                                        aria-label={`Adicionar ${product.name} por R$ ${product.price.toFixed(2)}`}
                                       >
                                         <div className="text-left">
                                           <p className="font-bold uppercase tracking-wider text-xs md:text-sm">{product.name}</p>
-                                          <p className="text-[9px] md:text-[10px] font-bold text-muted-foreground uppercase tracking-widest">R$ {product.price.toFixed(2)}</p>
+                                          <div className="flex items-center gap-2">
+                                            <p className="text-[9px] md:text-[10px] font-bold text-muted-foreground uppercase tracking-widest">R$ {product.price.toFixed(2)}</p>
+                                            {product.unit && product.unit !== 'Por Unidade' && (
+                                              <Badge variant="outline" className="text-[7px] md:text-[8px] font-bold tracking-widest uppercase border-border bg-white/5 text-muted-foreground px-1 py-0">
+                                                {product.unit}
+                                              </Badge>
+                                            )}
+                                          </div>
                                         </div>
-                                        <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary opacity-0 group-hover:opacity-100 transition-all">
-                                          <Plus className="w-3 h-3 md:w-4 md:h-4" />
+                                        <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-[#0070f3]/10 flex items-center justify-center text-[#0070f3] opacity-0 group-hover:opacity-100 transition-all">
+                                          <Plus className="w-4 h-4 md:w-5 md:h-5" />
                                         </div>
                                       </button>
                                     ))}
@@ -924,27 +938,27 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                     </div>
 
                     {/* Right Side: Cart */}
-                    <div className="w-full lg:w-[400px] flex flex-col bg-[#0b1224] border-t lg:border-t-0 border-border/50 max-h-[40vh] lg:max-h-none">
-                      <div className="p-4 md:p-6 border-b border-border/50 flex items-center justify-between flex-shrink-0">
+                    <div className="w-full lg:w-[450px] flex flex-col bg-[#0b1224] border-t lg:border-t-0 border-border/50 min-h-0">
+                      <div className="p-4 md:p-6 border-b border-border/50 flex items-center justify-between flex-shrink-0 bg-[#0b1224] z-10">
                         <div className="flex items-center gap-3">
-                          <ShoppingCart className="w-4 h-4 md:w-5 md:h-5 text-primary" />
+                          <ShoppingCart className="w-5 h-5 text-[#0070f3]" />
                           <h4 className="font-black uppercase tracking-widest text-xs">SACOLA ({order.items.reduce((sum, i) => sum + i.quantity, 0)})</h4>
                         </div>
                         <button 
                           onClick={() => setIsClearConfirmOpen(true)}
-                          aria-label="Limpar sacola"
-                          disabled={isProcessing}
-                          className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-red-500/10 flex items-center justify-center text-red-500 hover:bg-red-500/20 transition-all disabled:opacity-50"
+                          aria-label="Limpar sacola inteira"
+                          disabled={isProcessing || order.items.length === 0}
+                          className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center text-red-500 hover:bg-red-500/20 transition-all disabled:opacity-50"
                         >
-                          <Trash2 className="w-4 h-4 md:w-5 md:h-5" />
+                          <Trash2 className="w-5 h-5" />
                         </button>
                       </div>
 
                       <div className="flex-1 p-4 md:p-6 overflow-y-auto min-h-0 custom-scrollbar">
-                        <div className="space-y-3 md:space-y-4">
+                        <div className="space-y-4">
                           {order.items.map((item, idx) => (
-                            <div key={`${order.id}-cart-item-${item.productId}-${idx}`} className="p-4 md:p-5 rounded-2xl bg-[#111827]/50 border border-border/50 relative group">
-                              <div className="flex justify-between items-start mb-3 md:mb-4">
+                            <div key={`${order.id}-cart-item-${item.productId}-${idx}`} className="p-4 md:p-5 rounded-2xl bg-[#111827]/50 border border-border/50 relative group hover:border-[#0070f3]/30 transition-all">
+                              <div className="flex justify-between items-start mb-4">
                                 <div className="min-w-0">
                                   <h5 className="font-black uppercase tracking-widest text-xs md:text-sm mb-1 truncate">{item.productName}</h5>
                                   <p className="text-[9px] md:text-[10px] font-bold text-muted-foreground uppercase tracking-widest">R$ {item.price.toFixed(2)}</p>
@@ -954,11 +968,11 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                                     setItemToRemove(item.productId);
                                     setIsRemoveItemConfirmOpen(true);
                                   }}
-                                  aria-label="Remover item"
+                                  aria-label={`Remover ${item.productName} da sacola`}
                                   disabled={isProcessing}
-                                  className="text-muted-foreground hover:text-red-500 transition-colors disabled:opacity-50 flex-shrink-0"
+                                  className="text-muted-foreground hover:text-red-500 transition-colors disabled:opacity-50 flex-shrink-0 p-2"
                                 >
-                                  <Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                                  <Trash2 className="w-4 h-4" />
                                 </button>
                               </div>
 
@@ -966,52 +980,54 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                                 <div className="flex items-center bg-[#0b1224] rounded-xl border border-border p-1">
                                   <button 
                                     onClick={() => handleUpdateQuantity(item.productId, -1)}
-                                    aria-label="Diminuir quantidade"
+                                    aria-label={`Diminuir quantidade de ${item.productName}`}
                                     disabled={isProcessing}
-                                    className="w-7 h-7 md:w-8 md:h-8 rounded-lg hover:bg-white/5 flex items-center justify-center transition-colors disabled:opacity-50"
+                                    className="w-10 h-10 rounded-lg hover:bg-white/5 flex items-center justify-center transition-colors disabled:opacity-50"
                                   >
-                                    <div className="w-2.5 h-0.5 bg-muted-foreground" />
+                                    <div className="w-3 h-0.5 bg-muted-foreground" />
                                   </button>
-                                  <span className="w-8 md:w-10 text-center font-black text-xs md:text-sm">{item.quantity}</span>
+                                  <span className="w-10 text-center font-black text-sm">{item.quantity}</span>
                                   <button 
                                     onClick={() => handleUpdateQuantity(item.productId, 1)}
-                                    aria-label="Aumentar quantidade"
+                                    aria-label={`Aumentar quantidade de ${item.productName}`}
                                     disabled={isProcessing}
-                                    className="w-7 h-7 md:w-8 md:h-8 rounded-lg hover:bg-white/5 flex items-center justify-center transition-colors disabled:opacity-50"
+                                    className="w-10 h-10 rounded-lg hover:bg-white/5 flex items-center justify-center transition-colors disabled:opacity-50"
                                   >
-                                    <Plus className="w-2.5 h-2.5 md:w-3 md:h-3" />
+                                    <Plus className="w-4 h-4 text-muted-foreground" />
                                   </button>
                                 </div>
-                                <p className="font-black text-base md:text-lg tracking-tighter">R$ {(item.subtotal || 0).toFixed(2)}</p>
+                                <p className="font-black text-lg md:text-xl tracking-tighter text-[#0070f3]">R$ {(item.subtotal || 0).toFixed(2)}</p>
                               </div>
                             </div>
                           ))}
                           {order.items.length === 0 && (
-                            <div className="py-10 md:py-20 text-center">
-                              <ShoppingCart className="w-10 h-10 md:w-12 md:h-12 text-muted-foreground mx-auto mb-4 opacity-10" />
-                              <p className="text-[9px] md:text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Sacola vazia</p>
+                            <div className="py-12 md:py-20 text-center">
+                              <ShoppingCart className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-10" />
+                              <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Sacola vazia</p>
                             </div>
                           )}
                         </div>
                       </div>
 
-                      <div className="p-6 md:p-8 border-t border-border/50 bg-[#0b1224]/50 flex-shrink-0">
+                      <div className="p-4 md:p-8 border-t border-border/50 bg-[#0b1224]/50 flex-shrink-0">
                         <div className="flex items-center justify-between mb-6 md:mb-8">
-                          <p className="text-[9px] md:text-[10px] font-bold tracking-widest uppercase text-muted-foreground">TOTAL</p>
+                          <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">TOTAL ACUMULADO</p>
                           <p className="text-3xl md:text-4xl font-black text-[#0070f3] tracking-tighter">R$ {(order.totalAmount || 0).toFixed(2)}</p>
                         </div>
-
-                        <div className="grid grid-cols-2 gap-3 md:gap-4">
+                        
+                        <div className="grid grid-cols-2 gap-4">
                           <Button 
                             variant="outline" 
-                            className="h-12 md:h-16 border-border bg-[#111827]/50 hover:bg-white/5 font-black uppercase tracking-widest text-[10px] md:text-xs rounded-2xl gap-2 border-white/5"
+                            className="h-14 md:h-16 border-border bg-[#111827]/50 hover:bg-white/5 font-black uppercase tracking-widest text-[10px] md:text-xs rounded-2xl gap-2 border-white/5"
                             onClick={() => setIsCheckoutOpen(true)}
+                            aria-label="Ir para o pagamento"
                           >
-                            <span className="text-green-500 font-black">$</span> RECEBER
+                            <Receipt className="w-4 h-4 text-green-500" /> RECEBER
                           </Button>
                           <Button 
-                            className="h-12 md:h-16 bg-[#00a878] hover:bg-[#00a878]/90 font-black uppercase tracking-widest text-[10px] md:text-xs rounded-2xl shadow-[0_0_20px_rgba(0,168,120,0.2)]"
+                            className="h-14 md:h-16 bg-[#10b981] hover:bg-[#059669] font-black uppercase tracking-widest text-[10px] md:text-xs rounded-2xl shadow-[0_0_20px_rgba(16,185,129,0.3)]"
                             onClick={() => setIsAddItemsOpen(false)}
+                            aria-label="Salvar alterações na comanda"
                           >
                             SALVAR
                           </Button>

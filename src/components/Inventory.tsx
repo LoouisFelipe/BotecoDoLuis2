@@ -60,11 +60,11 @@ export function Inventory({ user }: { user: UserProfile }) {
 
   useEffect(() => {
     const unsubProducts = onSnapshot(collection(db, 'products'), (snapshot) => {
-      setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product)));
+      setProducts(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Product)));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'products'));
 
     const unsubCategories = onSnapshot(collection(db, 'categories'), (snapshot) => {
-      setCategories(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category)));
+      setCategories(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Category)));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'categories'));
 
     return () => {
@@ -174,7 +174,10 @@ export function Inventory({ user }: { user: UserProfile }) {
   };
 
   const handleDeleteProduct = async () => {
-    if (!productToDelete) return;
+    if (!productToDelete || !productToDelete.id) {
+      toast.error('Erro: ID do produto não encontrado');
+      return;
+    }
     try {
       await deleteDoc(doc(db, 'products', productToDelete.id));
       toast.success('Produto excluído');

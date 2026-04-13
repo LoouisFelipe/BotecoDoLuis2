@@ -32,7 +32,7 @@ export function Suppliers({ user }: { user: UserProfile }) {
   useEffect(() => {
     const q = query(collection(db, 'suppliers'), orderBy('name', 'asc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      setSuppliers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Supplier)));
+      setSuppliers(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Supplier)));
     });
     return () => unsubscribe();
   }, []);
@@ -83,7 +83,7 @@ export function Suppliers({ user }: { user: UserProfile }) {
   };
 
   const handleDelete = async () => {
-    if (!supplierToDelete) return;
+    if (!supplierToDelete || !supplierToDelete.id) return;
     try {
       await deleteDoc(doc(db, 'suppliers', supplierToDelete.id));
       toast.success('Fornecedor removido');

@@ -42,12 +42,12 @@ export function Finances({ user }: { user: UserProfile }) {
     };
 
     const unsubTransactions = onSnapshot(qTransactions, (snapshot) => {
-      transData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction));
+      transData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Transaction));
       updateMerged();
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'transactions'));
 
     const unsubExpenses = onSnapshot(qExpenses, (snapshot) => {
-      expData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), type: 'expense' } as Transaction));
+      expData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id, type: 'expense' } as Transaction));
       updateMerged();
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'expenses'));
 

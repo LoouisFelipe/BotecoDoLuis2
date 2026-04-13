@@ -38,7 +38,7 @@ export function Customers({ user }: { user: UserProfile }) {
   useEffect(() => {
     const q = query(collection(db, 'customers'), orderBy('name', 'asc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      setCustomers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer)));
+      setCustomers(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Customer)));
     });
     return () => unsubscribe();
   }, []);
@@ -110,7 +110,7 @@ export function Customers({ user }: { user: UserProfile }) {
   };
 
   const handleDelete = async () => {
-    if (!customerToDelete) return;
+    if (!customerToDelete || !customerToDelete.id) return;
     try {
       await deleteDoc(doc(db, 'customers', customerToDelete.id));
       toast.success('Cliente removido');
