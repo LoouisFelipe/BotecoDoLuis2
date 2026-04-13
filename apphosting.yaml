@@ -1,23 +1,39 @@
-# apphosting.yaml
-# Configuração para o Firebase App Hosting
-kind: "AppHostingConfig"
-schemaVersion: "v1"
+# Firebase App Hosting configuration file
+# Documentation: https://firebase.google.com/docs/app-hosting/configure
 
-# Configurações de ambiente para o build (opcional)
-# env:
-#   - variable: VITE_SOME_KEY
-#     value: "some-value"
-
-# Configurações de execução (Runtime)
-runConfig:
-  minInstances: 0
-  maxInstances: 10
-  concurrency: 80
-  cpu: 1
-  memoryMiB: 512
-
-# Configurações de Build
-# App Hosting detectará automaticamente, mas podemos ser explícitos se necessário
-# buildConfig:
-#   buildCommand: "npm run build"
-#   runCommand: "npm start"
+env:
+  - variable: VITE_FIREBASE_PROJECT_ID
+    value: botecodoluis2
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: VITE_FIREBASE_APP_ID
+    value: 1:959264021711:web:d96d3d6efd985680092bba
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: VITE_FIREBASE_API_KEY
+    value: AIzaSyBWMVE765V8nqz7gKwyBE2-SQ5_hNAPkDM
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: VITE_FIREBASE_AUTH_DOMAIN
+    value: botecodoluis2.firebaseapp.com
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: VITE_FIREBASE_FIRESTORE_DATABASE_ID
+    value: ai-studio-5d74a4cb-a26f-4cb6-87b2-03611bc14928
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: VITE_FIREBASE_STORAGE_BUCKET
+    value: botecodoluis2.firebasestorage.app
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: VITE_FIREBASE_MESSAGING_SENDER_ID
+    value: "959264021711"
+    availability:
+      - BUILD
+      - RUNTIME
