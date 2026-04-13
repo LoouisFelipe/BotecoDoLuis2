@@ -1,52 +1,29 @@
-# Firebase App Hosting configuration file
-# Documentation: https://firebase.google.com/docs/app-hosting/configure
-
+# apphosting.yaml
 env:
   - variable: VITE_FIREBASE_PROJECT_ID
     value: botecodoluis2
-    availability:
-      - BUILD
-      - RUNTIME
+    availability: [BUILD, RUNTIME]
   - variable: VITE_FIREBASE_APP_ID
     value: 1:959264021711:web:d96d3d6efd985680092bba
-    availability:
-      - BUILD
-      - RUNTIME
+    availability: [BUILD, RUNTIME]
   - variable: VITE_FIREBASE_API_KEY
     value: AIzaSyBWMVE765V8nqz7gKwyBE2-SQ5_hNAPkDM
-    availability:
-      - BUILD
-      - RUNTIME
+    availability: [BUILD, RUNTIME]
   - variable: VITE_FIREBASE_AUTH_DOMAIN
     value: botecodoluis2.firebaseapp.com
-    availability:
-      - BUILD
-      - RUNTIME
+    availability: [BUILD, RUNTIME]
   - variable: VITE_FIREBASE_DATABASE_ID
     value: botecodoluis
-    availability:
-      - BUILD
-      - RUNTIME
+    availability: [BUILD, RUNTIME]
   - variable: VITE_FIREBASE_FIRESTORE_DATABASE_ID
     value: botecodoluis
-    availability:
-      - BUILD
-      - RUNTIME
-  - variable: VITE_FIREBASE_MEASUREMENT_ID
-    value: G-3LEXX8S4X8
-    availability:
-      - BUILD
-      - RUNTIME
+    availability: [BUILD, RUNTIME]
   - variable: VITE_FIREBASE_STORAGE_BUCKET
     value: botecodoluis2.firebasestorage.app
-    availability:
-      - BUILD
-      - RUNTIME
+    availability: [BUILD, RUNTIME]
   - variable: VITE_FIREBASE_MESSAGING_SENDER_ID
     value: "959264021711"
-    availability:
-      - BUILD
-      - RUNTIME
+    availability: [BUILD, RUNTIME]
 
 runConfig:
   region: us-central1
