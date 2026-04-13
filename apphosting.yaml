@@ -15,3 +15,9 @@ runConfig:
   concurrency: 80
   cpu: 1
   memoryMiB: 512
+
+# Configurações de Build
+# App Hosting detectará automaticamente, mas podemos ser explícitos se necessário
+# buildConfig:
+#   buildCommand: "npm run build"
+#   runCommand: "npm start"
