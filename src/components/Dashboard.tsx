@@ -239,14 +239,14 @@ export function Dashboard({ user }: { user: UserProfile }) {
               setNewOrderTab('table');
             }
           }}>
-            <DialogTrigger render={
+            <DialogTrigger nativeButton={true} render={
               <Button className="h-16 px-8 bg-[#0070f3] hover:bg-[#0070f3]/90 text-white font-black uppercase tracking-widest rounded-2xl shadow-lg shadow-[#0070f3]/20 gap-2 hidden md:flex">
                 <Plus className="w-5 h-5" />
                 ABRIR COMANDA
               </Button>
             } />
             {/* FAB for Mobile */}
-            <DialogTrigger render={
+            <DialogTrigger nativeButton={true} render={
               <button className="md:hidden fixed bottom-24 right-6 w-16 h-16 bg-[#0070f3] text-white rounded-full shadow-2xl flex items-center justify-center z-40 active:scale-95 transition-transform">
                 <Plus className="w-8 h-8" />
               </button>
@@ -672,7 +672,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
   return (
     <>
       <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-          <DialogTrigger render={viewMode === 'list' ? (
+          <DialogTrigger nativeButton={false} render={viewMode === 'list' ? (
             <div className="group relative bg-[#0d1117] hover:bg-[#161b22] border border-white/5 rounded-2xl p-5 md:p-6 transition-all cursor-pointer flex items-center justify-between gap-4 shadow-sm">
               <div className="flex items-center gap-4">
                 <div className="relative flex-shrink-0">
