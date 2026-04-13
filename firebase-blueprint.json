@@ -36,6 +36,7 @@
         "phone": { "type": "string" },
         "email": { "type": "string" },
         "address": { "type": "string" },
+        "balance": { "type": "number", "description": "Current debt or credit balance. Negative means debt." },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["name"]
@@ -84,9 +85,22 @@
       "type": "object",
       "properties": {
         "customerName": { "type": "string" },
+        "customerId": { "type": "string", "description": "Reference to Customer entity if it is a loyal customer" },
         "status": { "type": "string", "enum": ["open", "closed", "cancelled"] },
         "items": { "type": "array" },
         "totalAmount": { "type": "number" },
+        "payments": { 
+          "type": "array", 
+          "description": "List of payments made for this order (supports splitting)",
+          "items": {
+            "type": "object",
+            "properties": {
+              "method": { "type": "string", "enum": ["dinheiro", "pix", "credito", "debito", "vr", "fiado"] },
+              "amount": { "type": "number" },
+              "date": { "type": "string", "format": "date-time" }
+            }
+          }
+        },
         "createdAt": { "type": "string", "format": "date-time" },
         "closedAt": { "type": "string", "format": "date-time" },
         "createdBy": { "type": "string" }

@@ -6,6 +6,7 @@ export interface Customer {
   address?: string;
   totalSpent?: number;
   orderCount?: number;
+  balance?: number;
   createdAt: any;
 }
 
@@ -94,6 +95,11 @@ export interface Order {
   status: 'open' | 'closed' | 'cancelled';
   items: OrderItem[];
   totalAmount: number;
+  payments?: {
+    method: string;
+    amount: number;
+    date: any;
+  }[];
   createdAt: any;
   closedAt?: any;
   createdBy: string;

@@ -51,7 +51,7 @@ export function Reports({ user }: { user: UserProfile }) {
           const dayTransactions = transSnapshot.docs.map(doc => doc.data() as Transaction);
           const dayExpenses = expSnapshot.docs.map(doc => doc.data() as Transaction);
           
-          const income = dayTransactions.filter(t => t.type === 'income').reduce((s, t) => s + (t.amount || 0), 0);
+          const income = dayTransactions.filter(t => t.type === 'income' && !(t as any).isFiado).reduce((s, t) => s + (t.amount || 0), 0);
           const expenseFromTrans = dayTransactions.filter(t => t.type === 'expense').reduce((s, t) => s + (t.amount || 0), 0);
           const expenseFromExp = dayExpenses.reduce((s, t) => s + (t.amount || 0), 0);
 

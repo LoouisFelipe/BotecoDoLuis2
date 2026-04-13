@@ -4,20 +4,20 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import { getAnalytics } from 'firebase/analytics';
 
-// Configuração carregada via variáveis de ambiente (Vite)
+// Configuração do Firebase (Manual)
 const firebaseConfig = {
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  firestoreDatabaseId: import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  apiKey: "AIzaSyBWMVE765V8nqz7gKwyBE2-SQ5_hNAPkDM",
+  authDomain: "botecodoluis2.firebaseapp.com",
+  projectId: "botecodoluis2",
+  storageBucket: "botecodoluis2.firebasestorage.app",
+  messagingSenderId: "959264021711",
+  appId: "1:959264021711:web:d96d3d6efd985680092bba",
+  measurementId: "G-3LEXX8S4X8"
 };
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+export const db = getFirestore(app, "botecodoluis");
 export const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
 
 // Connection test

@@ -424,9 +424,20 @@ export function Dashboard({ user }: { user: UserProfile }) {
         "grid gap-3",
         viewMode === 'grid' ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" : "grid-cols-1"
       )}>
-        {filteredOrders.map((order) => (
-          <OrderCard key={order.id} order={order} products={products} customers={customers} categories={categories} viewMode={viewMode} />
-        ))}
+        <AnimatePresence mode="popLayout">
+          {filteredOrders.map((order) => (
+            <motion.div
+              key={order.id}
+              layout
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.2 }}
+            >
+              <OrderCard order={order} products={products} customers={customers} categories={categories} viewMode={viewMode} />
+            </motion.div>
+          ))}
+        </AnimatePresence>
         {filteredOrders.length === 0 && (
           <div className="col-span-full py-24 text-center bg-card/30 rounded-2xl border border-dashed border-border">
             <ShoppingCart className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-10" />
@@ -458,13 +469,15 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
   const [checkoutAmount, setCheckoutAmount] = useState(order.totalAmount);
   const [checkoutDiscount, setCheckoutDiscount] = useState(0);
   const [checkoutAdjustment, setCheckoutAdjustment] = useState(0);
-  const [checkoutPaymentMethod, setCheckoutPaymentMethod] = useState('DINHEIRO');
+  const [checkoutPayments, setCheckoutPayments] = useState<{method: string, amount: number}[]>([]);
   const [checkoutDate, setCheckoutDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [checkoutCustomerId, setCheckoutCustomerId] = useState(order.customerId || 'none');
 
   useEffect(() => {
     if (isCheckoutOpen) {
-      setCheckoutAmount(order.totalAmount - checkoutDiscount + checkoutAdjustment);
+      const total = order.totalAmount - checkoutDiscount + checkoutAdjustment;
+      setCheckoutAmount(total);
+      setCheckoutPayments([{ method: 'DINHEIRO', amount: total }]);
     }
   }, [order.totalAmount, checkoutDiscount, checkoutAdjustment, isCheckoutOpen]);
 
@@ -577,6 +590,11 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
   };
 
   const handleFinalizeCheckout = async () => {
+    if (checkoutPayments.reduce((sum, p) => sum + p.amount, 0).toFixed(2) !== checkoutAmount.toFixed(2)) {
+      toast.error('O total dos pagamentos deve ser igual ao valor a receber');
+      return;
+    }
+
     setIsProcessing(true);
     try {
       const finalAmount = checkoutAmount;
@@ -586,6 +604,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
         status: 'closed',
         closedAt: serverTimestamp(),
         totalAmount: finalAmount,
+        payments: checkoutPayments.map(p => ({ ...p, date: new Date() })),
         customerId: targetCustomerId === 'none' ? '' : targetCustomerId
       });
       
@@ -593,23 +612,32 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
         const customerRef = doc(db, 'customers', targetCustomerId);
         const customer = customers.find(c => c.id === targetCustomerId);
         if (customer) {
+          const fiadoAmount = checkoutPayments
+            .filter(p => p.method === 'FIADO')
+            .reduce((sum, p) => sum + p.amount, 0);
+
           await updateDoc(customerRef, {
             totalSpent: (customer.totalSpent || 0) + finalAmount,
             orderCount: (customer.orderCount || 0) + 1,
+            balance: (customer.balance || 0) - fiadoAmount,
             lastVisit: serverTimestamp()
           });
         }
       }
 
-      await addDoc(collection(db, 'transactions'), {
-        type: 'income',
-        category: 'Vendas',
-        amount: finalAmount,
-        description: `Comanda fechada: ${order.customerName}${checkoutDiscount > 0 ? ` (Desc: R$ ${checkoutDiscount})` : ''}${checkoutAdjustment !== 0 ? ` (Ajuste: R$ ${checkoutAdjustment})` : ''}`,
-        date: new Date(checkoutDate + 'T12:00:00'),
-        orderId: order.id,
-        paymentMethod: checkoutPaymentMethod
-      });
+      // Create transactions for each payment
+      for (const payment of checkoutPayments) {
+        await addDoc(collection(db, 'transactions'), {
+          type: 'income',
+          category: 'Vendas',
+          amount: payment.amount,
+          description: `Comanda fechada: ${order.customerName} (${payment.method})${checkoutDiscount > 0 ? ` (Desc: R$ ${checkoutDiscount})` : ''}${checkoutAdjustment !== 0 ? ` (Ajuste: R$ ${checkoutAdjustment})` : ''}`,
+          date: new Date(checkoutDate + 'T12:00:00'),
+          orderId: order.id,
+          paymentMethod: payment.method,
+          isFiado: payment.method === 'FIADO' // Mark for filtering in reports
+        });
+      }
 
       setIsCheckoutOpen(false);
       setIsDetailOpen(false);
@@ -693,7 +721,21 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                     {(order.totalAmount || 0).toFixed(2)}
                   </p>
                 </div>
-                <ChevronRight className="w-5 h-5 text-muted-foreground/30 group-hover:text-primary transition-colors" />
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    disabled={isProcessing}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsDeleteConfirmOpen(true);
+                    }}
+                    className="h-10 w-10 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-all rounded-xl"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                  <ChevronRight className="w-5 h-5 text-muted-foreground/30 group-hover:text-primary transition-colors" />
+                </div>
               </div>
             </div>
           ) : (
@@ -925,41 +967,50 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                   </div>
 
                   <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3">
-                    {order.items.map(item => (
-                      <div key={item.productId} className="bg-[#0d1117] border border-white/5 rounded-2xl p-5 flex items-center justify-between gap-4">
-                        <div className="min-w-0">
-                          <p className="font-black text-sm md:text-lg uppercase tracking-tight truncate leading-none mb-1">{item.productName}</p>
-                          <p className="text-xs text-muted-foreground font-bold tracking-widest">R$ {item.price.toFixed(2)}</p>
-                        </div>
+                    <AnimatePresence mode="popLayout">
+                      {order.items.map(item => (
+                        <motion.div 
+                          key={item.productId}
+                          layout
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: 20 }}
+                          className="bg-[#0d1117] border border-white/5 rounded-2xl p-5 flex items-center justify-between gap-4"
+                        >
+                          <div className="min-w-0">
+                            <p className="font-black text-sm md:text-lg uppercase tracking-tight truncate leading-none mb-1">{item.productName}</p>
+                            <p className="text-xs text-muted-foreground font-bold tracking-widest">R$ {item.price.toFixed(2)}</p>
+                          </div>
 
-                        <div className="flex items-center gap-4">
-                          <div className="flex items-center bg-[#161b22] rounded-xl p-1 border border-white/5">
+                          <div className="flex items-center gap-4">
+                            <div className="flex items-center bg-[#161b22] rounded-xl p-1 border border-white/5">
+                              <button 
+                                onClick={() => handleUpdateQuantity(item.productId, -1)}
+                                className="w-10 h-10 flex items-center justify-center text-muted-foreground hover:text-white transition-colors"
+                              >
+                                <Minus className="w-4 h-4" />
+                              </button>
+                              <span className="w-8 text-center font-black text-lg">{item.quantity}</span>
+                              <button 
+                                onClick={() => handleUpdateQuantity(item.productId, 1)}
+                                className="w-10 h-10 flex items-center justify-center text-muted-foreground hover:text-white transition-colors"
+                              >
+                                <Plus className="w-4 h-4" />
+                              </button>
+                            </div>
                             <button 
-                              onClick={() => handleUpdateQuantity(item.productId, -1)}
-                              className="w-10 h-10 flex items-center justify-center text-muted-foreground hover:text-white transition-colors"
+                              onClick={() => {
+                                setItemToRemove(item.productId);
+                                setIsRemoveItemConfirmOpen(true);
+                              }}
+                              className="w-10 h-10 rounded-xl bg-red-500/10 text-red-500 flex items-center justify-center hover:bg-red-500/20 transition-colors"
                             >
-                              <Minus className="w-4 h-4" />
-                            </button>
-                            <span className="w-8 text-center font-black text-lg">{item.quantity}</span>
-                            <button 
-                              onClick={() => handleUpdateQuantity(item.productId, 1)}
-                              className="w-10 h-10 flex items-center justify-center text-muted-foreground hover:text-white transition-colors"
-                            >
-                              <Plus className="w-4 h-4" />
+                              <Trash2 className="w-4 h-4" />
                             </button>
                           </div>
-                          <button 
-                            onClick={() => {
-                              setItemToRemove(item.productId);
-                              setIsRemoveItemConfirmOpen(true);
-                            }}
-                            className="w-10 h-10 rounded-xl bg-red-500/10 text-red-500 flex items-center justify-center hover:bg-red-500/20 transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                        </motion.div>
+                      ))}
+                    </AnimatePresence>
                     {order.items.length === 0 && (
                       <div className="py-24 text-center">
                         <ShoppingCart className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-10" />
@@ -976,10 +1027,15 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
           <div className="p-6 md:p-8 border-t border-white/5 bg-[#0d1117] flex flex-col space-y-4 flex-shrink-0">
             <div className="flex items-center justify-between mb-2">
               <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">TOTAL ACUMULADO</p>
-              <p className="text-3xl font-black tracking-tighter text-[#0070f3]">
+              <motion.p 
+                key={order.totalAmount}
+                initial={{ scale: 1.1, color: '#0070f3' }}
+                animate={{ scale: 1, color: '#0070f3' }}
+                className="text-3xl font-black tracking-tighter"
+              >
                 <span className="text-sm mr-1">R$</span>
                 {(order.totalAmount || 0).toFixed(2)}
-              </p>
+              </motion.p>
             </div>
             <div className="flex gap-4">
               <Button 
@@ -1145,18 +1201,76 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                 />
               </div>
 
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Forma de Pagamento</label>
-                <Select value={checkoutPaymentMethod} onValueChange={setCheckoutPaymentMethod}>
-                  <SelectTrigger className="h-14 bg-[#0d1117] border-white/5 font-bold">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[#05070a] border-white/5">
-                    {['DINHEIRO', 'PIX', 'CARTÃO DE CRÉDITO', 'CARTÃO DE DÉBITO', 'VALE REFEIÇÃO'].map(method => (
-                      <SelectItem key={method} value={method} className="font-bold uppercase tracking-widest">{method}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Pagamentos / Divisão</label>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setCheckoutPayments([...checkoutPayments, { method: 'DINHEIRO', amount: 0 }])}
+                    className="h-8 text-[10px] font-bold uppercase tracking-widest border-white/5 hover:bg-white/5"
+                  >
+                    <Plus className="w-3 h-3 mr-1" /> Adicionar
+                  </Button>
+                </div>
+                
+                <div className="space-y-3">
+                  {checkoutPayments.map((payment, index) => (
+                    <div key={index} className="flex gap-3 items-end animate-in fade-in slide-in-from-top-1 duration-200">
+                      <div className="flex-1 space-y-1">
+                        <Select 
+                          value={payment.method} 
+                          onValueChange={(val) => {
+                            const newPayments = [...checkoutPayments];
+                            newPayments[index].method = val;
+                            setCheckoutPayments(newPayments);
+                          }}
+                        >
+                          <SelectTrigger className="h-12 bg-[#0d1117] border-white/5 font-bold text-xs uppercase">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="bg-[#05070a] border-white/5">
+                            {['DINHEIRO', 'PIX', 'CARTÃO DE CRÉDITO', 'CARTÃO DE DÉBITO', 'VALE REFEIÇÃO', 'FIADO'].map(method => (
+                              <SelectItem key={method} value={method} className="font-bold uppercase tracking-widest text-xs">{method}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="w-32 space-y-1">
+                        <Input 
+                          type="number" 
+                          step="0.01"
+                          className="h-12 bg-[#0d1117] border-white/5 font-bold text-xs"
+                          value={payment.amount}
+                          onChange={(e) => {
+                            const newPayments = [...checkoutPayments];
+                            newPayments[index].amount = parseFloat(e.target.value) || 0;
+                            setCheckoutPayments(newPayments);
+                          }}
+                        />
+                      </div>
+                      {checkoutPayments.length > 1 && (
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => setCheckoutPayments(checkoutPayments.filter((_, i) => i !== index))}
+                          className="h-12 w-12 text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                
+                <div className={cn(
+                  "p-3 rounded-xl text-center text-[10px] font-black uppercase tracking-widest transition-colors",
+                  checkoutPayments.reduce((sum, p) => sum + p.amount, 0).toFixed(2) === checkoutAmount.toFixed(2) 
+                    ? "bg-green-500/10 text-green-500 border border-green-500/20" 
+                    : "bg-red-500/10 text-red-500 border border-red-500/20"
+                )}>
+                  Total Pago: R$ {checkoutPayments.reduce((sum, p) => sum + p.amount, 0).toFixed(2)} / R$ {checkoutAmount.toFixed(2)}
+                </div>
               </div>
             </div>
           </div>

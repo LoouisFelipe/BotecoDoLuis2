@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, query, onSnapshot, addDoc, serverTimestamp, orderBy, limit, getDocs } from 'firebase/firestore';
-import { Transaction, UserProfile } from '../types';
+import { collection, query, onSnapshot, addDoc, serverTimestamp, orderBy, limit, getDocs, where } from 'firebase/firestore';
+import { Transaction, UserProfile, Customer } from '../types';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from './ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Plus, TrendingUp, TrendingDown, Receipt, Calendar, ArrowUpRight, ArrowDownRight, Filter, X } from 'lucide-react';
+import { Plus, TrendingUp, TrendingDown, Receipt, Calendar, ArrowUpRight, ArrowDownRight, Filter, X, Users } from 'lucide-react';
 import { Badge } from './ui/badge';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -17,6 +17,7 @@ import { cn } from '../lib/utils';
 
 export function Finances({ user }: { user: UserProfile }) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   
@@ -28,6 +29,7 @@ export function Finances({ user }: { user: UserProfile }) {
   useEffect(() => {
     const qTransactions = query(collection(db, 'transactions'), orderBy('date', 'desc'), limit(50));
     const qExpenses = query(collection(db, 'expenses'), orderBy('date', 'desc'), limit(50));
+    const qCustomers = query(collection(db, 'customers'));
 
     let transData: Transaction[] = [];
     let expData: Transaction[] = [];
@@ -51,9 +53,14 @@ export function Finances({ user }: { user: UserProfile }) {
       updateMerged();
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'expenses'));
 
+    const unsubCustomers = onSnapshot(qCustomers, (snapshot) => {
+      setCustomers(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Customer)));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'customers'));
+
     return () => {
       unsubTransactions();
       unsubExpenses();
+      unsubCustomers();
     };
   }, []);
 
@@ -81,16 +88,18 @@ export function Finances({ user }: { user: UserProfile }) {
   };
 
   const totalIncome = transactions
-    .filter(t => t.type === 'income')
+    .filter(t => t.type === 'income' && !(t as any).isFiado)
     .reduce((sum, t) => sum + (t.amount || 0), 0);
     
   const totalExpense = transactions
     .filter(t => t.type === 'expense')
     .reduce((sum, t) => sum + (t.amount || 0), 0);
 
+  const totalFiado = customers.reduce((sum, c) => sum + Math.abs(Math.min(0, c.balance || 0)), 0);
+
   return (
     <div className="space-y-8">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card className="border-border bg-card/50 rounded-2xl overflow-hidden group">
           <CardHeader className="pb-2">
             <div className="flex justify-between items-start">
@@ -142,6 +151,24 @@ export function Finances({ user }: { user: UserProfile }) {
               {(totalIncome - totalExpense).toFixed(2)}
             </div>
             <p className="text-[10px] text-white/70 mt-1 font-bold tracking-widest uppercase">Fluxo de Caixa</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border bg-[#0d1117] border-orange-500/20 rounded-2xl overflow-hidden group">
+          <CardHeader className="pb-2">
+            <div className="flex justify-between items-start">
+              <p className="text-[10px] font-bold tracking-widest uppercase text-orange-500">Fiado Pendente</p>
+              <div className="p-2 rounded-lg bg-orange-500/10 text-orange-500">
+                <Users className="w-4 h-4" />
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-black tracking-tight text-orange-500">
+              <span className="text-sm font-bold mr-1">R$</span>
+              {totalFiado.toFixed(2)}
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-1 font-bold tracking-widest uppercase">Contas a Receber</p>
           </CardContent>
         </Card>
       </div>

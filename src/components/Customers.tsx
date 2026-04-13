@@ -4,13 +4,15 @@ import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { Customer, UserProfile } from '../types';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
-import { Users, Plus, Search, Phone, Mail, MapPin, Edit2, Trash2, TrendingUp, Star, Clock, History, Receipt, ChevronRight, X } from 'lucide-react';
+import { Users, Plus, Search, Phone, Mail, MapPin, Edit2, Trash2, TrendingUp, TrendingDown, Star, Clock, History, Receipt, ChevronRight, X } from 'lucide-react';
 import { Input } from './ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from './ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { toast } from 'sonner';
 import { addDoc, updateDoc, doc, deleteDoc, serverTimestamp, getDocs, where } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../lib/firebase-utils';
+import { cn } from '../lib/utils';
 import { ConfirmDialog } from './ConfirmDialog';
 import { Badge } from './ui/badge';
 import { format } from 'date-fns';
@@ -28,6 +30,10 @@ export function Customers({ user }: { user: UserProfile }) {
   const [customerHistory, setCustomerHistory] = useState<Order[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isPayModalOpen, setIsPayModalOpen] = useState(false);
+  const [selectedCustomerForPay, setSelectedCustomerForPay] = useState<Customer | null>(null);
+  const [payAmount, setPayAmount] = useState('');
+  const [payMethod, setPayMethod] = useState('DINHEIRO');
 
   // Form states
   const [name, setName] = useState('');
@@ -120,15 +126,59 @@ export function Customers({ user }: { user: UserProfile }) {
     }
   };
 
+  const handlePayDebt = async () => {
+    if (!selectedCustomerForPay || !payAmount || parseFloat(payAmount) <= 0) return;
+    setIsSaving(true);
+    const amount = parseFloat(payAmount);
+
+    try {
+      // Update customer balance
+      const customerRef = doc(db, 'customers', selectedCustomerForPay.id);
+      await updateDoc(customerRef, {
+        balance: (selectedCustomerForPay.balance || 0) + amount,
+        updatedAt: serverTimestamp()
+      });
+
+      // Create transaction
+      await addDoc(collection(db, 'transactions'), {
+        type: 'income',
+        category: 'Recebimento Fiado',
+        amount: amount,
+        description: `Pagamento de dívida: ${selectedCustomerForPay.name}`,
+        date: serverTimestamp(),
+        paymentMethod: payMethod,
+        customerId: selectedCustomerForPay.id
+      });
+
+      toast.success('Pagamento registrado com sucesso');
+      setIsPayModalOpen(false);
+      setPayAmount('');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'transactions');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const openPayModal = (customer: Customer) => {
+    setSelectedCustomerForPay(customer);
+    setPayAmount(Math.abs(customer.balance || 0).toString());
+    setPayMethod('DINHEIRO');
+    setIsPayModalOpen(true);
+  };
+
   const filtered = customers.filter(c => 
     c.name.toLowerCase().includes(search.toLowerCase()) ||
     c.phone?.includes(search)
   );
 
+  const totalDebt = customers.reduce((sum, c) => sum + Math.abs(Math.min(0, c.balance || 0)), 0);
+  const totalCredit = customers.reduce((sum, c) => sum + Math.max(0, c.balance || 0), 0);
+
   return (
     <div className="space-y-8">
       {/* Customer Insights */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="bg-card border-border">
           <CardContent className="p-4 flex items-center gap-4">
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
@@ -143,12 +193,12 @@ export function Customers({ user }: { user: UserProfile }) {
 
         <Card className="bg-card border-border">
           <CardContent className="p-4 flex items-center gap-4">
-            <div className="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center text-yellow-500 border border-yellow-500/20">
-              <Star className="w-5 h-5" />
+            <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center text-red-500 border border-red-500/20">
+              <TrendingDown className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Clientes VIP</p>
-              <p className="text-sm font-black uppercase tracking-tighter">Top 5% Ativos</p>
+              <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Total em Dívida</p>
+              <p className="text-sm font-black uppercase tracking-tighter text-red-500">R$ {totalDebt.toFixed(2)}</p>
             </div>
           </CardContent>
         </Card>
@@ -159,15 +209,20 @@ export function Customers({ user }: { user: UserProfile }) {
               <TrendingUp className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Novos este Mês</p>
-              <p className="text-sm font-black uppercase tracking-tighter">
-                {customers.filter(c => {
-                  const createdAt = (c as any).createdAt?.toDate?.();
-                  if (!createdAt) return false;
-                  const now = new Date();
-                  return createdAt.getMonth() === now.getMonth() && createdAt.getFullYear() === now.getFullYear();
-                }).length} Novos
-              </p>
+              <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Total em Crédito</p>
+              <p className="text-sm font-black uppercase tracking-tighter text-green-500">R$ {totalCredit.toFixed(2)}</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-card border-border">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center text-yellow-500 border border-yellow-500/20">
+              <Star className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Clientes VIP</p>
+              <p className="text-sm font-black uppercase tracking-tighter">Top 5% Ativos</p>
             </div>
           </CardContent>
         </Card>
@@ -275,6 +330,7 @@ export function Customers({ user }: { user: UserProfile }) {
               <TableRow className="border-border hover:bg-transparent">
                 <TableHead className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground h-14">Cliente</TableHead>
                 <TableHead className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground h-14">Contato</TableHead>
+                <TableHead className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground h-14">Saldo / Fiado</TableHead>
                 <TableHead className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground h-14">Consumo</TableHead>
                 <TableHead className="text-right text-[10px] font-bold tracking-widest uppercase text-muted-foreground h-14">Ações</TableHead>
               </TableRow>
@@ -301,6 +357,29 @@ export function Customers({ user }: { user: UserProfile }) {
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <Mail className="w-3 h-3" /> {customer.email}
                         </div>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="space-y-1">
+                      <p className={cn(
+                        "text-sm font-black",
+                        (customer.balance || 0) < 0 ? "text-red-500" : (customer.balance || 0) > 0 ? "text-green-500" : "text-muted-foreground"
+                      )}>
+                        R$ {Math.abs(customer.balance || 0).toFixed(2)}
+                        <span className="text-[8px] ml-1 uppercase opacity-60">
+                          {(customer.balance || 0) < 0 ? 'Dívida' : (customer.balance || 0) > 0 ? 'Crédito' : 'Zerado'}
+                        </span>
+                      </p>
+                      {(customer.balance || 0) < 0 && (
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          onClick={() => openPayModal(customer)}
+                          className="h-7 text-[8px] font-bold uppercase tracking-widest border-red-500/20 text-red-500 hover:bg-red-500/10"
+                        >
+                          Receber Pagamento
+                        </Button>
                       )}
                     </div>
                   </TableCell>
@@ -367,13 +446,29 @@ export function Customers({ user }: { user: UserProfile }) {
                   <div className="min-w-0">
                     <h4 className="font-bold uppercase tracking-wider text-sm truncate">{customer.name}</h4>
                     <div className="flex items-center gap-2 mt-1">
-                      <Badge variant="outline" className="bg-primary/10 border-none text-primary text-[8px] font-bold uppercase tracking-widest">
+                      <Badge variant="outline" className={cn(
+                        "border-none text-[8px] font-bold uppercase tracking-widest",
+                        (customer.balance || 0) < 0 ? "bg-red-500/10 text-red-500" : (customer.balance || 0) > 0 ? "bg-green-500/10 text-green-500" : "bg-primary/10 text-primary"
+                      )}>
+                        {(customer.balance || 0) < 0 ? `Dívida: R$ ${Math.abs(customer.balance || 0).toFixed(2)}` : (customer.balance || 0) > 0 ? `Crédito: R$ ${customer.balance?.toFixed(2)}` : 'Saldo Zerado'}
+                      </Badge>
+                      <Badge variant="outline" className="bg-white/5 border-none text-muted-foreground text-[8px] font-bold uppercase tracking-widest">
                         {customer.orderCount || 0} Comandas
                       </Badge>
                     </div>
                   </div>
                 </div>
                 <div className="flex gap-1">
+                  {(customer.balance || 0) < 0 && (
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => openPayModal(customer)}
+                      className="w-8 h-8 rounded-lg hover:bg-green-500/10 hover:text-green-500 text-green-500"
+                    >
+                      <Receipt className="w-4 h-4" />
+                    </Button>
+                  )}
                   <Button 
                     variant="ghost" 
                     size="icon" 
@@ -518,6 +613,62 @@ export function Customers({ user }: { user: UserProfile }) {
               <Button onClick={() => setIsHistoryOpen(false)} className="h-10 md:h-12 px-6 md:px-8 font-black uppercase tracking-widest bg-white/5 hover:bg-white/10 border border-border rounded-xl text-[10px] md:text-sm">Fechar</Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Pay Debt Modal */}
+      <Dialog open={isPayModalOpen} onOpenChange={setIsPayModalOpen}>
+        <DialogContent className="bg-[#0b1224] border-border max-w-lg text-white p-0 overflow-hidden flex flex-col">
+          <div className="p-6 md:p-8 border-b border-border/50 relative flex-shrink-0">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 md:w-14 md:h-14 rounded-xl md:rounded-2xl bg-green-500/10 flex items-center justify-center border border-green-500/20">
+                <TrendingUp className="w-5 h-5 md:w-7 md:h-7 text-green-500" />
+              </div>
+              <div>
+                <DialogTitle className="text-xl md:text-2xl font-black uppercase tracking-tighter leading-none mb-1">
+                  Receber Pagamento
+                </DialogTitle>
+                <p className="text-[9px] md:text-[10px] font-bold tracking-widest uppercase text-green-500/60 flex items-center gap-2">
+                  {selectedCustomerForPay?.name} • Dívida: R$ {Math.abs(selectedCustomerForPay?.balance || 0).toFixed(2)}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-6 md:p-8 space-y-6 overflow-y-auto custom-scrollbar flex-1">
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Valor do Pagamento (R$)</label>
+              <Input 
+                type="number"
+                step="0.01"
+                className="h-14 bg-[#111827] border-border text-2xl font-black text-center text-green-500"
+                value={payAmount}
+                onChange={(e) => setPayAmount(e.target.value)}
+                placeholder="0.00"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Forma de Pagamento</label>
+              <Select value={payMethod} onValueChange={setPayMethod}>
+                <SelectTrigger className="h-12 bg-[#111827] border-border font-bold text-xs uppercase">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-[#0b1224] border-border">
+                  {['DINHEIRO', 'PIX', 'DÉBITO', 'CRÉDITO'].map(method => (
+                    <SelectItem key={method} value={method} className="font-bold uppercase tracking-widest text-xs">{method}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter className="p-6 md:p-8 border-t border-border/50 bg-[#0b1120] flex-shrink-0">
+            <Button variant="ghost" onClick={() => setIsPayModalOpen(false)} disabled={isSaving} className="font-bold uppercase tracking-widest text-xs">Cancelar</Button>
+            <Button onClick={handlePayDebt} disabled={isSaving || !payAmount || parseFloat(payAmount) <= 0} className="h-12 px-8 font-bold uppercase tracking-widest bg-green-600 hover:bg-green-700 text-xs shadow-lg shadow-green-600/20">
+              {isSaving ? 'Processando...' : 'Confirmar Pagamento'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
