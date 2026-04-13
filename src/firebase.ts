@@ -15,9 +15,13 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-3LEXX8S4X8"
 };
 
+console.log("Firebase Config Initializing with Project:", firebaseConfig.projectId);
+
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app, import.meta.env.VITE_FIREBASE_DATABASE_ID || import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || "botecodoluis");
+const dbId = import.meta.env.VITE_FIREBASE_DATABASE_ID || import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || "botecodoluis";
+export const db = getFirestore(app, dbId);
+console.log("Firestore Initialized with Database ID:", dbId);
 export const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
 
 // Connection test
