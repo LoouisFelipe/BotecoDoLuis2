@@ -15,7 +15,8 @@ import { Customers } from './components/Customers';
 import { Suppliers } from './components/Suppliers';
 import { AIAssistant } from './components/AIAssistant';
 import { Settings as SettingsComponent } from './components/Settings';
-import { LayoutDashboard, Package, Receipt, BarChart3, LogOut, Shield, Users, Truck, Settings, Gamepad2, User, Sparkles, Activity, Globe, Database, Menu, X as CloseIcon } from 'lucide-react';
+import { BottomNav } from './components/BottomNav';
+import { LayoutDashboard, Package, Receipt, BarChart3, LogOut, Shield, Users, Truck, Settings, Gamepad2, User, Sparkles, Activity, Globe, Database, Menu, X as CloseIcon, Plus } from 'lucide-react';
 import { auth } from './firebase';
 import { Button } from './components/ui/button';
 import { useState, useEffect } from 'react';
@@ -151,7 +152,7 @@ export default function App() {
             </aside>
 
             {/* Main Content */}
-            <div className="flex-1 flex flex-col min-w-0 w-full">
+            <div className="flex-1 flex flex-col min-w-0 w-full pb-24 lg:pb-0">
               <header className="h-20 border-b border-border flex items-center justify-between px-4 md:px-8 bg-background/50 backdrop-blur-sm sticky top-0 z-30">
                 <div className="flex items-center gap-3 md:gap-4">
                   <Button 
@@ -207,6 +208,9 @@ export default function App() {
                 {activeTab === 'suppliers' && <Suppliers user={user} />}
                 {activeTab === 'settings' && <SettingsComponent user={user} />}
               </main>
+
+              {/* Mobile Navigation */}
+              <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
             </div>
             <Toaster position="top-right" />
           </div>
