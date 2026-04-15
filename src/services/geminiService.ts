@@ -1,42 +1,84 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel, Type } from "@google/genai";
 
-// Initialize the Gemini API client
-// Note: process.env.GEMINI_API_KEY is automatically injected by AI Studio
-// if configured in the Secrets panel.
-const genAI = new GoogleGenAI({ 
-  apiKey: process.env.GEMINI_API_KEY || "" 
-});
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 export const geminiService = {
   /**
-   * Generates a response from Gemini based on a prompt.
+   * Fast task using gemini-3.1-flash-lite-preview
    */
-  async generateResponse(prompt: string, systemInstruction?: string) {
-    try {
-      if (!process.env.GEMINI_API_KEY) {
-        throw new Error("GEMINI_API_KEY não configurada. Por favor, adicione-a nos Ajustes do AI Studio.");
-      }
-
-      const response = await genAI.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: prompt,
-        config: {
-          systemInstruction: systemInstruction || "Você é um assistente especializado em gestão de bares e botecos. Ajude o Luis a gerenciar o Boteco do Luis com dicas de estoque, finanças e atendimento.",
-        },
-      });
-
-      return response.text;
-    } catch (error) {
-      console.error("Erro ao chamar Gemini API:", error);
-      throw error;
-    }
+  async fastTask(prompt: string, systemInstruction?: string) {
+    const response = await ai.models.generateContent({
+      model: "gemini-3.1-flash-lite-preview",
+      contents: prompt,
+      config: {
+        systemInstruction: systemInstruction || "Você é um assistente rápido para tarefas simples.",
+      },
+    });
+    return response.text;
   },
 
   /**
-   * Analyzes bar data to provide insights.
+   * General task using gemini-3-flash-preview
    */
-  async analyzeData(data: any, type: 'inventory' | 'finances' | 'general') {
-    const prompt = `Analise os seguintes dados de ${type} do Boteco do Luis e forneça 3 insights estratégicos curtos:\n${JSON.stringify(data)}`;
-    return this.generateResponse(prompt);
+  async generalTask(prompt: string, systemInstruction?: string) {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: prompt,
+      config: {
+        systemInstruction: systemInstruction || "Você é um assistente inteligente para tarefas gerais.",
+      },
+    });
+    return response.text;
+  },
+
+  /**
+   * Task with Google Search grounding using gemini-3-flash-preview
+   */
+  async searchGroundedTask(prompt: string, systemInstruction?: string) {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: prompt,
+      config: {
+        tools: [{ googleSearch: {} }],
+        systemInstruction: systemInstruction || "Você é um assistente que utiliza dados da pesquisa Google para fornecer informações atualizadas.",
+      },
+    });
+    return response.text;
+  },
+
+  /**
+   * Complex task using gemini-3.1-pro-preview
+   */
+  async complexTask(prompt: string, systemInstruction?: string) {
+    const response = await ai.models.generateContent({
+      model: "gemini-3.1-pro-preview",
+      contents: prompt,
+      config: {
+        systemInstruction: systemInstruction || "Você é um assistente avançado para tarefas complexas.",
+      },
+    });
+    return response.text;
+  },
+
+  /**
+   * High Thinking task using gemini-3.1-pro-preview
+   */
+  async highThinkingTask(prompt: string, systemInstruction?: string) {
+    const response = await ai.models.generateContent({
+      model: "gemini-3.1-pro-preview",
+      contents: prompt,
+      config: {
+        thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH },
+        systemInstruction: systemInstruction || "Você é um assistente de alta performance capaz de lidar com as consultas mais complexas dos usuários através de um raciocínio profundo.",
+      },
+    });
+    return response.text;
+  },
+
+  /**
+   * Legacy method for compatibility if needed, using generalTask
+   */
+  async generateResponse(prompt: string, systemInstruction?: string) {
+    return this.generalTask(prompt, systemInstruction);
   }
 };

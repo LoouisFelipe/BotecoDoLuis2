@@ -198,10 +198,10 @@ export default function App() {
               </header>
 
               <main className="flex-1 p-4 md:p-8 overflow-y-auto custom-scrollbar">
-                {activeTab === 'dashboard' && <Dashboard user={user} />}
-                {activeTab === 'inventory' && <Inventory user={user} />}
-                {activeTab === 'finances' && <Finances user={user} />}
-                {activeTab === 'reports' && <Reports user={user} />}
+                {activeTab === 'dashboard' && <Dashboard user={user} setActiveTab={setActiveTab} />}
+                {activeTab === 'inventory' && <Inventory user={user} setActiveTab={setActiveTab} />}
+                {activeTab === 'finances' && <Finances user={user} setActiveTab={setActiveTab} />}
+                {activeTab === 'reports' && <Reports user={user} setActiveTab={setActiveTab} />}
                 {activeTab === 'ai' && <AIAssistant user={user} />}
                 {activeTab === 'games' && <Games user={user} />}
                 {activeTab === 'clients' && <Customers user={user} />}

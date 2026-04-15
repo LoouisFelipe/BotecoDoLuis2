@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
-import { Plus, Search, ShoppingCart, CheckCircle2, ChevronRight, LayoutGrid, List, Zap, Activity, Clock, TrendingUp, TrendingDown, Trash2, ShieldCheck, UserPlus, Menu, X, Receipt, Package, Calendar, Minus, Gamepad2, ArrowLeft, PlusCircle } from 'lucide-react';
+import { Plus, Search, ShoppingCart, CheckCircle2, ChevronRight, LayoutGrid, List, Zap, Activity, Clock, TrendingUp, TrendingDown, Trash2, ShieldCheck, UserPlus, Menu, X, Receipt, Package, Calendar, Minus, Gamepad2, ArrowLeft, PlusCircle, Users } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle, DialogTrigger, DialogFooter } from './ui/dialog';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -16,7 +16,7 @@ import { cn } from '../lib/utils';
 import { ConfirmDialog } from './ConfirmDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
-export function Dashboard({ user }: { user: UserProfile }) {
+export function Dashboard({ user, setActiveTab }: { user: UserProfile, setActiveTab: (tab: string) => void }) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -198,7 +198,10 @@ export function Dashboard({ user }: { user: UserProfile }) {
           </CardContent>
         </Card>
 
-        <Card className="bg-card border-border">
+        <Card 
+          className="bg-card border-border cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98]"
+          onClick={() => setSearch('')}
+        >
           <CardContent className="p-4 flex items-center gap-4">
             <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500">
               <Clock className="w-5 h-5" />
@@ -210,7 +213,10 @@ export function Dashboard({ user }: { user: UserProfile }) {
           </CardContent>
         </Card>
 
-        <Card className="bg-card border-border">
+        <Card 
+          className="bg-card border-border cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98]"
+          onClick={() => setActiveTab('finances')}
+        >
           <CardContent className="p-4 flex items-center gap-4">
             <div className="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center text-yellow-500">
               <TrendingUp className="w-5 h-5" />
@@ -695,8 +701,9 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
   };
 
   const handleFinalizeCheckout = async () => {
-    if (checkoutPayments.reduce((sum, p) => sum + p.amount, 0).toFixed(2) !== checkoutAmount.toFixed(2)) {
-      toast.error('O total dos pagamentos deve ser igual ao valor a receber');
+    const totalPaid = checkoutPayments.reduce((sum, p) => sum + p.amount, 0);
+    if (totalPaid < checkoutAmount - 0.01) {
+      toast.error('O total dos pagamentos deve ser igual ou maior ao valor a receber');
       return;
     }
 
@@ -704,6 +711,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
     try {
       const finalAmount = checkoutAmount;
       const targetCustomerId = checkoutCustomerId || order.customerId;
+      const surplus = totalPaid - finalAmount;
 
       await updateDoc(doc(db, 'open_orders', order.id), {
         status: 'closed',
@@ -720,11 +728,18 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
           const fiadoAmount = checkoutPayments
             .filter(p => p.method === 'FIADO')
             .reduce((sum, p) => sum + p.amount, 0);
+          
+          const saldoUsedAmount = checkoutPayments
+            .filter(p => p.method === 'SALDO')
+            .reduce((sum, p) => sum + p.amount, 0);
+
+          // Balance Impact: Surplus increases balance, FIADO and SALDO decrease it
+          const balanceImpact = surplus - fiadoAmount - saldoUsedAmount;
 
           await updateDoc(customerRef, {
             totalSpent: (customer.totalSpent || 0) + finalAmount,
             orderCount: (customer.orderCount || 0) + 1,
-            balance: (customer.balance || 0) - fiadoAmount,
+            balance: (customer.balance || 0) + balanceImpact,
             lastVisit: serverTimestamp()
           });
         }
@@ -1435,6 +1450,43 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
               )}
             </div>
 
+            {/* Customer Balance Info */}
+            {checkoutCustomerId !== 'none' && (
+              <div className="bg-[#0d1117] p-4 rounded-2xl border border-white/5 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-500">
+                    <Users className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-black tracking-widest uppercase text-muted-foreground">Saldo Atual do Cliente</p>
+                    <p className={cn(
+                      "text-sm font-black uppercase tracking-tighter",
+                      (customers.find(c => c.id === checkoutCustomerId)?.balance || 0) >= 0 ? "text-green-500" : "text-orange-500"
+                    )}>
+                      R$ {(customers.find(c => c.id === checkoutCustomerId)?.balance || 0).toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+                {(customers.find(c => c.id === checkoutCustomerId)?.balance || 0) > 0 && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => {
+                      const balance = customers.find(c => c.id === checkoutCustomerId)?.balance || 0;
+                      const needed = checkoutAmount - checkoutPayments.reduce((sum, p) => sum + p.amount, 0);
+                      const use = Math.min(balance, needed);
+                      if (use > 0) {
+                        setCheckoutPayments([...checkoutPayments, { method: 'SALDO', amount: use }]);
+                      }
+                    }}
+                    className="text-[9px] font-black uppercase tracking-widest text-[#0070f3] hover:bg-[#0070f3]/10 rounded-xl"
+                  >
+                    Usar Saldo
+                  </Button>
+                )}
+              </div>
+            )}
+
             {/* Quick Actions */}
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {['DINHEIRO', 'PIX', 'CARTÃO'].map((method) => (
@@ -1537,9 +1589,11 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                           <SelectTrigger className="h-12 bg-[#161b22] border-white/5 font-bold text-xs uppercase rounded-xl">
                             <SelectValue />
                           </SelectTrigger>
-                          <SelectContent className="bg-[#05070a] border-white/5">
-                            {['DINHEIRO', 'PIX', 'CARTÃO DE CRÉDITO', 'CARTÃO DE DÉBITO', 'VALE REFEIÇÃO', 'FIADO'].map(method => (
-                              <SelectItem key={method} value={method} className="font-bold uppercase tracking-widest text-xs py-3">{method}</SelectItem>
+                          <SelectContent className="bg-[#05070a] border-white/10 rounded-2xl">
+                            {['DINHEIRO', 'PIX', 'CARTÃO DE CRÉDITO', 'CARTÃO DE DÉBITO', 'VALE REFEIÇÃO', 'FIADO', 'SALDO'].map(method => (
+                              <SelectItem key={method} value={method} className="font-black uppercase tracking-widest text-[10px] py-4 focus:bg-[#0070f3]/10 focus:text-[#0070f3]">
+                                {method}
+                              </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -1577,12 +1631,14 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                 
                 <div className={cn(
                   "p-5 rounded-2xl text-center text-xs font-black uppercase tracking-widest transition-all shadow-lg",
-                  checkoutPayments.reduce((sum, p) => sum + p.amount, 0).toFixed(2) === checkoutAmount.toFixed(2) 
+                  checkoutPayments.reduce((sum, p) => sum + p.amount, 0).toFixed(2) >= checkoutAmount.toFixed(2) 
                     ? "bg-green-500/10 text-green-500 border border-green-500/20" 
                     : "bg-red-500/10 text-red-500 border border-red-500/20 animate-pulse"
                 )}>
-                  {checkoutPayments.reduce((sum, p) => sum + p.amount, 0).toFixed(2) === checkoutAmount.toFixed(2) 
-                    ? "✓ Conferência de Valores OK" 
+                  {checkoutPayments.reduce((sum, p) => sum + p.amount, 0).toFixed(2) >= checkoutAmount.toFixed(2) 
+                    ? (checkoutPayments.reduce((sum, p) => sum + p.amount, 0) > checkoutAmount 
+                        ? `✓ Crédito a Gerar: R$ ${(checkoutPayments.reduce((sum, p) => sum + p.amount, 0) - checkoutAmount).toFixed(2)}`
+                        : "✓ Conferência de Valores OK")
                     : `⚠️ Faltam R$ ${(checkoutAmount - checkoutPayments.reduce((sum, p) => sum + p.amount, 0)).toFixed(2)}`}
                 </div>
               </div>
@@ -1593,7 +1649,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
             <Button variant="ghost" onClick={() => setIsCheckoutOpen(false)} className="flex-1 h-16 font-black uppercase tracking-widest text-muted-foreground hover:text-white rounded-2xl">Voltar</Button>
             <Button 
               onClick={handleFinalizeCheckout} 
-              disabled={isProcessing || checkoutPayments.reduce((sum, p) => sum + p.amount, 0).toFixed(2) !== checkoutAmount.toFixed(2)}
+              disabled={isProcessing || checkoutPayments.reduce((sum, p) => sum + p.amount, 0) < checkoutAmount - 0.01}
               className="flex-1 h-16 font-black uppercase tracking-widest bg-green-600 hover:bg-green-700 shadow-lg shadow-green-600/20 rounded-2xl"
             >
               {isProcessing ? 'Processando...' : 'Finalizar Recebimento'}

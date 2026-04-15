@@ -1,25 +1,52 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, query, onSnapshot, addDoc, serverTimestamp, orderBy, limit, getDocs, where } from 'firebase/firestore';
-import { Transaction, UserProfile, Customer } from '../types';
+import { collection, query, onSnapshot, addDoc, serverTimestamp, orderBy, limit, getDocs, where, doc, getDoc } from 'firebase/firestore';
+import { Transaction, UserProfile, Customer, Order } from '../types';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from './ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Plus, TrendingUp, TrendingDown, Receipt, Calendar, ArrowUpRight, ArrowDownRight, Filter, X, Users } from 'lucide-react';
+import { Plus, TrendingUp, TrendingDown, Receipt, Calendar, ArrowUpRight, ArrowDownRight, Filter, X, Users, ChevronRight } from 'lucide-react';
 import { Badge } from './ui/badge';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { handleFirestoreError, OperationType } from '../lib/firebase-utils';
 import { cn } from '../lib/utils';
 
-export function Finances({ user }: { user: UserProfile }) {
+export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveTab: (tab: string) => void }) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense'>('all');
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
+  const [isFiadoModalOpen, setIsFiadoModalOpen] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  const [relatedOrder, setRelatedOrder] = useState<Order | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (selectedTransaction?.orderId) {
+      const fetchOrder = async () => {
+        try {
+          const orderDoc = await getDoc(doc(db, 'closed_orders', selectedTransaction.orderId!));
+          if (orderDoc.exists()) {
+            setRelatedOrder({ ...orderDoc.data(), id: orderDoc.id } as Order);
+          } else {
+            const openOrderDoc = await getDoc(doc(db, 'open_orders', selectedTransaction.orderId!));
+            if (openOrderDoc.exists()) {
+              setRelatedOrder({ ...openOrderDoc.data(), id: openOrderDoc.id } as Order);
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching related order:", error);
+        }
+      };
+      fetchOrder();
+    } else {
+      setRelatedOrder(null);
+    }
+  }, [selectedTransaction]);
   
   // Form states
   const [amount, setAmount] = useState('');
@@ -97,10 +124,21 @@ export function Finances({ user }: { user: UserProfile }) {
 
   const totalFiado = customers.reduce((sum, c) => sum + Math.abs(Math.min(0, c.balance || 0)), 0);
 
+  const filteredTransactions = transactions.filter(t => {
+    if (typeFilter === 'all') return true;
+    return t.type === typeFilter;
+  });
+
   return (
     <div className="space-y-8">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="border-border bg-card/50 rounded-2xl overflow-hidden group">
+        <Card 
+          className={cn(
+            "border-border bg-card/50 rounded-2xl overflow-hidden group cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98]",
+            typeFilter === 'income' && "ring-2 ring-green-500/50 bg-green-500/5"
+          )}
+          onClick={() => setTypeFilter(typeFilter === 'income' ? 'all' : 'income')}
+        >
           <CardHeader className="pb-2">
             <div className="flex justify-between items-start">
               <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Entradas Recentes</p>
@@ -118,7 +156,13 @@ export function Finances({ user }: { user: UserProfile }) {
           </CardContent>
         </Card>
         
-        <Card className="border-border bg-card/50 rounded-2xl overflow-hidden group">
+        <Card 
+          className={cn(
+            "border-border bg-card/50 rounded-2xl overflow-hidden group cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98]",
+            typeFilter === 'expense' && "ring-2 ring-red-500/50 bg-red-500/5"
+          )}
+          onClick={() => setTypeFilter(typeFilter === 'expense' ? 'all' : 'expense')}
+        >
           <CardHeader className="pb-2">
             <div className="flex justify-between items-start">
               <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Saídas Recentes</p>
@@ -154,7 +198,10 @@ export function Finances({ user }: { user: UserProfile }) {
           </CardContent>
         </Card>
 
-        <Card className="border-border bg-[#0d1117] border-orange-500/20 rounded-2xl overflow-hidden group">
+        <Card 
+          className="border-border bg-[#0d1117] border-orange-500/20 rounded-2xl overflow-hidden group cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98]"
+          onClick={() => setIsFiadoModalOpen(true)}
+        >
           <CardHeader className="pb-2">
             <div className="flex justify-between items-start">
               <p className="text-[10px] font-bold tracking-widest uppercase text-orange-500">Fiado Pendente</p>
@@ -288,8 +335,12 @@ export function Finances({ user }: { user: UserProfile }) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {transactions.map((t, idx) => (
-                <TableRow key={`${t.id}-${idx}`} className="border-border hover:bg-white/5 transition-colors">
+              {filteredTransactions.map((t, idx) => (
+                <TableRow 
+                  key={`${t.id}-${idx}`} 
+                  className="border-border hover:bg-white/5 transition-colors cursor-pointer"
+                  onClick={() => setSelectedTransaction(t)}
+                >
                   <TableCell className="py-4 text-xs font-bold text-muted-foreground uppercase tracking-widest">
                     {t.date?.toDate ? format(t.date.toDate(), 'dd MMM, HH:mm') : '...'}
                   </TableCell>
@@ -320,8 +371,12 @@ export function Finances({ user }: { user: UserProfile }) {
 
         {/* Mobile Card View */}
         <div className="md:hidden divide-y divide-border/50">
-          {transactions.map((t, idx) => (
-            <div key={`mobile-trans-${t.id}-${idx}`} className="p-4 space-y-3">
+          {filteredTransactions.map((t, idx) => (
+            <div 
+              key={`mobile-trans-${t.id}-${idx}`} 
+              className="p-4 space-y-3 cursor-pointer active:bg-white/5"
+              onClick={() => setSelectedTransaction(t)}
+            >
               <div className="flex justify-between items-start">
                 <div className="space-y-1">
                   <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">
@@ -359,6 +414,172 @@ export function Finances({ user }: { user: UserProfile }) {
           </div>
         )}
       </Card>
+
+      {/* Fiado Details Modal */}
+      <Dialog open={isFiadoModalOpen} onOpenChange={setIsFiadoModalOpen}>
+        <DialogContent className="bg-[#0b1224] border-border max-w-2xl text-white p-0 overflow-hidden flex flex-col max-h-[90vh]">
+          <div className="p-6 md:p-8 border-b border-border/50 relative flex-shrink-0">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-orange-500/10 flex items-center justify-center border border-orange-500/20">
+                <Users className="w-7 h-7 text-orange-500" />
+              </div>
+              <div>
+                <DialogTitle className="text-2xl md:text-3xl font-black uppercase tracking-tighter leading-none mb-1">Fiado Pendente</DialogTitle>
+                <p className="text-[10px] font-bold tracking-widest uppercase text-orange-500/60 flex items-center gap-2">
+                  <TrendingDown className="w-3 h-3" /> Clientes com saldo devedor
+                </p>
+              </div>
+            </div>
+            <button onClick={() => setIsFiadoModalOpen(false)} className="absolute right-6 top-6 text-muted-foreground hover:text-white transition-colors">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar">
+            <div className="space-y-4">
+              {customers.filter(c => (c.balance || 0) < 0).length === 0 ? (
+                <div className="text-center py-12 bg-white/5 rounded-2xl border border-dashed border-border">
+                  <p className="text-muted-foreground font-bold uppercase tracking-widest text-xs">Nenhum fiado pendente</p>
+                </div>
+              ) : (
+                customers
+                  .filter(c => (c.balance || 0) < 0)
+                  .sort((a, b) => (a.balance || 0) - (b.balance || 0))
+                  .map((customer) => (
+                    <div 
+                      key={customer.id} 
+                      className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-border/50 hover:border-orange-500/30 transition-all group"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-lg bg-orange-500/10 flex items-center justify-center text-orange-500">
+                          <Users className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-sm uppercase tracking-wider">{customer.name}</h4>
+                          <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">{customer.phone || 'Sem telefone'}</p>
+                        </div>
+                      </div>
+                      <div className="text-right flex items-center gap-4">
+                        <div>
+                          <p className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Saldo Devedor</p>
+                          <p className="font-mono font-bold text-orange-500 text-lg">R$ {Math.abs(customer.balance || 0).toFixed(2)}</p>
+                        </div>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => {
+                            setIsFiadoModalOpen(false);
+                            setActiveTab('clients');
+                          }}
+                          className="hover:bg-orange-500/10 hover:text-orange-500"
+                        >
+                          <ChevronRight className="w-5 h-5" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Transaction Detail Modal */}
+      <Dialog open={!!selectedTransaction} onOpenChange={(open) => !open && setSelectedTransaction(null)}>
+        <DialogContent className="bg-[#0b1224] border-border max-w-lg text-white p-0 overflow-hidden flex flex-col max-h-[90vh]">
+          <div className="p-6 md:p-8 border-b border-border/50 relative flex-shrink-0">
+            <div className="flex items-center gap-4">
+              <div className={cn(
+                "w-14 h-14 rounded-2xl flex items-center justify-center border",
+                selectedTransaction?.type === 'income' ? "bg-green-500/10 border-green-500/20 text-green-500" : "bg-red-500/10 border-red-500/20 text-red-500"
+              )}>
+                {selectedTransaction?.type === 'income' ? <TrendingUp className="w-7 h-7" /> : <TrendingDown className="w-7 h-7" />}
+              </div>
+              <div>
+                <DialogTitle className="text-2xl md:text-3xl font-black uppercase tracking-tighter leading-none mb-1">Detalhes da Transação</DialogTitle>
+                <p className={cn(
+                  "text-[10px] font-bold tracking-widest uppercase flex items-center gap-2",
+                  selectedTransaction?.type === 'income' ? "text-green-500/60" : "text-red-500/60"
+                )}>
+                  {selectedTransaction?.type === 'income' ? 'Entrada de Caixa' : 'Saída de Caixa'}
+                </p>
+              </div>
+            </div>
+            <button onClick={() => setSelectedTransaction(null)} className="absolute right-6 top-6 text-muted-foreground hover:text-white transition-colors">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="p-8 space-y-8 overflow-y-auto custom-scrollbar">
+            <div className="grid grid-cols-2 gap-8">
+              <div className="space-y-1">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Data e Hora</p>
+                <p className="font-bold text-sm uppercase">
+                  {selectedTransaction?.date?.toDate ? format(selectedTransaction.date.toDate(), 'dd/MM/yyyy HH:mm:ss') : '...'}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Categoria</p>
+                <p className="font-bold text-sm uppercase">{selectedTransaction?.category}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Método de Pagamento</p>
+                <p className="font-bold text-sm uppercase">{selectedTransaction?.paymentMethod || 'N/A'}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Valor Total</p>
+                <p className={cn(
+                  "font-mono font-bold text-xl",
+                  selectedTransaction?.type === 'income' ? "text-green-500" : "text-red-500"
+                )}>
+                  {selectedTransaction?.type === 'income' ? '+' : '-'} R$ {(selectedTransaction?.amount || 0).toFixed(2)}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Descrição / Observações</p>
+              <div className="p-4 bg-white/5 rounded-xl border border-border/50 text-sm leading-relaxed">
+                {selectedTransaction?.description || 'Nenhuma descrição informada.'}
+              </div>
+            </div>
+
+            {selectedTransaction?.orderId && (
+              <div className="space-y-4">
+                <div className="h-px bg-border/50" />
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Itens da Comanda</p>
+                {relatedOrder ? (
+                  <div className="space-y-2">
+                    {relatedOrder.items.map((item, i) => (
+                      <div key={i} className="flex justify-between items-center p-3 bg-white/5 rounded-lg border border-border/30">
+                        <div>
+                          <p className="text-xs font-bold uppercase">{item.productName}</p>
+                          <p className="text-[10px] text-muted-foreground">{item.quantity}x R$ {item.price.toFixed(2)}</p>
+                        </div>
+                        <p className="text-xs font-mono font-bold">R$ {item.subtotal.toFixed(2)}</p>
+                      </div>
+                    ))}
+                    <Button 
+                      variant="outline" 
+                      className="w-full h-12 rounded-xl font-bold uppercase tracking-widest text-xs border-border hover:bg-white/5 mt-4"
+                      onClick={() => {
+                        setSelectedTransaction(null);
+                        setActiveTab('dashboard');
+                      }}
+                    >
+                      Ver Comanda Completa
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

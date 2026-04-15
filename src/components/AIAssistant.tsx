@@ -3,7 +3,7 @@ import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Input } from './ui/input';
 import { geminiService } from '../services/geminiService';
-import { Bot, Send, Sparkles, Loader2, Shield, Info, Users, Target, Code, Database as DbIcon, CheckCircle, Lock, Zap } from 'lucide-react';
+import { Bot, Send, Sparkles, Loader2, Shield, Info, Users, Target, Code, Database as DbIcon, CheckCircle, Lock, Zap, Globe, Activity } from 'lucide-react';
 import { toast } from 'sonner';
 import Markdown from 'react-markdown';
 import { collection, getDocs, query, where, Timestamp } from 'firebase/firestore';
@@ -27,6 +27,7 @@ export function AIAssistant({ user }: { user: any }) {
   const [loading, setLoading] = useState(false);
   const [context, setContext] = useState<any>(null);
   const [selectedAgent, setSelectedAgent] = useState('orchestrator');
+  const [aiMode, setAiMode] = useState<'normal' | 'search' | 'thinking'>('normal');
 
   useEffect(() => {
     const fetchContext = async () => {
@@ -82,7 +83,16 @@ export function AIAssistant({ user }: { user: any }) {
         
         Responda sempre em Português, de forma profissional e estratégica.
       `;
-      const result = await geminiService.generateResponse(activePrompt, systemInstruction);
+
+      let result = "";
+      if (aiMode === 'search') {
+        result = await geminiService.searchGroundedTask(activePrompt, systemInstruction);
+      } else if (aiMode === 'thinking') {
+        result = await geminiService.highThinkingTask(activePrompt, systemInstruction);
+      } else {
+        result = await geminiService.generalTask(activePrompt, systemInstruction);
+      }
+
       setResponse(result || "Não foi possível gerar uma resposta.");
     } catch (error: any) {
       toast.error(error.message || "Erro ao consultar o assistente.");
@@ -112,6 +122,39 @@ export function AIAssistant({ user }: { user: any }) {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="md:col-span-2 space-y-6">
+          <Card className="border-border bg-card/50">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm uppercase tracking-wider flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-primary" />
+                Modo de Inteligência
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { id: 'normal', name: 'Normal', icon: Zap, color: 'text-blue-500', desc: 'Rápido e eficiente' },
+                  { id: 'search', name: 'Pesquisa Google', icon: Globe, color: 'text-green-500', desc: 'Dados atualizados da web' },
+                  { id: 'thinking', name: 'Análise Profunda', icon: Activity, color: 'text-orange-500', desc: 'Raciocínio complexo' },
+                ].map((mode) => (
+                  <button
+                    key={mode.id}
+                    onClick={() => setAiMode(mode.id as any)}
+                    className={cn(
+                      "flex-1 flex flex-col items-center gap-2 p-3 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all border",
+                      aiMode === mode.id
+                        ? "bg-primary/20 border-primary text-primary shadow-sm"
+                        : "bg-white/5 border-transparent text-muted-foreground hover:bg-white/10"
+                    )}
+                  >
+                    <mode.icon className={cn("w-4 h-4", aiMode === mode.id ? mode.color : "text-muted-foreground")} />
+                    <span>{mode.name}</span>
+                    <span className="text-[8px] opacity-60 normal-case font-medium">{mode.desc}</span>
+                  </button>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
           <Card className="border-border bg-card/50">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm uppercase tracking-wider flex items-center gap-2">

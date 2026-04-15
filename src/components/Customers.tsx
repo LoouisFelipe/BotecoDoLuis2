@@ -371,16 +371,19 @@ export function Customers({ user }: { user: UserProfile }) {
                           {(customer.balance || 0) < 0 ? 'Dívida' : (customer.balance || 0) > 0 ? 'Crédito' : 'Zerado'}
                         </span>
                       </p>
-                      {(customer.balance || 0) < 0 && (
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
-                          onClick={() => openPayModal(customer)}
-                          className="h-7 text-[8px] font-bold uppercase tracking-widest border-red-500/20 text-red-500 hover:bg-red-500/10"
-                        >
-                          Receber Pagamento
-                        </Button>
-                      )}
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        onClick={() => openPayModal(customer)}
+                        className={cn(
+                          "h-7 px-2 text-[8px] font-black uppercase tracking-widest rounded-lg transition-all",
+                          (customer.balance || 0) < 0 
+                            ? "text-red-500 hover:bg-red-500/10" 
+                            : "text-[#0070f3] hover:bg-[#0070f3]/10"
+                        )}
+                      >
+                        {(customer.balance || 0) < 0 ? 'Receber Dívida' : 'Adicionar Crédito'}
+                      </Button>
                     </div>
                   </TableCell>
                   <TableCell>
@@ -626,10 +629,10 @@ export function Customers({ user }: { user: UserProfile }) {
               </div>
               <div>
                 <DialogTitle className="text-xl md:text-2xl font-black uppercase tracking-tighter leading-none mb-1">
-                  Receber Pagamento
+                  { (selectedCustomerForPay?.balance || 0) < 0 ? 'Receber Pagamento' : 'Adicionar Crédito' }
                 </DialogTitle>
                 <p className="text-[9px] md:text-[10px] font-bold tracking-widest uppercase text-green-500/60 flex items-center gap-2">
-                  {selectedCustomerForPay?.name} • Dívida: R$ {Math.abs(selectedCustomerForPay?.balance || 0).toFixed(2)}
+                  {selectedCustomerForPay?.name} • {(selectedCustomerForPay?.balance || 0) < 0 ? `Dívida: R$ ${Math.abs(selectedCustomerForPay?.balance || 0).toFixed(2)}` : `Crédito: R$ ${(selectedCustomerForPay?.balance || 0).toFixed(2)}`}
                 </p>
               </div>
             </div>

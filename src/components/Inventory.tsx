@@ -18,10 +18,11 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from './ui/command';
 import { Textarea } from './ui/textarea';
 
-export function Inventory({ user }: { user: UserProfile }) {
+export function Inventory({ user, setActiveTab }: { user: UserProfile, setActiveTab: (tab: string) => void }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [search, setSearch] = useState('');
+  const [stockFilter, setStockFilter] = useState<'all' | 'critical'>('all');
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   
@@ -188,15 +189,23 @@ export function Inventory({ user }: { user: UserProfile }) {
     }
   };
 
-  const filteredProducts = products.filter(p => 
-    p.name.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredProducts = products.filter(p => {
+    const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase());
+    const matchesStock = stockFilter === 'critical' ? (p.stock || 0) <= (p.minStock || 5) : true;
+    return matchesSearch && matchesStock;
+  });
 
   return (
     <div className="space-y-8">
       {/* Inventory Insights */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="bg-card border-border">
+        <Card 
+          className={cn(
+            "bg-card border-border cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98]",
+            stockFilter === 'critical' && "ring-2 ring-red-500/50 bg-red-500/5"
+          )}
+          onClick={() => setStockFilter(stockFilter === 'critical' ? 'all' : 'critical')}
+        >
           <CardContent className="p-4 flex items-center gap-4">
             <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center text-red-500">
               <AlertCircle className="w-5 h-5" />
@@ -204,13 +213,22 @@ export function Inventory({ user }: { user: UserProfile }) {
             <div>
               <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Estoque Crítico</p>
               <p className="text-sm font-black uppercase tracking-tighter">
-                {products.filter(p => (p.stock || 0) <= 5).length} Itens em Alerta
+                {products.filter(p => (p.stock || 0) <= (p.minStock || 5)).length} Itens em Alerta
               </p>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-card border-border">
+        <Card 
+          className={cn(
+            "bg-card border-border cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98]",
+            stockFilter === 'all' && !search && "ring-2 ring-blue-500/50 bg-blue-500/5"
+          )}
+          onClick={() => {
+            setStockFilter('all');
+            setSearch('');
+          }}
+        >
           <CardContent className="p-4 flex items-center gap-4">
             <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500">
               <Package className="w-5 h-5" />
@@ -222,7 +240,10 @@ export function Inventory({ user }: { user: UserProfile }) {
           </CardContent>
         </Card>
 
-        <Card className="bg-card border-border">
+        <Card 
+          className="bg-card border-border cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98]"
+          onClick={() => setActiveTab('finances')}
+        >
           <CardContent className="p-4 flex items-center gap-4">
             <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center text-green-500">
               <TrendingUp className="w-5 h-5" />
@@ -230,7 +251,7 @@ export function Inventory({ user }: { user: UserProfile }) {
             <div>
               <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Valor em Estoque</p>
               <p className="text-sm font-black uppercase tracking-tighter">
-                R$ {products.reduce((sum, p) => sum + ((p.cost || 0) * (p.stock || 0)), 0).toFixed(2)}
+                R$ {products.reduce((sum, p) => sum + ((p.cost || 0) * (p.stock || 0)), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
             </div>
           </CardContent>
@@ -249,6 +270,16 @@ export function Inventory({ user }: { user: UserProfile }) {
         </div>
         
         <div className="flex flex-row gap-3 w-full md:w-auto">
+          {stockFilter === 'critical' && (
+            <Button 
+              variant="destructive" 
+              onClick={() => setStockFilter('all')}
+              className="h-12 md:h-14 px-4 rounded-xl gap-2 font-bold tracking-widest uppercase text-[10px] md:text-sm animate-in fade-in zoom-in duration-200"
+            >
+              <X className="w-4 h-4" />
+              Limpar Filtro
+            </Button>
+          )}
           <Dialog open={isCategoryModalOpen} onOpenChange={setIsCategoryModalOpen}>
             <DialogTrigger
               nativeButton={true}
