@@ -52,6 +52,7 @@ export function Reports({ user }: { user: UserProfile }) {
           const dayExpenses = expSnapshot.docs.map(doc => doc.data() as Transaction);
           
           const income = dayTransactions.filter(t => t.type === 'income' && !(t as any).isFiado).reduce((s, t) => s + (t.amount || 0), 0);
+          const cost = dayTransactions.filter(t => t.type === 'income').reduce((s, t) => s + (t.cost || 0), 0);
           const expenseFromTrans = dayTransactions.filter(t => t.type === 'expense').reduce((s, t) => s + (t.amount || 0), 0);
           const expenseFromExp = dayExpenses.reduce((s, t) => s + (t.amount || 0), 0);
 
@@ -63,7 +64,8 @@ export function Reports({ user }: { user: UserProfile }) {
             fullDate: format(date, 'dd/MM'),
             income,
             expense: totalDayExpense,
-            profit: income - totalDayExpense
+            cost,
+            profit: income - cost - totalDayExpense
           };
         });
       });

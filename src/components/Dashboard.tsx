@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
-import { Plus, Search, ShoppingCart, CheckCircle2, ChevronRight, LayoutGrid, List, Zap, Activity, Clock, TrendingUp, TrendingDown, Trash2, ShieldCheck, UserPlus, Menu, X, Receipt, Package, Calendar, Minus, Gamepad2 } from 'lucide-react';
+import { Plus, Search, ShoppingCart, CheckCircle2, ChevronRight, LayoutGrid, List, Zap, Activity, Clock, TrendingUp, TrendingDown, Trash2, ShieldCheck, UserPlus, Menu, X, Receipt, Package, Calendar, Minus, Gamepad2, ArrowLeft, PlusCircle } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle, DialogTrigger, DialogFooter } from './ui/dialog';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -468,7 +468,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
   const [isRemoveItemConfirmOpen, setIsRemoveItemConfirmOpen] = useState(false);
   const [isLinkCustomerOpen, setIsLinkCustomerOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
-  const [itemToRemove, setItemToRemove] = useState<string | null>(null);
+  const [itemToRemoveIndex, setItemToRemoveIndex] = useState<number | null>(null);
   const [itemSearch, setItemSearch] = useState('');
   const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
   const [linkCustomerId, setLinkCustomerId] = useState('');
@@ -479,7 +479,15 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
   const [menuSubTab, setMenuSubTab] = useState<'products' | 'games'>('products');
   const [isGameValueModalOpen, setIsGameValueModalOpen] = useState(false);
   const [selectedGame, setSelectedGame] = useState<GameModality | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [gameValue, setGameValue] = useState('');
+  const [isProductValueModalOpen, setIsProductValueModalOpen] = useState(false);
+  const [productValue, setProductValue] = useState('');
+  const [isAvulsoModalOpen, setIsAvulsoModalOpen] = useState(false);
+  const [avulsoSearch, setAvulsoSearch] = useState('');
+  const [avulsoPrice, setAvulsoPrice] = useState('');
+  const [avulsoCost, setAvulsoCost] = useState('');
+  const [selectedAvulsoProduct, setSelectedAvulsoProduct] = useState<Product | null>(null);
 
   // Checkout states
   const [checkoutAmount, setCheckoutAmount] = useState(order.totalAmount);
@@ -515,23 +523,27 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
     }
   }
 
-  const handleAddItem = async (product: Product) => {
-    const existingItemIndex = order.items.findIndex(i => i.productId === product.id);
+  const handleAddItem = async (product: Product, customPrice?: number, customCost?: number) => {
+    const finalPrice = customPrice !== undefined ? customPrice : product.price;
+    const finalCost = customCost !== undefined ? customCost : (product.cost || 0);
+    const existingItemIndex = order.items.findIndex(i => i.productId === product.id && i.price === finalPrice);
     let newItems = [...order.items];
 
     if (existingItemIndex > -1) {
       newItems[existingItemIndex] = {
         ...newItems[existingItemIndex],
         quantity: newItems[existingItemIndex].quantity + 1,
-        subtotal: (newItems[existingItemIndex].quantity + 1) * product.price
+        subtotal: (newItems[existingItemIndex].quantity + 1) * finalPrice,
+        costPrice: finalCost
       };
     } else {
       newItems.push({
-        productId: product.id,
+        productId: product.isOpenValue ? `${product.id}_${Date.now()}` : product.id,
         productName: product.name,
         quantity: 1,
-        price: product.price,
-        subtotal: product.price
+        price: finalPrice,
+        subtotal: finalPrice,
+        costPrice: finalCost
       });
     }
 
@@ -551,20 +563,65 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
     }
   };
 
-  const handleUpdateQuantity = async (productId: string, delta: number) => {
-    const itemIndex = order.items.findIndex(i => i.productId === productId);
-    if (itemIndex === -1) return;
+  const handleManualAdd = async (name: string, price: number, cost: number, product?: Product) => {
+    let newItems = [...order.items];
+    const itemId = product ? product.id : `manual_${Date.now()}`;
+    const finalId = (product?.isOpenValue || !product) ? `${itemId}_${Date.now()}` : itemId;
+
+    const existingItemIndex = newItems.findIndex(i => i.productId === finalId && i.price === price);
+
+    if (existingItemIndex > -1) {
+      newItems[existingItemIndex] = {
+        ...newItems[existingItemIndex],
+        quantity: newItems[existingItemIndex].quantity + 1,
+        subtotal: (newItems[existingItemIndex].quantity + 1) * price,
+        costPrice: cost
+      };
+    } else {
+      newItems.push({
+        productId: finalId,
+        productName: product ? product.name : `[AVULSO] ${name}`,
+        quantity: 1,
+        price: price,
+        subtotal: price,
+        costPrice: cost
+      });
+    }
+
+    const newTotal = newItems.reduce((sum, item) => sum + item.subtotal, 0);
+
+    setIsProcessing(true);
+    try {
+      await updateDoc(doc(db, 'open_orders', order.id), {
+        items: newItems,
+        totalAmount: newTotal
+      });
+      toast.success(`Adicionado: ${name}`);
+      setIsAvulsoModalOpen(false);
+      setAvulsoSearch('');
+      setAvulsoPrice('');
+      setAvulsoCost('');
+      setSelectedAvulsoProduct(null);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `open_orders/${order.id}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleUpdateQuantity = async (index: number, delta: number) => {
+    if (index === -1 || !order.items[index]) return;
 
     let newItems = [...order.items];
-    const newQuantity = newItems[itemIndex].quantity + delta;
+    const newQuantity = newItems[index].quantity + delta;
 
     if (newQuantity <= 0) {
-      newItems = newItems.filter(i => i.productId !== productId);
+      newItems = newItems.filter((_, i) => i !== index);
     } else {
-      newItems[itemIndex] = {
-        ...newItems[itemIndex],
+      newItems[index] = {
+        ...newItems[index],
         quantity: newQuantity,
-        subtotal: newQuantity * newItems[itemIndex].price
+        subtotal: newQuantity * newItems[index].price
       };
     }
 
@@ -673,12 +730,34 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
         }
       }
 
+      // Calculate total cost and subtract stock
+      let totalCost = 0;
+      for (const item of order.items) {
+        totalCost += (item.costPrice || 0) * item.quantity;
+
+        // Subtract stock for registered products
+        if (!item.productId.startsWith('manual_') && !item.productId.startsWith('game_')) {
+          const baseProductId = item.productId.split('_')[0];
+          const productRef = doc(db, 'products', baseProductId);
+          const product = products.find(p => p.id === baseProductId);
+          if (product) {
+            await updateDoc(productRef, {
+              stock: (product.stock || 0) - item.quantity
+            });
+          }
+        }
+      }
+
       // Create transactions for each payment
       for (const payment of checkoutPayments) {
+        // Proportional cost for this payment
+        const paymentCost = finalAmount > 0 ? (payment.amount / finalAmount) * totalCost : 0;
+
         await addDoc(collection(db, 'transactions'), {
           type: 'income',
           category: 'Vendas',
           amount: payment.amount,
+          cost: paymentCost,
           description: `Comanda fechada: ${order.customerName} (${payment.method})${checkoutDiscount > 0 ? ` (Desc: R$ ${checkoutDiscount})` : ''}${checkoutAdjustment !== 0 ? ` (Ajuste: R$ ${checkoutAdjustment})` : ''}`,
           date: new Date(checkoutDate + 'T12:00:00'),
           orderId: order.id,
@@ -727,8 +806,8 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
   };
 
   const handleRemoveItem = async () => {
-    if (!itemToRemove) return;
-    const newItems = order.items.filter(i => i.productId !== itemToRemove);
+    if (itemToRemoveIndex === null) return;
+    const newItems = order.items.filter((_, i) => i !== itemToRemoveIndex);
     const newTotal = newItems.reduce((sum, item) => sum + item.subtotal, 0);
     setIsProcessing(true);
     try {
@@ -737,7 +816,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
         totalAmount: newTotal
       });
       toast.success('Item removido');
-      setItemToRemove(null);
+      setItemToRemoveIndex(null);
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `open_orders/${order.id}`);
     } finally {
@@ -942,7 +1021,13 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                       onChange={(e) => setItemSearch(e.target.value)}
                     />
                   </div>
-                  {/* Quick Add Toggle or Category Filter could go here */}
+                  <Button 
+                    onClick={() => setIsAvulsoModalOpen(true)}
+                    className="h-14 px-6 bg-[#161b22] hover:bg-[#1d242d] border border-white/5 text-[#0070f3] rounded-2xl font-black uppercase tracking-widest text-[10px] sm:text-xs gap-2"
+                  >
+                    <PlusCircle className="w-4 h-4" />
+                    Lançamento Avulso
+                  </Button>
                 </div>
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-4">
@@ -980,14 +1065,23 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                             {products.slice(0, 4).map(product => (
                               <button
                                 key={`quick-${product.id}`}
-                                onClick={() => handleAddItem(product)}
+                                onClick={() => {
+                                  if (product.isOpenValue) {
+                                    setSelectedProduct(product);
+                                    setIsProductValueModalOpen(true);
+                                  } else {
+                                    handleAddItem(product);
+                                  }
+                                }}
                                 className="p-4 bg-[#0d1117] hover:bg-[#161b22] border border-white/5 rounded-2xl text-left transition-all group relative overflow-hidden active:scale-95"
                               >
                                 <div className="absolute top-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                   <Plus className="w-4 h-4 text-[#0070f3]" />
                                 </div>
                                 <p className="font-bold text-[11px] uppercase tracking-wider mb-1 truncate">{product.name}</p>
-                                <p className="text-xs font-black text-[#0070f3]">R$ {product.price.toFixed(2)}</p>
+                                <p className="text-xs font-black text-[#0070f3]">
+                                  {product.isOpenValue ? 'VALOR ABERTO' : `R$ ${product.price.toFixed(2)}`}
+                                </p>
                               </button>
                             ))}
                           </div>
@@ -1035,12 +1129,21 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                                       .map(product => (
                                         <button
                                           key={product.id}
-                                          onClick={() => handleAddItem(product)}
+                                          onClick={() => {
+                                            if (product.isOpenValue) {
+                                              setSelectedProduct(product);
+                                              setIsProductValueModalOpen(true);
+                                            } else {
+                                              handleAddItem(product);
+                                            }
+                                          }}
                                           className="w-full p-4 flex items-center justify-between rounded-xl hover:bg-white/10 transition-all text-left group border border-transparent hover:border-white/5"
                                         >
                                           <div className="min-w-0">
                                             <p className="font-bold text-xs uppercase tracking-wider group-hover:text-[#0070f3] transition-colors truncate">{product.name}</p>
-                                            <p className="text-[10px] text-muted-foreground font-black tracking-widest">R$ {product.price.toFixed(2)}</p>
+                                            <p className="text-[10px] text-muted-foreground font-black tracking-widest">
+                                              {product.isOpenValue ? 'VALOR ABERTO' : `R$ ${product.price.toFixed(2)}`}
+                                            </p>
                                           </div>
                                           <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center group-hover:bg-[#0070f3] group-hover:text-white transition-all">
                                             <Plus className="w-4 h-4" />
@@ -1107,6 +1210,13 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
               <div className="p-6 md:p-8 flex-1 flex flex-col overflow-hidden">
                 <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center gap-3">
+                    <button 
+                      onClick={() => setDetailTab('menu')}
+                      className="lg:hidden w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-muted-foreground hover:text-white transition-all mr-1"
+                      title="Voltar para o Cardápio"
+                    >
+                      <ArrowLeft className="w-5 h-5" />
+                    </button>
                     <div className="w-10 h-10 rounded-xl bg-[#0070f3]/10 flex items-center justify-center text-[#0070f3]">
                       <ShoppingCart className="w-5 h-5" />
                     </div>
@@ -1128,9 +1238,9 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3">
                   <AnimatePresence mode="popLayout">
-                    {order.items.map(item => (
+                    {order.items.map((item, index) => (
                       <motion.div 
-                        key={item.productId}
+                        key={`${item.productId}-${index}`}
                         layout
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -1145,14 +1255,14 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                         <div className="flex items-center gap-3">
                           <div className="flex items-center bg-[#05070a] rounded-xl p-1 border border-white/5">
                             <button 
-                              onClick={() => handleUpdateQuantity(item.productId, -1)}
+                              onClick={() => handleUpdateQuantity(index, -1)}
                               className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-white transition-colors rounded-lg hover:bg-white/5"
                             >
                               <Minus className="w-3 h-3" />
                             </button>
                             <span className="w-8 text-center font-black text-sm">{item.quantity}</span>
                             <button 
-                              onClick={() => handleUpdateQuantity(item.productId, 1)}
+                              onClick={() => handleUpdateQuantity(index, 1)}
                               className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-white transition-colors rounded-lg hover:bg-white/5"
                             >
                               <Plus className="w-3 h-3" />
@@ -1160,7 +1270,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                           </div>
                           <button 
                             onClick={() => {
-                              setItemToRemove(item.productId);
+                              setItemToRemoveIndex(index);
                               setIsRemoveItemConfirmOpen(true);
                             }}
                             className="w-8 h-8 rounded-lg bg-red-500/10 text-red-500 flex items-center justify-center hover:bg-red-500/20 transition-colors"
@@ -1555,6 +1665,162 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
               className="flex-1 h-14 font-black uppercase tracking-widest bg-[#0070f3] hover:bg-[#0070f3]/90 rounded-xl shadow-lg shadow-[#0070f3]/20"
             >
               Confirmar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Product Value Modal (Dose Personalizada) */}
+      <Dialog open={isProductValueModalOpen} onOpenChange={setIsProductValueModalOpen}>
+        <DialogContent className="bg-[#05070a] border-none max-w-md text-white p-0 overflow-hidden shadow-2xl rounded-3xl">
+          <div className="p-8 border-b border-white/5 relative bg-[#05070a]">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-[#0070f3]/10 flex items-center justify-center border border-[#0070f3]/20 shadow-lg">
+                <Package className="w-7 h-7 text-[#0070f3]" />
+              </div>
+              <div>
+                <DialogTitle className="text-2xl font-black uppercase tracking-tighter leading-none mb-1">{selectedProduct?.name}</DialogTitle>
+                <p className="text-[10px] font-bold tracking-widest uppercase text-[#0070f3]/60">Defina o valor do item</p>
+              </div>
+            </div>
+          </div>
+          <div className="p-8 space-y-6">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Valor do Lançamento (R$)</label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">R$</span>
+                <Input 
+                  type="number" 
+                  step="0.01"
+                  autoFocus
+                  className="h-20 pl-12 bg-[#0d1117] border-white/5 text-3xl font-black focus:ring-[#0070f3]/20 focus:border-[#0070f3] rounded-2xl"
+                  value={productValue}
+                  onChange={(e) => setProductValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && productValue) {
+                      handleAddItem(selectedProduct!, parseFloat(productValue));
+                      setIsProductValueModalOpen(false);
+                      setProductValue('');
+                    }
+                  }}
+                  placeholder="0.00"
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="p-8 border-t border-white/5 bg-[#05070a] flex-row gap-4">
+            <Button variant="ghost" onClick={() => setIsProductValueModalOpen(false)} className="flex-1 h-14 font-black uppercase tracking-widest text-muted-foreground hover:text-white rounded-xl">Cancelar</Button>
+            <Button 
+              onClick={() => {
+                if (productValue) {
+                  handleAddItem(selectedProduct!, parseFloat(productValue));
+                  setIsProductValueModalOpen(false);
+                  setProductValue('');
+                }
+              }}
+              disabled={!productValue || isProcessing}
+              className="flex-1 h-14 font-black uppercase tracking-widest bg-[#0070f3] hover:bg-[#0070f3]/90 rounded-xl shadow-lg shadow-[#0070f3]/20"
+            >
+              Confirmar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Avulso Modal */}
+      <Dialog open={isAvulsoModalOpen} onOpenChange={setIsAvulsoModalOpen}>
+        <DialogContent className="bg-[#05070a] border-none max-w-md text-white p-0 overflow-hidden shadow-2xl rounded-3xl">
+          <div className="p-8 border-b border-white/5 relative bg-[#05070a]">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-[#0070f3]/10 flex items-center justify-center border border-[#0070f3]/20 shadow-lg">
+                <PlusCircle className="w-7 h-7 text-[#0070f3]" />
+              </div>
+              <div>
+                <DialogTitle className="text-2xl font-black uppercase tracking-tighter leading-none mb-1">Lançamento Avulso</DialogTitle>
+                <p className="text-[10px] font-bold tracking-widest uppercase text-[#0070f3]/60">Adicione qualquer item com valor aberto</p>
+              </div>
+            </div>
+          </div>
+          <div className="p-8 space-y-6">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Buscar Produto ou Digitar Nome</label>
+              <div className="relative">
+                <Input 
+                  placeholder="NOME DO ITEM..."
+                  value={avulsoSearch}
+                  onChange={(e) => {
+                    setAvulsoSearch(e.target.value);
+                    const found = products.find(p => p.name.toLowerCase() === e.target.value.toLowerCase());
+                    if (found) {
+                      setSelectedAvulsoProduct(found);
+                      setAvulsoPrice(found.price.toString());
+                      setAvulsoCost(found.cost.toString());
+                    } else {
+                      setSelectedAvulsoProduct(null);
+                    }
+                  }}
+                  className="h-14 bg-[#0d1117] border-white/5 rounded-2xl text-sm font-bold focus:ring-[#0070f3]/20 focus:border-[#0070f3]"
+                />
+                {avulsoSearch && !selectedAvulsoProduct && (
+                  <div className="absolute z-10 w-full mt-2 bg-[#0d1117] border border-white/5 rounded-2xl overflow-hidden shadow-2xl">
+                    {products.filter(p => p.name.toLowerCase().includes(avulsoSearch.toLowerCase())).slice(0, 5).map(p => (
+                      <button
+                        key={p.id}
+                        onClick={() => {
+                          setSelectedAvulsoProduct(p);
+                          setAvulsoSearch(p.name);
+                          setAvulsoPrice(p.price.toString());
+                          setAvulsoCost(p.cost.toString());
+                        }}
+                        className="w-full p-4 text-left hover:bg-white/5 text-xs font-bold uppercase tracking-widest border-b border-white/5 last:border-0 transition-colors"
+                      >
+                        {p.name} - R$ {p.price.toFixed(2)}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Preço Venda (R$)</label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold text-xs">R$</span>
+                  <Input 
+                    type="number"
+                    step="0.01"
+                    value={avulsoPrice}
+                    onChange={(e) => setAvulsoPrice(e.target.value)}
+                    className="h-14 pl-10 bg-[#0d1117] border-white/5 rounded-xl text-sm font-bold focus:ring-[#0070f3]/20 focus:border-[#0070f3]"
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Preço Custo (R$)</label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold text-xs">R$</span>
+                  <Input 
+                    type="number"
+                    step="0.01"
+                    value={avulsoCost}
+                    onChange={(e) => setAvulsoCost(e.target.value)}
+                    className="h-14 pl-10 bg-[#0d1117] border-white/5 rounded-xl text-sm font-bold focus:ring-[#0070f3]/20 focus:border-[#0070f3]"
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="p-8 border-t border-white/5 bg-[#05070a] flex-row gap-4">
+            <Button variant="ghost" onClick={() => setIsAvulsoModalOpen(false)} className="flex-1 h-14 font-black uppercase tracking-widest text-muted-foreground hover:text-white rounded-xl">Cancelar</Button>
+            <Button 
+              onClick={() => handleManualAdd(avulsoSearch, parseFloat(avulsoPrice) || 0, parseFloat(avulsoCost) || 0, selectedAvulsoProduct || undefined)}
+              disabled={!avulsoSearch || !avulsoPrice || isProcessing}
+              className="flex-1 h-14 font-black uppercase tracking-widest bg-[#0070f3] hover:bg-[#0070f3]/90 rounded-xl shadow-lg shadow-[#0070f3]/20"
+            >
+              {isProcessing ? 'Adicionando...' : 'Confirmar'}
             </Button>
           </DialogFooter>
         </DialogContent>

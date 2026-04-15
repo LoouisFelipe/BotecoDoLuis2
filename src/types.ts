@@ -78,6 +78,7 @@ export interface Product {
   minStock?: number;
   unit?: string;
   active?: boolean;
+  isOpenValue?: boolean;
 }
 
 export interface OrderItem {
@@ -86,6 +87,7 @@ export interface OrderItem {
   quantity: number;
   price: number;
   subtotal: number;
+  costPrice?: number;
 }
 
 export interface Order {
@@ -111,6 +113,7 @@ export interface Transaction {
   type: 'income' | 'expense';
   category: string;
   amount: number;
+  cost?: number;
   description?: string;
   date: any;
   orderId?: string;

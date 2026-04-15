@@ -108,7 +108,8 @@ export function Inventory({ user }: { user: UserProfile }) {
       categoryId: finalCategoryId,
       subcategory: productSubcategory,
       description: productDescription,
-      active: true
+      active: true,
+      isOpenValue: productUnit === 'Dose (Personalizada)' || productUnit === 'Serviço / Valor Aberto'
     };
 
     try {
