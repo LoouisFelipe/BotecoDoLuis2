@@ -4,22 +4,24 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import { getAnalytics } from 'firebase/analytics';
 
-// Configuração do Firebase
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyBWMVE765V8nqz7gKwyBE2-SQ5_hNAPkDM",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "botecodoluis2.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "botecodoluis2",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "botecodoluis2.firebasestorage.app",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "959264021711",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:959264021711:web:d96d3d6efd985680092bba",
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-3LEXX8S4X8"
+import firebaseConfig from '../firebase-applet-config.json';
+
+// Configuração do Firebase com suporte a overrides de ambiente
+const config = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || firebaseConfig.apiKey,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || firebaseConfig.authDomain,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || firebaseConfig.projectId,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || firebaseConfig.storageBucket,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || firebaseConfig.messagingSenderId,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || firebaseConfig.appId,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || firebaseConfig.measurementId
 };
 
-console.log("Firebase Config Initializing with Project:", firebaseConfig.projectId);
+console.log("Firebase Config Initializing with Project:", config.projectId);
 
-const app = initializeApp(firebaseConfig);
+const app = initializeApp(config);
 export const auth = getAuth(app);
-const dbId = import.meta.env.VITE_FIREBASE_DATABASE_ID || import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || "botecodoluis";
+const dbId = import.meta.env.VITE_FIREBASE_DATABASE_ID || import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || firebaseConfig.firestoreDatabaseId;
 export const db = getFirestore(app, dbId);
 console.log("Firestore Initialized with Database ID:", dbId);
 export const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;

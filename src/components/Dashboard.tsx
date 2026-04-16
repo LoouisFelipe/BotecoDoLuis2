@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
-import { Plus, Search, ShoppingCart, CheckCircle2, ChevronRight, LayoutGrid, List, Zap, Activity, Clock, TrendingUp, TrendingDown, Trash2, ShieldCheck, UserPlus, Menu, X, Receipt, Package, Calendar, Minus, Gamepad2, ArrowLeft, PlusCircle, Users } from 'lucide-react';
+import { Plus, Search, ShoppingCart, CheckCircle2, ChevronRight, LayoutGrid, List, Zap, Activity, Clock, TrendingUp, TrendingDown, Trash2, ShieldCheck, UserPlus, Menu, X, Receipt, Package, Calendar, Minus, Gamepad2, ArrowLeft, PlusCircle, Users, FlaskConical } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle, DialogTrigger, DialogFooter } from './ui/dialog';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -532,10 +532,31 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
   const handleAddItem = async (product: Product, customPrice?: number, customCost?: number) => {
     const finalPrice = customPrice !== undefined ? customPrice : product.price;
     const finalCost = customCost !== undefined ? customCost : (product.cost || 0);
+    
+    // Dose control warning
+    if (product.isDoseControl) {
+      const bottle = product.linkedProductId 
+        ? products.find(p => p.id === product.linkedProductId)
+        : product;
+      
+      if (bottle) {
+        const currentVol = bottle.currentBottleVolume !== undefined ? bottle.currentBottleVolume : (bottle.volumePerUnit || 0);
+        const stock = bottle.stock || 0;
+        if (currentVol <= 0 && stock <= 0) {
+          toast.error(`Atenção: A garrafa de ${bottle.name} está vazia e sem estoque!`);
+        } else if (currentVol < (product.doseSize || 0) && stock <= 0) {
+          toast.warning(`Atenção: Volume insuficiente na última garrafa de ${bottle.name}`);
+        }
+      }
+    }
+
+    // For dose control products, we want to keep them as separate entries if they have different IDs 
+    // or if they are "open value" to ensure they don't merge incorrectly.
+    // However, for standard products, we merge by productId and price.
     const existingItemIndex = order.items.findIndex(i => i.productId === product.id && i.price === finalPrice);
     let newItems = [...order.items];
 
-    if (existingItemIndex > -1) {
+    if (existingItemIndex > -1 && !product.isOpenValue) {
       newItems[existingItemIndex] = {
         ...newItems[existingItemIndex],
         quantity: newItems[existingItemIndex].quantity + 1,
@@ -544,6 +565,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
       };
     } else {
       newItems.push({
+        // If it's open value, we definitely need a unique ID to avoid merging different open values
         productId: product.isOpenValue ? `${product.id}_${Date.now()}` : product.id,
         productName: product.name,
         quantity: 1,
@@ -753,12 +775,60 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
         // Subtract stock for registered products
         if (!item.productId.startsWith('manual_') && !item.productId.startsWith('game_')) {
           const baseProductId = item.productId.split('_')[0];
-          const productRef = doc(db, 'products', baseProductId);
           const product = products.find(p => p.id === baseProductId);
+          
           if (product) {
-            await updateDoc(productRef, {
-              stock: (product.stock || 0) - item.quantity
-            });
+            const productRef = doc(db, 'products', baseProductId);
+            
+            if (product.isDoseControl && product.linkedProductId) {
+              // It's a DOSE. Subtract from the LINKED BOTTLE.
+              const bottleId = product.linkedProductId;
+              const bottle = products.find(p => p.id === bottleId);
+              
+              if (bottle) {
+                const bottleRef = doc(db, 'products', bottleId);
+                const totalMlSold = (product.doseSize || 0) * item.quantity;
+                const volPerUnit = bottle.volumePerUnit || 0;
+                
+                let newCurrentVolume = (bottle.currentBottleVolume !== undefined ? bottle.currentBottleVolume : volPerUnit) - totalMlSold;
+                let newStock = bottle.stock || 0;
+
+                // If volume goes negative, open a new bottle
+                if (volPerUnit > 0) {
+                  while (newCurrentVolume < 0 && newStock > 0) {
+                    newStock -= 1;
+                    newCurrentVolume += volPerUnit;
+                  }
+                }
+
+                // If volume is still negative (out of stock), cap it at 0
+                if (newCurrentVolume < 0) {
+                  newCurrentVolume = 0;
+                  newStock = 0;
+                }
+
+                await updateDoc(bottleRef, {
+                  stock: Math.max(0, newStock),
+                  currentBottleVolume: Math.max(0, newCurrentVolume)
+                });
+              }
+            } else if (product.isDoseControl && !product.linkedProductId) {
+              // It's a BOTTLE sold as a whole.
+              const newStock = Math.max(0, (product.stock || 0) - item.quantity);
+              const updateData: any = { stock: newStock };
+              
+              // If stock reaches 0, also clear current volume
+              if (newStock === 0) {
+                updateData.currentBottleVolume = 0;
+              }
+              
+              await updateDoc(productRef, updateData);
+            } else {
+              // Normal product
+              await updateDoc(productRef, {
+                stock: Math.max(0, (product.stock || 0) - item.quantity)
+              });
+            }
           }
         }
       }
@@ -1156,9 +1226,21 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                                         >
                                           <div className="min-w-0">
                                             <p className="font-bold text-xs uppercase tracking-wider group-hover:text-[#0070f3] transition-colors truncate">{product.name}</p>
-                                            <p className="text-[10px] text-muted-foreground font-black tracking-widest">
-                                              {product.isOpenValue ? 'VALOR ABERTO' : `R$ ${product.price.toFixed(2)}`}
-                                            </p>
+                                            <div className="flex flex-col gap-0.5">
+                                              <p className="text-[10px] text-muted-foreground font-black tracking-widest">
+                                                {product.isOpenValue ? 'VALOR ABERTO' : `R$ ${product.price.toFixed(2)}`}
+                                              </p>
+                                              {product.isDoseControl && (
+                                                <p className="text-[9px] text-[#0070f3]/70 font-black uppercase tracking-widest flex items-center gap-1">
+                                                  <FlaskConical className="w-2.5 h-2.5" />
+                                                  {product.linkedProductId ? (
+                                                    <>Garrafa: {products.find(p => p.id === product.linkedProductId)?.currentBottleVolume || 0}ml rest.</>
+                                                  ) : (
+                                                    <>{product.currentBottleVolume || 0}ml rest. na garrafa</>
+                                                  )}
+                                                </p>
+                                              )}
+                                            </div>
                                           </div>
                                           <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center group-hover:bg-[#0070f3] group-hover:text-white transition-all">
                                             <Plus className="w-4 h-4" />
@@ -1264,7 +1346,24 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                       >
                         <div className="min-w-0 flex-1">
                           <p className="font-black text-sm uppercase tracking-tight truncate leading-none mb-1">{item.productName}</p>
-                          <p className="text-[10px] text-muted-foreground font-bold tracking-widest">R$ {item.price.toFixed(2)} / UN</p>
+                          <div className="flex flex-col gap-0.5">
+                            <p className="text-[10px] text-muted-foreground font-bold tracking-widest uppercase">R$ {item.price.toFixed(2)} / UN</p>
+                            {(() => {
+                              const product = products.find(p => p.id === item.productId.split('_')[0]);
+                              if (product?.isDoseControl) {
+                                const bottle = product.linkedProductId 
+                                  ? products.find(p => p.id === product.linkedProductId)
+                                  : product;
+                                return (
+                                  <p className="text-[9px] text-[#0070f3]/70 font-black uppercase tracking-widest flex items-center gap-1">
+                                    <FlaskConical className="w-2.5 h-2.5" />
+                                    {bottle?.name || 'Garrafa'}: {bottle?.currentBottleVolume || 0}ml rest.
+                                  </p>
+                                );
+                              }
+                              return null;
+                            })()}
+                          </div>
                         </div>
 
                         <div className="flex items-center gap-3">
@@ -1739,6 +1838,35 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                 <p className="text-[10px] font-bold tracking-widest uppercase text-[#0070f3]/60">Defina o valor do item</p>
               </div>
             </div>
+            {selectedProduct?.isDoseControl && (
+              <div className="mt-4 p-4 bg-[#0070f3]/5 border border-[#0070f3]/10 rounded-2xl">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[#0070f3]/10 flex items-center justify-center text-[#0070f3]">
+                    <FlaskConical className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground">Garrafa Vinculada</p>
+                    <p className="text-xs font-bold text-white truncate">
+                      {selectedProduct.linkedProductId ? (
+                        <>
+                          {products.find(p => p.id === selectedProduct.linkedProductId)?.name || 'Garrafa não encontrada'}
+                          <span className="text-[#0070f3] ml-2 font-black">
+                            ({products.find(p => p.id === selectedProduct.linkedProductId)?.currentBottleVolume || 0}ml rest.)
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          Controle Próprio
+                          <span className="text-[#0070f3] ml-2 font-black">
+                            ({selectedProduct.currentBottleVolume || 0}ml rest.)
+                          </span>
+                        </>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
           <div className="p-8 space-y-6">
             <div className="space-y-2">

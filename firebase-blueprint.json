@@ -22,8 +22,15 @@
         "price": { "type": "number" },
         "cost": { "type": "number" },
         "stock": { "type": "number" },
+        "minStock": { "type": "number" },
         "unit": { "type": "string" },
-        "active": { "type": "boolean" }
+        "active": { "type": "boolean" },
+        "isOpenValue": { "type": "boolean" },
+        "isDoseControl": { "type": "boolean" },
+        "volumePerUnit": { "type": "number" },
+        "currentBottleVolume": { "type": "number" },
+        "linkedProductId": { "type": "string" },
+        "doseSize": { "type": "number" }
       },
       "required": ["name", "categoryId", "price", "cost", "stock"]
     },

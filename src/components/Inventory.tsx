@@ -9,8 +9,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from './ui/dialog';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from './ui/select';
 import { Badge } from './ui/badge';
-import { Plus, Edit2, Trash2, Package, Tag, Search, Filter, ChevronDown, ChevronRight, Layers, Info, AlertCircle, TrendingUp, X, Settings, Check } from 'lucide-react';
+import { Plus, Edit2, Trash2, Package, Tag, Search, Filter, ChevronDown, ChevronRight, Layers, Info, AlertCircle, TrendingUp, X, Settings, Check, Wine, Droplets, FlaskConical } from 'lucide-react';
 import { toast } from 'sonner';
+import { motion, AnimatePresence } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../lib/firebase-utils';
 import { cn } from '../lib/utils';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -23,6 +24,7 @@ export function Inventory({ user, setActiveTab }: { user: UserProfile, setActive
   const [categories, setCategories] = useState<Category[]>([]);
   const [search, setSearch] = useState('');
   const [stockFilter, setStockFilter] = useState<'all' | 'critical'>('all');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   
@@ -37,6 +39,32 @@ export function Inventory({ user, setActiveTab }: { user: UserProfile, setActive
   const [productUnit, setProductUnit] = useState('Por Unidade');
   const [productMinStock, setProductMinStock] = useState('');
   const [productDescription, setProductDescription] = useState('');
+  const [isOpenValue, setIsOpenValue] = useState(false);
+  const [isDoseControl, setIsDoseControl] = useState(false);
+  const [volumePerUnit, setVolumePerUnit] = useState('');
+  const [currentBottleVolume, setCurrentBottleVolume] = useState('');
+  const [linkedProductId, setLinkedProductId] = useState('');
+  const [doseSize, setDoseSize] = useState('');
+
+  // Auto-configure dose control based on unit selection
+  useEffect(() => {
+    if (productUnit === 'Dose Simples (50ml)') {
+      setIsDoseControl(true);
+      setDoseSize('50');
+    } else if (productUnit === 'Dose Dupla (100ml)') {
+      setIsDoseControl(true);
+      setDoseSize('100');
+    } else if (productUnit === 'Dose (30ml)') {
+      setIsDoseControl(true);
+      setDoseSize('30');
+    } else if (productUnit === 'Garrafa / Inteiro') {
+      setIsDoseControl(true);
+      setLinkedProductId('');
+    } else if (productUnit === 'Serviço / Valor Aberto') {
+      setIsOpenValue(true);
+    }
+  }, [productUnit]);
+
   const [categoryName, setCategoryName] = useState('');
   const [isSavingProduct, setIsSavingProduct] = useState(false);
   const [isSavingCategory, setIsSavingCategory] = useState(false);
@@ -74,6 +102,12 @@ export function Inventory({ user, setActiveTab }: { user: UserProfile, setActive
     };
   }, []);
 
+  useEffect(() => {
+    if (categoryFilter !== 'all') {
+      setExpandedCategories(prev => prev.includes(categoryFilter) ? prev : [...prev, categoryFilter]);
+    }
+  }, [categoryFilter]);
+
   const handleSaveProduct = async () => {
     if (!productName || !productPrice || !productCategoryId) return;
     setIsSavingProduct(true);
@@ -110,7 +144,14 @@ export function Inventory({ user, setActiveTab }: { user: UserProfile, setActive
       subcategory: productSubcategory,
       description: productDescription,
       active: true,
-      isOpenValue: productUnit === 'Dose (Personalizada)' || productUnit === 'Serviço / Valor Aberto'
+      isOpenValue,
+      isDoseControl,
+      volumePerUnit: Math.max(0, parseFloat(volumePerUnit) || 0),
+      linkedProductId: isDoseControl ? linkedProductId : '',
+      doseSize: isDoseControl ? Math.max(0, parseFloat(doseSize) || 0) : 0,
+      currentBottleVolume: isDoseControl && !linkedProductId 
+        ? (currentBottleVolume !== '' ? Math.max(0, parseFloat(currentBottleVolume)) : (editingProduct?.currentBottleVolume ?? parseFloat(volumePerUnit) ?? 0))
+        : 0
     };
 
     try {
@@ -159,6 +200,12 @@ export function Inventory({ user, setActiveTab }: { user: UserProfile, setActive
     setProductCategoryId('');
     setProductSubcategory('');
     setProductDescription('');
+    setIsOpenValue(false);
+    setIsDoseControl(false);
+    setVolumePerUnit('');
+    setCurrentBottleVolume('');
+    setLinkedProductId('');
+    setDoseSize('');
   };
 
   const openEditProduct = (product: Product) => {
@@ -172,6 +219,12 @@ export function Inventory({ user, setActiveTab }: { user: UserProfile, setActive
     setProductCategoryId(product.categoryId || '');
     setProductSubcategory(product.subcategory || '');
     setProductDescription(product.description || '');
+    setIsOpenValue(product.isOpenValue || false);
+    setIsDoseControl(product.isDoseControl || false);
+    setVolumePerUnit((product.volumePerUnit || '').toString());
+    setCurrentBottleVolume((product.currentBottleVolume || '').toString());
+    setLinkedProductId(product.linkedProductId || '');
+    setDoseSize((product.doseSize || '').toString());
     setIsProductModalOpen(true);
   };
 
@@ -192,7 +245,8 @@ export function Inventory({ user, setActiveTab }: { user: UserProfile, setActive
   const filteredProducts = products.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase());
     const matchesStock = stockFilter === 'critical' ? (p.stock || 0) <= (p.minStock || 5) : true;
-    return matchesSearch && matchesStock;
+    const matchesCategory = categoryFilter === 'all' ? true : p.categoryId === categoryFilter;
+    return matchesSearch && matchesStock && matchesCategory;
   });
 
   return (
@@ -501,16 +555,188 @@ export function Inventory({ user, setActiveTab }: { user: UserProfile, setActive
                         />
                       </div>
 
-                      <div className="space-y-2">
-                        <label className="text-xs font-medium text-muted-foreground ml-1">Preço de Venda (R$)</label>
-                        <Input 
-                          type="number"
-                          step="0.01"
-                          className="h-14 bg-[#111827]/50 border-border focus:ring-primary/20 focus:border-primary text-sm font-medium rounded-xl"
-                          value={productPrice}
-                          onChange={(e) => setProductPrice(e.target.value)}
-                          placeholder="0"
-                        />
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <label className="text-xs font-medium text-muted-foreground ml-1">Preço de Venda (R$)</label>
+                          <Input 
+                            type="number"
+                            step="0.01"
+                            className="h-14 bg-[#111827]/50 border-border focus:ring-primary/20 focus:border-primary text-sm font-medium rounded-xl"
+                            value={productPrice}
+                            onChange={(e) => setProductPrice(e.target.value)}
+                            placeholder="0"
+                            disabled={isOpenValue}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-xs font-medium text-muted-foreground ml-1">Valor Aberto?</label>
+                          <Button
+                            variant={isOpenValue ? "default" : "outline"}
+                            onClick={() => setIsOpenValue(!isOpenValue)}
+                            className={cn(
+                              "h-14 w-full rounded-xl font-bold uppercase tracking-widest text-[10px] transition-all",
+                              isOpenValue ? "bg-blue-600 hover:bg-blue-700" : "border-border hover:bg-white/5"
+                            )}
+                          >
+                            {isOpenValue ? (
+                              <div className="flex items-center gap-2">
+                                <Check className="w-4 h-4" /> Ativado
+                              </div>
+                            ) : "Desativado"}
+                          </Button>
+                          <p className="text-[9px] text-muted-foreground uppercase tracking-widest ml-1">Definir preço no momento da venda</p>
+                        </div>
+                      </div>
+
+                      {/* Controle de Doses */}
+                      <div className="space-y-6 pt-6 border-t border-border/30">
+                        <div className="flex items-center justify-between bg-primary/5 p-4 rounded-2xl border border-primary/10">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                              <FlaskConical className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold text-white">Controle de Doses / Volume</p>
+                              <p className="text-[10px] text-muted-foreground uppercase tracking-widest">Abater do estoque por ML</p>
+                            </div>
+                          </div>
+                          <Button
+                            variant={isDoseControl ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setIsDoseControl(!isDoseControl)}
+                            className={cn(
+                              "h-10 px-6 rounded-xl font-bold uppercase tracking-widest text-[10px] transition-all",
+                              isDoseControl ? "bg-primary hover:bg-primary/90" : "border-border hover:bg-white/5"
+                            )}
+                          >
+                            {isDoseControl ? "Ativado" : "Desativado"}
+                          </Button>
+                        </div>
+
+                        {isDoseControl && (
+                          <motion.div 
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="space-y-6 p-6 bg-[#111827]/30 rounded-2xl border border-border/50"
+                          >
+                            <div className="space-y-2">
+                              <label className="text-xs font-medium text-muted-foreground ml-1">Este produto é:</label>
+                              <div className="grid grid-cols-2 gap-2">
+                                <Button
+                                  variant={!linkedProductId ? "default" : "outline"}
+                                  onClick={() => setLinkedProductId('')}
+                                  className="h-12 rounded-xl text-[10px] font-bold uppercase tracking-widest"
+                                >
+                                  Garrafa
+                                </Button>
+                                <Button
+                                  variant={linkedProductId ? "default" : "outline"}
+                                  onClick={() => {
+                                    const firstBottle = products.find(p => p.isDoseControl && !p.linkedProductId);
+                                    if (firstBottle) setLinkedProductId(firstBottle.id);
+                                  }}
+                                  className="h-12 rounded-xl text-[10px] font-bold uppercase tracking-widest"
+                                >
+                                  Dose
+                                </Button>
+                              </div>
+                            </div>
+
+                            {!linkedProductId ? (
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-2">
+                                  <label className="text-xs font-medium text-muted-foreground ml-1 flex items-center gap-2">
+                                    <Droplets className="w-3 h-3 text-primary" /> Volume Total (ml)
+                                  </label>
+                                  <Input 
+                                    type="number"
+                                    min="0"
+                                    className="h-14 bg-[#111827]/50 border-border focus:ring-primary/20 focus:border-primary text-sm font-medium rounded-xl"
+                                    value={volumePerUnit}
+                                    onChange={(e) => setVolumePerUnit(e.target.value)}
+                                    placeholder="Ex: 1000"
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <label className="text-xs font-medium text-muted-foreground ml-1 flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2">
+                                      <FlaskConical className="w-3 h-3 text-primary" /> Volume Atual (ml)
+                                    </div>
+                                    {volumePerUnit && (
+                                      <button 
+                                        type="button"
+                                        onClick={() => setCurrentBottleVolume(volumePerUnit)}
+                                        className="text-[9px] font-bold text-primary hover:underline uppercase tracking-widest"
+                                      >
+                                        Resetar p/ Cheia
+                                      </button>
+                                    )}
+                                  </label>
+                                  <Input 
+                                    type="number"
+                                    min="0"
+                                    className="h-14 bg-[#111827]/50 border-border focus:ring-primary/20 focus:border-primary text-sm font-medium rounded-xl"
+                                    value={currentBottleVolume}
+                                    onChange={(e) => setCurrentBottleVolume(e.target.value)}
+                                    placeholder="Ex: 998"
+                                  />
+                                </div>
+                                <p className="text-[9px] text-muted-foreground uppercase tracking-widest ml-1 md:col-span-2">
+                                  Volume total é o que reseta ao abrir nova garrafa. Volume atual é o que resta na garrafa aberta agora.
+                                </p>
+                              </div>
+                            ) : (
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-2">
+                                  <label className="text-xs font-medium text-muted-foreground ml-1">Garrafa de Origem</label>
+                                  <Select value={linkedProductId} onValueChange={setLinkedProductId}>
+                                    <SelectTrigger className="h-14 bg-[#111827]/50 border-border text-sm font-medium rounded-xl">
+                                      <SelectValue placeholder="Selecionar Garrafa" />
+                                    </SelectTrigger>
+                                    <SelectContent className="bg-[#0b1224] border-border">
+                                      {products
+                                        .filter(p => p.isDoseControl && !p.linkedProductId && p.id !== editingProduct?.id)
+                                        .map(p => (
+                                          <SelectItem key={p.id} value={p.id} className="font-bold uppercase tracking-widest text-[10px] py-3">
+                                            {p.name} ({p.currentBottleVolume || p.volumePerUnit}ml rest.)
+                                          </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="space-y-2">
+                                  <label className="text-xs font-medium text-muted-foreground ml-1 flex items-center gap-2">
+                                    <Wine className="w-3 h-3 text-primary" /> Tamanho Dose (ml)
+                                  </label>
+                                  <Input 
+                                    type="number"
+                                    min="0"
+                                    className="h-14 bg-[#111827]/50 border-border focus:ring-primary/20 focus:border-primary text-sm font-medium rounded-xl"
+                                    value={doseSize}
+                                    onChange={(e) => setDoseSize(e.target.value)}
+                                    placeholder="Ex: 50"
+                                  />
+                                </div>
+                                <div className="md:col-span-2 p-4 bg-primary/5 border border-primary/10 rounded-xl">
+                                  <p className="text-[10px] font-bold text-primary uppercase tracking-widest flex items-center gap-2">
+                                    <Info className="w-3 h-3" /> Resumo da Configuração
+                                  </p>
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    Ao vender este produto ({productName || 'Sem nome'}), o sistema cobrará 
+                                    <span className="text-white font-bold mx-1">
+                                      {isOpenValue ? 'Valor Aberto' : `R$ ${parseFloat(productPrice || '0').toFixed(2)}`}
+                                    </span> 
+                                    e abaterá 
+                                    <span className="text-white font-bold mx-1">
+                                      {doseSize || '0'}ml
+                                    </span> 
+                                    do estoque da garrafa vinculada.
+                                  </p>
+                                </div>
+                              </div>
+                            )}
+                          </motion.div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -546,254 +772,335 @@ export function Inventory({ user, setActiveTab }: { user: UserProfile, setActive
         </div>
       </div>
 
-      <div className="space-y-4">
-        {categories.map((category, catIdx) => {
-          const categoryProducts = filteredProducts.filter(p => p.categoryId === category.id);
-          const subcategories = Array.from(new Set(categoryProducts.map(p => p.subcategory || 'Sem Subcategoria')));
-          const isExpanded = expandedCategories.includes(category.id);
+      {/* Category Filter Bar */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-2 custom-scrollbar -mx-2 px-2">
+        <Button
+          variant={categoryFilter === 'all' ? 'default' : 'outline'}
+          onClick={() => setCategoryFilter('all')}
+          className={cn(
+            "h-10 px-6 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shrink-0",
+            categoryFilter === 'all' ? "bg-primary shadow-lg shadow-primary/20" : "border-border hover:bg-white/5"
+          )}
+        >
+          Todos
+        </Button>
+        {categories.map(category => (
+          <Button
+            key={`filter-${category.id}`}
+            variant={categoryFilter === category.id ? 'default' : 'outline'}
+            onClick={() => setCategoryFilter(category.id)}
+            className={cn(
+              "h-10 px-6 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shrink-0",
+              categoryFilter === category.id ? "bg-primary shadow-lg shadow-primary/20" : "border-border hover:bg-white/5"
+            )}
+          >
+            {category.name}
+          </Button>
+        ))}
+      </div>
 
-          if (categoryProducts.length === 0 && search) return null;
+      <div className="space-y-4">
+        {(() => {
+          const visibleCategories = categories
+            .filter(c => categoryFilter === 'all' || c.id === categoryFilter)
+            .filter(category => {
+              const categoryProducts = filteredProducts.filter(p => p.categoryId === category.id);
+              return !(categoryProducts.length === 0 && search);
+            });
+
+          const uncategorizedProducts = filteredProducts.filter(p => !categories.find(c => c.id === p.categoryId));
+          const hasUncategorized = uncategorizedProducts.length > 0 && (categoryFilter === 'all' || categoryFilter === 'uncategorized');
+
+          if (visibleCategories.length === 0 && !hasUncategorized) {
+            return (
+              <div className="py-20 text-center bg-card/30 rounded-2xl border border-dashed border-border animate-in fade-in duration-500">
+                <Package className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-10" />
+                <p className="text-muted-foreground font-bold tracking-widest uppercase">Nenhum produto encontrado nesta visualização</p>
+                <Button 
+                  variant="link" 
+                  onClick={() => {
+                    setSearch('');
+                    setCategoryFilter('all');
+                    setStockFilter('all');
+                  }}
+                  className="mt-2 text-primary font-bold uppercase tracking-widest text-[10px]"
+                >
+                  Limpar todos os filtros
+                </Button>
+              </div>
+            );
+          }
 
           return (
-            <div key={`${category.id}-${catIdx}`} className="border border-border bg-card/30 rounded-2xl overflow-hidden transition-all">
-              <button 
-                onClick={() => toggleCategory(category.id)}
-                className="w-full flex items-center justify-between p-6 hover:bg-white/5 transition-colors group"
-              >
-                <div className="flex items-center gap-4">
-                  <div className={cn(
-                    "w-10 h-10 rounded-xl flex items-center justify-center border transition-all",
-                    isExpanded ? "bg-primary/20 border-primary/30 text-primary" : "bg-white/5 border-border text-muted-foreground group-hover:text-white"
-                  )}>
-                    <Package className="w-5 h-5" />
-                  </div>
-                  <div className="text-left">
-                    <h3 className="font-black uppercase tracking-tighter text-lg">{category.name}</h3>
-                    <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">{categoryProducts.length} ITENS</p>
-                  </div>
-                </div>
-                {isExpanded ? <ChevronDown className="w-5 h-5 text-muted-foreground" /> : <ChevronRight className="w-5 h-5 text-muted-foreground" />}
-              </button>
+            <>
+              {visibleCategories.map((category, catIdx) => {
+                const categoryProducts = filteredProducts.filter(p => p.categoryId === category.id);
+                const subcategories = Array.from(new Set(categoryProducts.map(p => p.subcategory || 'Sem Subcategoria')));
+                const isExpanded = expandedCategories.includes(category.id);
 
-              {isExpanded && (
-                <div className="px-6 pb-6 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                  {subcategories.map((subName, subIdx) => {
-                    const subProducts = categoryProducts.filter(p => (p.subcategory || 'Sem Subcategoria') === subName);
-                    const subId = `${category.id}-${subName}-${subIdx}`;
-                    const isSubExpanded = expandedSubcategories.includes(subId);
+                return (
+                  <div key={`${category.id}-${catIdx}`} className="border border-border bg-card/30 rounded-2xl overflow-hidden transition-all">
+                    <button 
+                      onClick={() => toggleCategory(category.id)}
+                      className="w-full flex items-center justify-between p-6 hover:bg-white/5 transition-colors group"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className={cn(
+                          "w-10 h-10 rounded-xl flex items-center justify-center border transition-all",
+                          isExpanded ? "bg-primary/20 border-primary/30 text-primary" : "bg-white/5 border-border text-muted-foreground group-hover:text-white"
+                        )}>
+                          <Package className="w-5 h-5" />
+                        </div>
+                        <div className="text-left">
+                          <h3 className="font-black uppercase tracking-tighter text-lg">{category.name}</h3>
+                          <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">{categoryProducts.length} ITENS</p>
+                        </div>
+                      </div>
+                      {isExpanded ? <ChevronDown className="w-5 h-5 text-muted-foreground" /> : <ChevronRight className="w-5 h-5 text-muted-foreground" />}
+                    </button>
 
-                    return (
-                      <div key={subId} className="border border-border/50 bg-black/20 rounded-xl overflow-hidden">
-                        <button 
-                          onClick={() => toggleSubcategory(subId)}
-                          className="w-full flex items-center justify-between p-4 hover:bg-white/5 transition-colors group"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className={cn(
-                              "w-8 h-8 rounded-lg flex items-center justify-center border transition-all",
-                              isSubExpanded ? "bg-primary/10 border-primary/20 text-primary" : "bg-white/5 border-border/50 text-muted-foreground group-hover:text-white"
-                            )}>
-                              <Layers className="w-4 h-4" />
-                            </div>
-                            <div className="text-left">
-                              <h4 className="font-black uppercase tracking-tighter text-sm">{subName}</h4>
-                              <p className="text-[9px] font-bold tracking-widest uppercase text-muted-foreground">{subProducts.length} PRODUTOS</p>
-                            </div>
-                          </div>
-                          {isSubExpanded ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
-                        </button>
+                    {isExpanded && (
+                      <div className="px-6 pb-6 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                        {subcategories.map((subName, subIdx) => {
+                          const subProducts = categoryProducts.filter(p => (p.subcategory || 'Sem Subcategoria') === subName);
+                          const subId = `${category.id}-${subName}-${subIdx}`;
+                          const isSubExpanded = expandedSubcategories.includes(subId);
 
-                        {isSubExpanded && (
-                          <div className="p-2 space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
-                            {subProducts.map((product, prodIdx) => {
-                              const margin = product.cost > 0 ? ((product.price - product.cost) / product.cost) * 100 : 0;
-                              return (
-                                <div key={`${product.id}-${prodIdx}`} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-card/40 border border-border/30 rounded-xl hover:border-primary/30 transition-all group/item gap-4">
-                                  <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center border border-border/50 group-hover/item:border-primary/30 transition-all flex-shrink-0">
-                                      <Package className="w-5 h-5 text-muted-foreground group-hover/item:text-primary" />
-                                    </div>
-                                    <div className="min-w-0">
-                                      <h5 className="font-black uppercase tracking-tighter text-sm truncate">{product.name}</h5>
-                                      <p className="text-[9px] font-bold tracking-widest uppercase text-muted-foreground truncate">{product.subcategory || category.name}</p>
-                                    </div>
+                          return (
+                            <div key={subId} className="border border-border/50 bg-black/20 rounded-xl overflow-hidden">
+                              <button 
+                                onClick={() => toggleSubcategory(subId)}
+                                className="w-full flex items-center justify-between p-4 hover:bg-white/5 transition-colors group"
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div className={cn(
+                                    "w-8 h-8 rounded-lg flex items-center justify-center border transition-all",
+                                    isSubExpanded ? "bg-primary/10 border-primary/20 text-primary" : "bg-white/5 border-border/50 text-muted-foreground group-hover:text-white"
+                                  )}>
+                                    <Layers className="w-4 h-4" />
                                   </div>
-
-                                  <div className="flex items-center justify-between sm:justify-end gap-4 md:gap-8 border-t sm:border-t-0 pt-3 sm:pt-0 border-border/50">
-                                    <div className="hidden md:block text-right">
-                                      <p className="text-[8px] font-bold tracking-widest uppercase text-muted-foreground mb-1">Custo Unit.</p>
-                                      <p className="font-mono font-bold text-xs text-muted-foreground">R$ {(product.cost || 0).toFixed(2)}</p>
-                                    </div>
-                                    
-                                    <div className="text-left sm:text-right">
-                                      <p className="text-[8px] font-bold tracking-widest uppercase text-muted-foreground mb-1">Preço Venda</p>
-                                      <p className="font-mono font-bold text-sm text-white">R$ {(product.price || 0).toFixed(2)}</p>
-                                    </div>
-
-                                    <div className="text-right">
-                                      <p className="text-[8px] font-bold tracking-widest uppercase text-muted-foreground mb-1">Estoque</p>
-                                      <Badge variant="outline" className={cn(
-                                        "text-[9px] md:text-[10px] font-bold uppercase tracking-widest border-none px-2 py-0.5",
-                                        (product.stock || 0) <= 5 ? "bg-red-500/10 text-red-500" : "bg-green-500/10 text-green-500"
-                                      )}>
-                                        {(product.stock || 0)} UN.
-                                      </Badge>
-                                    </div>
-
-                                    <div className="hidden lg:block text-right">
-                                      <p className="text-[8px] font-bold tracking-widest uppercase text-muted-foreground mb-1">Margem</p>
-                                      <p className={cn(
-                                        "text-[10px] font-bold uppercase tracking-widest",
-                                        margin >= 30 ? "text-green-500" : "text-yellow-500"
-                                      )}>
-                                        {margin.toFixed(0)}%
-                                      </p>
-                                    </div>
-
-                                    <div className="flex items-center gap-1 md:gap-2 ml-0 sm:ml-4">
-                                      <Button 
-                                        variant="ghost" 
-                                        size="icon" 
-                                        aria-label="Ver Movimentação"
-                                        title="Ver Movimentação"
-                                        className="w-8 h-8 rounded-lg hover:bg-primary/10 hover:text-primary transition-all"
-                                      >
-                                        <Layers className="w-4 h-4" />
-                                      </Button>
-                                      <Button 
-                                        variant="ghost" 
-                                        size="icon" 
-                                        aria-label="Editar Produto"
-                                        title="Editar Produto"
-                                        onClick={() => openEditProduct(product)}
-                                        className="w-8 h-8 rounded-lg hover:bg-blue-500/10 hover:text-blue-500 transition-all"
-                                      >
-                                        <Edit2 className="w-4 h-4" />
-                                      </Button>
-                                      <Button 
-                                        variant="ghost" 
-                                        size="icon" 
-                                        aria-label="Excluir Produto"
-                                        title="Excluir Produto"
-                                        onClick={() => {
-                                          setProductToDelete(product);
-                                          setIsDeleteConfirmOpen(true);
-                                        }}
-                                        className="w-8 h-8 rounded-lg hover:bg-red-500/10 hover:text-red-500 transition-all"
-                                      >
-                                        <Trash2 className="w-4 h-4" />
-                                      </Button>
-                                    </div>
+                                  <div className="text-left">
+                                    <h4 className="font-black uppercase tracking-tighter text-sm">{subName}</h4>
+                                    <p className="text-[9px] font-bold tracking-widest uppercase text-muted-foreground">{subProducts.length} PRODUTOS</p>
                                   </div>
                                 </div>
-                              );
-                            })}
-                          </div>
-                        )}
+                                {isSubExpanded ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+                              </button>
+
+                              {isSubExpanded && (
+                                <div className="p-2 space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                                  {subProducts.map((product, prodIdx) => {
+                                    const margin = product.cost > 0 ? ((product.price - product.cost) / product.cost) * 100 : 0;
+                                    return (
+                                      <div key={`${product.id}-${prodIdx}`} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-card/40 border border-border/30 rounded-xl hover:border-primary/30 transition-all group/item gap-4">
+                                        <div className="flex items-center gap-4">
+                                          <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center border border-border/50 group-hover/item:border-primary/30 transition-all flex-shrink-0 relative">
+                                            <Package className="w-5 h-5 text-muted-foreground group-hover/item:text-primary" />
+                                            {product.isDoseControl && (
+                                              <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary flex items-center justify-center border border-background">
+                                                {product.linkedProductId ? <Wine className="w-2.5 h-2.5 text-white" /> : <FlaskConical className="w-2.5 h-2.5 text-white" />}
+                                              </div>
+                                            )}
+                                          </div>
+                                          <div className="min-w-0">
+                                            <div className="flex items-center gap-2">
+                                              <h5 className="font-black uppercase tracking-tighter text-sm truncate">{product.name}</h5>
+                                              {product.isOpenValue && (
+                                                <Badge variant="outline" className="text-[7px] font-black uppercase tracking-widest border-blue-500/30 text-blue-500 bg-blue-500/5 px-1 py-0">Aberto</Badge>
+                                              )}
+                                            </div>
+                                            <p className="text-[9px] font-bold tracking-widest uppercase text-muted-foreground truncate">{product.subcategory || category.name}</p>
+                                          </div>
+                                        </div>
+
+                                        <div className="flex items-center justify-between sm:justify-end gap-4 md:gap-8 border-t sm:border-t-0 pt-3 sm:pt-0 border-border/50">
+                                          <div className="hidden md:block text-right">
+                                            <p className="text-[8px] font-bold tracking-widest uppercase text-muted-foreground mb-1">Custo Unit.</p>
+                                            <p className="font-mono font-bold text-xs text-muted-foreground">R$ {(product.cost || 0).toFixed(2)}</p>
+                                          </div>
+                                          
+                                          <div className="text-left sm:text-right">
+                                            <p className="text-[8px] font-bold tracking-widest uppercase text-muted-foreground mb-1">Preço Venda</p>
+                                            <p className="font-mono font-bold text-sm text-white">R$ {(product.price || 0).toFixed(2)}</p>
+                                          </div>
+
+                                          <div className="text-right">
+                                            <p className="text-[8px] font-bold tracking-widest uppercase text-muted-foreground mb-1">Estoque</p>
+                                            <div className="flex flex-col items-end gap-1">
+                                              <Badge variant="outline" className={cn(
+                                                "text-[9px] md:text-[10px] font-bold uppercase tracking-widest border-none px-2 py-0.5",
+                                                (product.stock || 0) <= 5 ? "bg-red-500/10 text-red-500" : "bg-green-500/10 text-green-500"
+                                              )}>
+                                                {(product.stock || 0)} UN.
+                                              </Badge>
+                                              {product.isDoseControl && !product.linkedProductId && (
+                                                <p className="text-[8px] font-mono font-bold text-primary/60">
+                                                  {(product.currentBottleVolume || 0)}ml REST.
+                                                </p>
+                                              )}
+                                            </div>
+                                          </div>
+
+                                          <div className="hidden lg:block text-right">
+                                            <p className="text-[8px] font-bold tracking-widest uppercase text-muted-foreground mb-1">Margem</p>
+                                            <p className={cn(
+                                              "text-[10px] font-bold uppercase tracking-widest",
+                                              margin >= 30 ? "text-green-500" : "text-yellow-500"
+                                            )}>
+                                              {margin.toFixed(0)}%
+                                            </p>
+                                          </div>
+
+                                          <div className="flex items-center gap-1 md:gap-2 ml-0 sm:ml-4">
+                                            <Button 
+                                              variant="ghost" 
+                                              size="icon" 
+                                              aria-label="Ver Movimentação"
+                                              title="Ver Movimentação"
+                                              className="w-8 h-8 rounded-lg hover:bg-primary/10 hover:text-primary transition-all"
+                                            >
+                                              <Layers className="w-4 h-4" />
+                                            </Button>
+                                            <Button 
+                                              variant="ghost" 
+                                              size="icon" 
+                                              aria-label="Editar Produto"
+                                              title="Editar Produto"
+                                              onClick={() => openEditProduct(product)}
+                                              className="w-8 h-8 rounded-lg hover:bg-blue-500/10 hover:text-blue-500 transition-all"
+                                            >
+                                              <Edit2 className="w-4 h-4" />
+                                            </Button>
+                                            <Button 
+                                              variant="ghost" 
+                                              size="icon" 
+                                              aria-label="Excluir Produto"
+                                              title="Excluir Produto"
+                                              onClick={() => {
+                                                setProductToDelete(product);
+                                                setIsDeleteConfirmOpen(true);
+                                              }}
+                                              className="w-8 h-8 rounded-lg hover:bg-red-500/10 hover:text-red-500 transition-all"
+                                            >
+                                              <Trash2 className="w-4 h-4" />
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          );
-        })}
-
-        {/* Fallback for products without category or if categories collection is empty */}
-        {(() => {
-          const uncategorizedProducts = filteredProducts.filter(p => !categories.find(c => c.id === p.categoryId));
-          if (uncategorizedProducts.length === 0) return null;
-
-          return (
-            <div className="border border-border bg-card/30 rounded-2xl overflow-hidden transition-all">
-              <div className="p-6 border-b border-border bg-white/5">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-white/5 border border-border flex items-center justify-center text-muted-foreground">
-                    <AlertCircle className="w-5 h-5" />
+                    )}
                   </div>
-                  <div>
-                    <h3 className="font-black uppercase tracking-tighter text-lg">Outros / Sem Categoria</h3>
-                    <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">{uncategorizedProducts.length} ITENS</p>
-                  </div>
-                </div>
-              </div>
-              <div className="p-4 space-y-2">
-                {uncategorizedProducts.map((product, idx) => {
-                  const margin = product.cost > 0 ? ((product.price - product.cost) / product.cost) * 100 : 0;
-                  return (
-                    <div key={`${product.id}-${idx}`} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-card/40 border border-border/30 rounded-xl hover:border-primary/30 transition-all group/item gap-4">
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center border border-border/50 group-hover/item:border-primary/30 transition-all flex-shrink-0">
-                          <Package className="w-5 h-5 text-muted-foreground group-hover/item:text-primary" />
-                        </div>
-                        <div className="min-w-0">
-                          <h5 className="font-black uppercase tracking-tighter text-sm truncate">{product.name}</h5>
-                          <p className="text-[9px] font-bold tracking-widest uppercase text-muted-foreground truncate">{product.subcategory || 'Sem Categoria'}</p>
-                        </div>
+                );
+              })}
+
+              {hasUncategorized && (
+                <div className="border border-border bg-card/30 rounded-2xl overflow-hidden transition-all">
+                  <div className="p-6 border-b border-border bg-white/5">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-xl bg-white/5 border border-border flex items-center justify-center text-muted-foreground">
+                        <AlertCircle className="w-5 h-5" />
                       </div>
-
-                      <div className="flex items-center justify-between sm:justify-end gap-4 md:gap-8 border-t sm:border-t-0 pt-3 sm:pt-0 border-border/50">
-                        <div className="hidden md:block text-right">
-                          <p className="text-[8px] font-bold tracking-widest uppercase text-muted-foreground mb-1">Custo Unit.</p>
-                          <p className="font-mono font-bold text-xs text-muted-foreground">R$ {(product.cost || 0).toFixed(2)}</p>
-                        </div>
-                        
-                        <div className="text-left sm:text-right">
-                          <p className="text-[8px] font-bold tracking-widest uppercase text-muted-foreground mb-1">Preço Venda</p>
-                          <p className="font-mono font-bold text-sm text-white">R$ {(product.price || 0).toFixed(2)}</p>
-                        </div>
-
-                        <div className="text-right">
-                          <p className="text-[8px] font-bold tracking-widest uppercase text-muted-foreground mb-1">Estoque</p>
-                          <Badge variant="outline" className={cn(
-                            "text-[9px] md:text-[10px] font-bold uppercase tracking-widest border-none px-2 py-0.5",
-                            (product.stock || 0) <= 5 ? "bg-red-500/10 text-red-500" : "bg-green-500/10 text-green-500"
-                          )}>
-                            {(product.stock || 0)} UN.
-                          </Badge>
-                        </div>
-
-                        <div className="flex items-center gap-1 md:gap-2 ml-0 sm:ml-4">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            aria-label="Editar Produto"
-                            title="Editar Produto"
-                            onClick={() => openEditProduct(product)} 
-                            className="w-8 h-8 rounded-lg hover:bg-blue-500/10 hover:text-blue-500 transition-all"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            aria-label="Excluir Produto"
-                            title="Excluir Produto"
-                            onClick={() => {
-                              setProductToDelete(product);
-                              setIsDeleteConfirmOpen(true);
-                            }} 
-                            className="w-8 h-8 rounded-lg hover:bg-red-500/10 hover:text-red-500 transition-all"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
+                      <div>
+                        <h3 className="font-black uppercase tracking-tighter text-lg">Outros / Sem Categoria</h3>
+                        <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">{uncategorizedProducts.length} ITENS</p>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            </div>
+                  </div>
+                  <div className="p-4 space-y-2">
+                    {uncategorizedProducts.map((product, idx) => {
+                      const margin = product.cost > 0 ? ((product.price - product.cost) / product.cost) * 100 : 0;
+                      return (
+                        <div key={`${product.id}-${idx}`} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-card/40 border border-border/30 rounded-xl hover:border-primary/30 transition-all group/item gap-4">
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center border border-border/50 group-hover/item:border-primary/30 transition-all flex-shrink-0 relative">
+                              <Package className="w-5 h-5 text-muted-foreground group-hover/item:text-primary" />
+                              {product.isDoseControl && (
+                                <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary flex items-center justify-center border border-background">
+                                  {product.linkedProductId ? <Wine className="w-2.5 h-2.5 text-white" /> : <FlaskConical className="w-2.5 h-2.5 text-white" />}
+                                </div>
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <h5 className="font-black uppercase tracking-tighter text-sm truncate">{product.name}</h5>
+                                {product.isOpenValue && (
+                                  <Badge variant="outline" className="text-[7px] font-black uppercase tracking-widest border-blue-500/30 text-blue-500 bg-blue-500/5 px-1 py-0">Aberto</Badge>
+                                )}
+                              </div>
+                              <p className="text-[9px] font-bold tracking-widest uppercase text-muted-foreground truncate">{product.subcategory || 'Sem Categoria'}</p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between sm:justify-end gap-4 md:gap-8 border-t sm:border-t-0 pt-3 sm:pt-0 border-border/50">
+                            <div className="hidden md:block text-right">
+                              <p className="text-[8px] font-bold tracking-widest uppercase text-muted-foreground mb-1">Custo Unit.</p>
+                              <p className="font-mono font-bold text-xs text-muted-foreground">R$ {(product.cost || 0).toFixed(2)}</p>
+                            </div>
+                            
+                            <div className="text-left sm:text-right">
+                              <p className="text-[8px] font-bold tracking-widest uppercase text-muted-foreground mb-1">Preço Venda</p>
+                              <p className="font-mono font-bold text-sm text-white">R$ {(product.price || 0).toFixed(2)}</p>
+                            </div>
+
+                            <div className="text-right">
+                              <p className="text-[8px] font-bold tracking-widest uppercase text-muted-foreground mb-1">Estoque</p>
+                              <div className="flex flex-col items-end gap-1">
+                                <Badge variant="outline" className={cn(
+                                  "text-[9px] md:text-[10px] font-bold uppercase tracking-widest border-none px-2 py-0.5",
+                                  (product.stock || 0) <= 5 ? "bg-red-500/10 text-red-500" : "bg-green-500/10 text-green-500"
+                                )}>
+                                  {(product.stock || 0)} UN.
+                                </Badge>
+                                {product.isDoseControl && !product.linkedProductId && (
+                                  <p className="text-[8px] font-mono font-bold text-primary/60">
+                                    {(product.currentBottleVolume || 0)}ml REST.
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1 md:gap-2 ml-0 sm:ml-4">
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                aria-label="Editar Produto"
+                                title="Editar Produto"
+                                onClick={() => openEditProduct(product)} 
+                                className="w-8 h-8 rounded-lg hover:bg-blue-500/10 hover:text-blue-500 transition-all"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                aria-label="Excluir Produto"
+                                title="Excluir Produto"
+                                onClick={() => {
+                                  setProductToDelete(product);
+                                  setIsDeleteConfirmOpen(true);
+                                }} 
+                                className="w-8 h-8 rounded-lg hover:bg-red-500/10 hover:text-red-500 transition-all"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </>
           );
         })()}
-
-        {filteredProducts.length === 0 && (
-          <div className="text-center py-32 bg-card/20 rounded-3xl border border-dashed border-border">
-            <Package className="w-20 h-20 mx-auto mb-6 opacity-10" />
-            <h3 className="text-xl font-black uppercase tracking-tighter text-muted-foreground">Nenhum produto encontrado</h3>
-            <p className="text-xs font-bold tracking-widest uppercase text-muted-foreground/50 mt-2">Tente ajustar sua busca ou filtros</p>
-          </div>
-        )}
       </div>
 
       <ConfirmDialog 

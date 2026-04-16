@@ -79,6 +79,12 @@ export interface Product {
   unit?: string;
   active?: boolean;
   isOpenValue?: boolean;
+  // Dose control fields
+  isDoseControl?: boolean;
+  volumePerUnit?: number; // ml per bottle
+  currentBottleVolume?: number; // ml left in open bottle
+  linkedProductId?: string; // ID of the bottle product
+  doseSize?: number; // ml of this dose
 }
 
 export interface OrderItem {
