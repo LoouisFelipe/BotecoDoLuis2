@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { db } from '../firebase';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { Customer, UserProfile } from '../types';
@@ -34,6 +35,8 @@ export function Customers({ user }: { user: UserProfile }) {
   const [selectedCustomerForPay, setSelectedCustomerForPay] = useState<Customer | null>(null);
   const [payAmount, setPayAmount] = useState('');
   const [payMethod, setPayMethod] = useState('DINHEIRO');
+  const [letterFilter, setLetterFilter] = useState('TODOS');
+  const [balanceFilter, setBalanceFilter] = useState<'all' | 'debt' | 'credit'>('all');
 
   // Form states
   const [name, setName] = useState('');
@@ -167,10 +170,21 @@ export function Customers({ user }: { user: UserProfile }) {
     setIsPayModalOpen(true);
   };
 
-  const filtered = customers.filter(c => 
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    c.phone?.includes(search)
-  );
+  const filtered = customers.filter(c => {
+    const matchesSearch = c.name.toLowerCase().includes(search.toLowerCase()) ||
+                         c.phone?.includes(search);
+    
+    const matchesLetter = letterFilter === 'TODOS' || 
+                         c.name.trim().charAt(0).toUpperCase() === letterFilter;
+    
+    const matchesBalance = balanceFilter === 'all' ? true :
+                          balanceFilter === 'debt' ? (c.balance || 0) < 0 :
+                          (c.balance || 0) > 0;
+
+    return matchesSearch && matchesLetter && matchesBalance;
+  });
+
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
   const totalDebt = customers.reduce((sum, c) => sum + Math.abs(Math.min(0, c.balance || 0)), 0);
   const totalCredit = customers.reduce((sum, c) => sum + Math.max(0, c.balance || 0), 0);
@@ -179,41 +193,71 @@ export function Customers({ user }: { user: UserProfile }) {
     <div className="space-y-8">
       {/* Customer Insights */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-card border-border">
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
-              <Users className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Total de Clientes</p>
-              <p className="text-sm font-black uppercase tracking-tighter">{customers.length} Cadastrados</p>
-            </div>
-          </CardContent>
-        </Card>
+        <motion.div 
+          onClick={() => setBalanceFilter('all')}
+          whileHover={{ y: -4 }}
+          className={cn(
+            "cursor-pointer transition-all",
+            balanceFilter === 'all' ? "ring-2 ring-primary ring-offset-4 ring-offset-[#05070a]" : "opacity-80 hover:opacity-100"
+          )}
+        >
+          <Card className="bg-card border-border overflow-hidden relative">
+            {balanceFilter === 'all' && <div className="absolute inset-0 bg-primary/5 animate-pulse" />}
+            <CardContent className="p-4 flex items-center gap-4">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
+                <Users className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Total de Clientes</p>
+                <p className="text-sm font-black uppercase tracking-tighter">{customers.length} Cadastrados</p>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
 
-        <Card className="bg-card border-border">
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center text-red-500 border border-red-500/20">
-              <TrendingDown className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Total em Dívida</p>
-              <p className="text-sm font-black uppercase tracking-tighter text-red-500">R$ {totalDebt.toFixed(2)}</p>
-            </div>
-          </CardContent>
-        </Card>
+        <motion.div 
+          onClick={() => setBalanceFilter('debt')}
+          whileHover={{ y: -4 }}
+          className={cn(
+            "cursor-pointer transition-all",
+            balanceFilter === 'debt' ? "ring-2 ring-red-500 ring-offset-4 ring-offset-[#05070a]" : "opacity-80 hover:opacity-100"
+          )}
+        >
+          <Card className="bg-card border-border overflow-hidden relative">
+            {balanceFilter === 'debt' && <div className="absolute inset-0 bg-red-500/5 animate-pulse" />}
+            <CardContent className="p-4 flex items-center gap-4">
+              <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center text-red-500 border border-red-500/20">
+                <TrendingDown className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Total em Dívida</p>
+                <p className="text-sm font-black uppercase tracking-tighter text-red-500">R$ {totalDebt.toFixed(2)}</p>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
 
-        <Card className="bg-card border-border">
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center text-green-500 border border-green-500/20">
-              <TrendingUp className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Total em Crédito</p>
-              <p className="text-sm font-black uppercase tracking-tighter text-green-500">R$ {totalCredit.toFixed(2)}</p>
-            </div>
-          </CardContent>
-        </Card>
+        <motion.div 
+          onClick={() => setBalanceFilter('credit')}
+          whileHover={{ y: -4 }}
+          className={cn(
+            "cursor-pointer transition-all",
+            balanceFilter === 'credit' ? "ring-2 ring-green-500 ring-offset-4 ring-offset-[#05070a]" : "opacity-80 hover:opacity-100"
+          )}
+        >
+          <Card className="bg-card border-border overflow-hidden relative">
+            {balanceFilter === 'credit' && <div className="absolute inset-0 bg-green-500/5 animate-pulse" />}
+            <CardContent className="p-4 flex items-center gap-4">
+              <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center text-green-500 border border-green-500/20">
+                <TrendingUp className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Total em Crédito</p>
+                <p className="text-sm font-black uppercase tracking-tighter text-green-500">R$ {totalCredit.toFixed(2)}</p>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
 
         <Card className="bg-card border-border">
           <CardContent className="p-4 flex items-center gap-4">
@@ -226,31 +270,35 @@ export function Customers({ user }: { user: UserProfile }) {
             </div>
           </CardContent>
         </Card>
-      </div>      <div className="flex flex-col md:flex-row justify-between items-center gap-4 md:gap-6">
-        <div className="relative flex-1 w-full max-w-2xl group">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 md:w-5 md:h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
-          <Input 
-            placeholder="PESQUISAR CLIENTE..." 
-            className="pl-10 md:pl-12 h-12 md:h-14 bg-card/50 border-border rounded-xl text-xs md:text-sm font-bold tracking-widest focus:ring-primary/20 focus:border-primary transition-all"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-        
-        <Dialog open={isModalOpen} onOpenChange={(open) => {
-          setIsModalOpen(open);
-          if (!open) resetForm();
-        }}>
-          <DialogTrigger
-            nativeButton={true}
-            render={
-              <Button className="w-full md:w-auto h-12 md:h-14 px-6 md:px-8 rounded-xl gap-2 md:gap-3 font-bold tracking-widest uppercase shadow-lg shadow-primary/20 text-[10px] md:text-sm">
-                <Plus className="w-4 h-4 md:w-5 md:h-5" />
-                Novo Cliente
-              </Button>
-            }
-          />
-          <DialogContent className="bg-[#0b1224] border-border max-w-lg text-white p-0 overflow-hidden flex flex-col max-h-[95vh] md:max-h-[90vh]">
+      </div>
+
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4 md:gap-6">
+          <div className="relative flex-1 w-full max-w-2xl group">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 md:w-5 md:h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
+            <Input 
+              placeholder="PESQUISAR CLIENTE..." 
+              className="pl-10 md:pl-12 h-12 md:h-14 bg-card/50 border-border rounded-2xl text-xs md:text-sm font-bold tracking-widest focus:ring-primary/20 focus:border-primary transition-all"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          
+          <Dialog open={isModalOpen} onOpenChange={(open) => {
+            setIsModalOpen(open);
+            if (!open) resetForm();
+          }}>
+            <DialogTrigger
+              nativeButton={true}
+              render={
+                <Button className="w-full md:w-auto h-12 md:h-14 px-6 md:px-8 rounded-2xl gap-2 md:gap-3 font-bold tracking-widest uppercase shadow-lg shadow-primary/20 text-[10px] md:text-sm">
+                  <Plus className="w-4 h-4 md:w-5 md:h-5" />
+                  Novo Cliente
+                </Button>
+              }
+            />
+            {/* New Customer Dialog */}
+            <DialogContent className="bg-[#0b1224] border-border max-w-lg text-white p-0 overflow-hidden flex flex-col max-h-[95vh] md:max-h-[90vh]">
             <div className="p-6 md:p-8 border-b border-border/50 relative flex-shrink-0">
               <div className="flex items-center gap-4">
                 <div className="w-10 h-10 md:w-14 md:h-14 rounded-xl md:rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20">
@@ -322,7 +370,36 @@ export function Customers({ user }: { user: UserProfile }) {
         </Dialog>
       </div>
 
-        <Card className="border-border bg-card/50 rounded-2xl overflow-hidden">
+        {/* Alphabetical Filter */}
+        <div className="flex overflow-x-auto pb-4 custom-scrollbar gap-2 no-scrollbar">
+          <button
+            onClick={() => setLetterFilter('TODOS')}
+            className={cn(
+              "px-4 h-10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex-shrink-0",
+              letterFilter === 'TODOS' 
+                ? "bg-primary text-white shadow-lg shadow-primary/20" 
+                : "bg-card/50 text-muted-foreground hover:bg-white/5 border border-border"
+            )}
+          >
+            TODOS
+          </button>
+          {alphabet.map(letter => (
+            <button
+              key={letter}
+              onClick={() => setLetterFilter(letter)}
+              className={cn(
+                "w-10 h-10 rounded-xl text-xs font-black transition-all flex-shrink-0",
+                letterFilter === letter 
+                  ? "bg-primary text-white shadow-lg shadow-primary/20" 
+                  : "bg-card/50 text-muted-foreground hover:bg-white/5 border border-border"
+              )}
+            >
+              {letter}
+            </button>
+          ))}
+        </div>
+
+        <Card className="border-border bg-card/50 rounded-3xl overflow-hidden">
         {/* Desktop View */}
         <div className="hidden md:block">
           <Table>
@@ -336,9 +413,17 @@ export function Customers({ user }: { user: UserProfile }) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map(customer => (
-                <TableRow key={customer.id} className="border-border hover:bg-white/5 transition-colors">
-                  <TableCell className="py-4">
+              <AnimatePresence mode="popLayout">
+                {filtered.map(customer => (
+                  <motion.tr 
+                    key={customer.id} 
+                    layout
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    className="border-border hover:bg-white/5 transition-colors"
+                  >
+                    <TableCell className="py-4">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
                         <Users className="w-5 h-5 text-primary" />
@@ -431,17 +516,27 @@ export function Customers({ user }: { user: UserProfile }) {
                       </Button>
                     </div>
                   </TableCell>
-                </TableRow>
+                </motion.tr>
               ))}
-            </TableBody>
+            </AnimatePresence>
+          </TableBody>
           </Table>
         </div>
 
         {/* Mobile View */}
         <div className="md:hidden divide-y divide-border/50">
-          {filtered.map(customer => (
-            <div key={`mobile-customer-${customer.id}`} className="p-4 space-y-4">
-              <div className="flex justify-between items-start">
+          <AnimatePresence mode="popLayout">
+            {filtered.map((customer, index) => (
+              <motion.div 
+                key={`mobile-customer-${customer.id}`} 
+                layout
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ delay: Math.min(index * 0.05, 0.3) }}
+                className="p-4 space-y-4"
+              >
+                <div className="flex justify-between items-start">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
                     <Users className="w-5 h-5 text-primary" />
@@ -519,8 +614,9 @@ export function Customers({ user }: { user: UserProfile }) {
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
+            </motion.div>
+            ))}
+          </AnimatePresence>
         </div>
 
         {filtered.length === 0 && (
@@ -530,6 +626,17 @@ export function Customers({ user }: { user: UserProfile }) {
           </div>
         )}
       </Card>
+      </div>
+
+      {/* Floating Action Button (Mobile) */}
+      <div className="md:hidden fixed bottom-24 right-6 z-50">
+        <Button 
+          onClick={() => setIsModalOpen(true)}
+          className="w-14 h-14 rounded-full shadow-2xl shadow-primary/40 bg-primary hover:bg-primary/90 flex items-center justify-center p-0"
+        >
+          <Plus className="w-8 h-8 text-white" />
+        </Button>
+      </div>
 
       <ConfirmDialog 
         isOpen={isDeleteConfirmOpen}

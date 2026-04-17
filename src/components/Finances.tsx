@@ -8,10 +8,13 @@ import { Input } from './ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from './ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { Calendar as CalendarUI } from './ui/calendar';
 import { Plus, TrendingUp, TrendingDown, Receipt, Calendar, ArrowUpRight, ArrowDownRight, Filter, X, Users, ChevronRight } from 'lucide-react';
 import { Badge } from './ui/badge';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
+import { format, isToday, isThisWeek, isThisMonth, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { handleFirestoreError, OperationType } from '../lib/firebase-utils';
 import { cn } from '../lib/utils';
 
@@ -24,6 +27,11 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [relatedOrder, setRelatedOrder] = useState<Order | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Date filter states
+  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month' | 'custom'>('today');
+  const [startDate, setStartDate] = useState<Date>();
+  const [endDate, setEndDate] = useState<Date>();
 
   useEffect(() => {
     if (selectedTransaction?.orderId) {
@@ -54,8 +62,8 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
   const [description, setDescription] = useState('');
 
   useEffect(() => {
-    const qTransactions = query(collection(db, 'transactions'), orderBy('date', 'desc'), limit(50));
-    const qExpenses = query(collection(db, 'expenses'), orderBy('date', 'desc'), limit(50));
+    const qTransactions = query(collection(db, 'transactions'), orderBy('date', 'desc'), limit(500));
+    const qExpenses = query(collection(db, 'expenses'), orderBy('date', 'desc'), limit(500));
     const qCustomers = query(collection(db, 'customers'));
 
     let transData: Transaction[] = [];
@@ -66,7 +74,7 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
         const dateA = a.date?.toDate ? a.date.toDate().getTime() : 0;
         const dateB = b.date?.toDate ? b.date.toDate().getTime() : 0;
         return dateB - dateA;
-      }).slice(0, 50);
+      }).slice(0, 500);
       setTransactions(merged);
     };
 
@@ -114,20 +122,49 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
     }
   };
 
-  const totalIncome = transactions
+  const dateFilteredTransactions = transactions.filter(t => {
+    if (dateFilter !== 'all') {
+      const tDate = t.date?.toDate ? t.date.toDate() : new Date(0);
+      switch (dateFilter) {
+        case 'today': return isToday(tDate);
+        case 'week': return isThisWeek(tDate, { weekStartsOn: 0 });
+        case 'month': return isThisMonth(tDate);
+        case 'custom':
+          if (startDate && endDate) {
+            const start = startOfDay(startDate);
+            const end = endOfDay(endDate);
+            return isWithinInterval(tDate, { start, end });
+          }
+          return true; // show all if custom dates are incomplete
+      }
+    }
+    return true;
+  });
+
+  const totalIncome = dateFilteredTransactions
     .filter(t => t.type === 'income' && !(t as any).isFiado)
     .reduce((sum, t) => sum + (t.amount || 0), 0);
     
-  const totalExpense = transactions
+  const totalExpense = dateFilteredTransactions
     .filter(t => t.type === 'expense')
     .reduce((sum, t) => sum + (t.amount || 0), 0);
 
   const totalFiado = customers.reduce((sum, c) => sum + Math.abs(Math.min(0, c.balance || 0)), 0);
 
-  const filteredTransactions = transactions.filter(t => {
+  const filteredTransactions = dateFilteredTransactions.filter(t => {
     if (typeFilter === 'all') return true;
     return t.type === typeFilter;
   });
+
+  const getFilterLabel = () => {
+    switch (dateFilter) {
+      case 'today': return 'Hoje';
+      case 'week': return 'Nesta Semana';
+      case 'month': return 'Neste Mês';
+      case 'custom': return 'Período Personalizado';
+      default: return 'Últimas transações';
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -152,7 +189,7 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
               <span className="text-sm font-bold mr-1">R$</span>
               {totalIncome.toFixed(2)}
             </div>
-            <p className="text-[10px] text-muted-foreground mt-1 font-bold tracking-widest uppercase">Últimas 50 transações</p>
+            <p className="text-[10px] text-muted-foreground mt-1 font-bold tracking-widest uppercase">{getFilterLabel()}</p>
           </CardContent>
         </Card>
         
@@ -176,7 +213,7 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
               <span className="text-sm font-bold mr-1">R$</span>
               {totalExpense.toFixed(2)}
             </div>
-            <p className="text-[10px] text-muted-foreground mt-1 font-bold tracking-widest uppercase">Últimas 50 transações</p>
+            <p className="text-[10px] text-muted-foreground mt-1 font-bold tracking-widest uppercase">{getFilterLabel()}</p>
           </CardContent>
         </Card>
 
@@ -231,11 +268,78 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
           </div>
         </div>
 
-        <div className="flex flex-row gap-3 w-full md:w-auto">
-          <Button variant="outline" className="flex-1 md:flex-none h-12 md:h-14 px-4 md:px-6 rounded-xl gap-2 md:gap-3 font-bold tracking-widest uppercase border-border hover:bg-white/5 text-[10px] md:text-sm">
-            <Filter className="w-4 h-4 md:w-5 md:h-5" />
-            Filtrar
-          </Button>
+        <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto mt-4 md:mt-0">
+          <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto items-center">
+            <Select value={dateFilter} onValueChange={(val: any) => setDateFilter(val)}>
+              <SelectTrigger className="w-full md:w-[180px] h-12 md:h-14 px-4 md:px-6 rounded-xl gap-2 md:gap-3 font-bold tracking-widest uppercase border-border hover:bg-white/5 text-[10px] md:text-sm bg-card/50">
+                <Filter className="w-4 h-4 md:w-5 md:h-5 text-primary" />
+                <SelectValue placeholder="Período" />
+              </SelectTrigger>
+              <SelectContent className="bg-[#0b1224] border-border">
+                <SelectItem value="all" className="uppercase font-bold tracking-widest text-xs">Todos</SelectItem>
+                <SelectItem value="today" className="uppercase font-bold tracking-widest text-xs">Hoje</SelectItem>
+                <SelectItem value="week" className="uppercase font-bold tracking-widest text-xs">Semana</SelectItem>
+                <SelectItem value="month" className="uppercase font-bold tracking-widest text-xs">Mês</SelectItem>
+                <SelectItem value="custom" className="uppercase font-bold tracking-widest text-xs">Personalizado</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {dateFilter === 'custom' && (
+              <div className="flex gap-2 w-full md:w-auto">
+                <Popover>
+                  <PopoverTrigger 
+                    render={
+                      <Button
+                        variant={"outline"}
+                        className={cn(
+                          "w-full h-12 md:h-14 md:w-[150px] justify-start text-left font-normal bg-card/50 border-border text-xs md:text-sm uppercase tracking-wider",
+                          !startDate && "text-muted-foreground"
+                        )}
+                      >
+                        <Calendar className="mr-2 h-4 w-4" />
+                        {startDate ? format(startDate, 'dd/MM/yyyy') : <span>Data inicial</span>}
+                      </Button>
+                    } 
+                  />
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarUI
+                      mode="single"
+                      selected={startDate}
+                      onSelect={(date) => setStartDate(date as Date)}
+                      initialFocus
+                      locale={ptBR}
+                    />
+                  </PopoverContent>
+                </Popover>
+
+                <Popover>
+                  <PopoverTrigger 
+                    render={
+                      <Button
+                        variant={"outline"}
+                        className={cn(
+                          "w-full h-12 md:h-14 md:w-[150px] justify-start text-left font-normal bg-card/50 border-border text-xs md:text-sm uppercase tracking-wider",
+                          !endDate && "text-muted-foreground"
+                        )}
+                      >
+                        <Calendar className="mr-2 h-4 w-4" />
+                        {endDate ? format(endDate, 'dd/MM/yyyy') : <span>Data final</span>}
+                      </Button>
+                    } 
+                  />
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarUI
+                      mode="single"
+                      selected={endDate}
+                      onSelect={(date) => setEndDate(date as Date)}
+                      initialFocus
+                      locale={ptBR}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
+          </div>
 
           <Dialog open={isExpenseModalOpen} onOpenChange={setIsExpenseModalOpen}>
             <DialogTrigger

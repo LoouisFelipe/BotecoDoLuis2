@@ -28,6 +28,7 @@ export function Dashboard({ user, setActiveTab }: { user: UserProfile, setActive
   const [newCustomerName, setNewCustomerName] = useState('');
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [letterFilter, setLetterFilter] = useState('TODOS');
+  const [balanceFilter, setBalanceFilter] = useState<'all' | 'credit' | 'debt'>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
 
@@ -338,8 +339,37 @@ export function Dashboard({ user, setActiveTab }: { user: UserProfile, setActive
                 {newOrderTab === 'fiel' && (
                   <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
                     <div className="space-y-4">
-                      <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Busca Rápida por Inicial</label>
-                      <div className="bg-[#0d1117] p-5 rounded-2xl border border-white/5 shadow-inner">
+                      <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Filtros de Busca</label>
+                      <div className="bg-[#0d1117] p-5 rounded-2xl border border-white/5 shadow-inner space-y-4">
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <button
+                            onClick={() => setBalanceFilter('all')}
+                            className={cn(
+                              "flex-1 h-10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                              balanceFilter === 'all' ? "bg-white/10 text-white" : "bg-transparent text-muted-foreground hover:bg-white/5"
+                            )}
+                          >
+                            Todos
+                          </button>
+                          <button
+                            onClick={() => setBalanceFilter('debt')}
+                            className={cn(
+                              "flex-1 h-10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                              balanceFilter === 'debt' ? "bg-red-500/20 text-red-500" : "bg-transparent text-muted-foreground hover:bg-white/5"
+                            )}
+                          >
+                            Em Débito
+                          </button>
+                          <button
+                            onClick={() => setBalanceFilter('credit')}
+                            className={cn(
+                              "flex-1 h-10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                              balanceFilter === 'credit' ? "bg-green-500/20 text-green-500" : "bg-transparent text-muted-foreground hover:bg-white/5"
+                            )}
+                          >
+                            Em Crédito
+                          </button>
+                        </div>
                         <div className="grid grid-cols-7 sm:grid-cols-9 gap-1.5">
                           {['TODOS', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')].map(letter => (
                             <button
@@ -364,18 +394,38 @@ export function Dashboard({ user, setActiveTab }: { user: UserProfile, setActive
                           "h-20 bg-[#0d1117] border-white/5 text-xl font-black rounded-2xl transition-all px-6",
                           selectedCustomerId && "border-[#0070f3] ring-2 ring-[#0070f3]/20"
                         )}>
-                          <SelectValue placeholder="BUSCAR NA LISTA..." />
+                          <SelectValue placeholder="BUSCAR NA LISTA...">
+                            {selectedCustomerId ? customers.find(c => c.id === selectedCustomerId)?.name : undefined}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent className="bg-[#05070a] border-white/10 max-h-[350px] custom-scrollbar rounded-2xl">
                           {customers
-                            .filter(c => letterFilter === 'TODOS' || c.name.toUpperCase().startsWith(letterFilter))
+                            .filter(c => {
+                              if (balanceFilter === 'debt' && (c.balance || 0) >= 0) return false;
+                              if (balanceFilter === 'credit' && (c.balance || 0) <= 0) return false;
+                              if (letterFilter === 'TODOS') return true;
+                              return c.name.toUpperCase().startsWith(letterFilter);
+                            })
                             .sort((a, b) => a.name.localeCompare(b.name))
                             .map(customer => (
                               <SelectItem key={customer.id} value={customer.id} className="text-sm font-black uppercase tracking-widest py-4 focus:bg-[#0070f3]/10 focus:text-[#0070f3]">
-                                {customer.name}
+                                <div className="flex justify-between items-center w-full">
+                                  <span>{customer.name}</span>
+                                  {(customer.balance || 0) < 0 && (
+                                     <span className="text-red-500 text-[10px]">DÉBITO R$ {Math.abs(customer.balance || 0).toFixed(2)}</span>
+                                  )}
+                                  {(customer.balance || 0) > 0 && (
+                                     <span className="text-green-500 text-[10px]">CRÉDITO R$ {(customer.balance || 0).toFixed(2)}</span>
+                                  )}
+                                </div>
                               </SelectItem>
                             ))}
-                          {customers.length === 0 && (
+                          {customers.filter(c => {
+                              if (balanceFilter === 'debt' && (c.balance || 0) >= 0) return false;
+                              if (balanceFilter === 'credit' && (c.balance || 0) <= 0) return false;
+                              if (letterFilter === 'TODOS') return true;
+                              return c.name.toUpperCase().startsWith(letterFilter);
+                            }).length === 0 && (
                             <div className="p-8 text-center text-muted-foreground uppercase text-[10px] font-black tracking-widest">Nenhum cliente cadastrado</div>
                           )}
                         </SelectContent>
@@ -479,6 +529,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
   const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
   const [linkCustomerId, setLinkCustomerId] = useState('');
   const [linkLetterFilter, setLinkLetterFilter] = useState('TODOS');
+  const [linkBalanceFilter, setLinkBalanceFilter] = useState<'all' | 'credit' | 'debt'>('all');
   const [checkoutLetterFilter, setCheckoutLetterFilter] = useState('TODOS');
   const [isProcessing, setIsProcessing] = useState(false);
   const [detailTab, setDetailTab] = useState<'menu' | 'cart'>('menu');
@@ -1462,8 +1513,37 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
 
           <div className="p-8 space-y-6 flex-1 overflow-y-auto custom-scrollbar">
             <div className="space-y-3">
-              <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Busca Rápida (A-Z)</label>
-              <div className="bg-[#0d1117] p-4 rounded-xl border border-white/5">
+              <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Filtros de Busca</label>
+              <div className="bg-[#0d1117] p-4 rounded-xl border border-white/5 space-y-4">
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <button
+                    onClick={() => setLinkBalanceFilter('all')}
+                    className={cn(
+                      "flex-1 h-10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                      linkBalanceFilter === 'all' ? "bg-white/10 text-white" : "bg-transparent text-muted-foreground hover:bg-white/5"
+                    )}
+                  >
+                    Todos
+                  </button>
+                  <button
+                    onClick={() => setLinkBalanceFilter('debt')}
+                    className={cn(
+                      "flex-1 h-10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                      linkBalanceFilter === 'debt' ? "bg-red-500/20 text-red-500" : "bg-transparent text-muted-foreground hover:bg-white/5"
+                    )}
+                  >
+                    Em Débito
+                  </button>
+                  <button
+                    onClick={() => setLinkBalanceFilter('credit')}
+                    className={cn(
+                      "flex-1 h-10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                      linkBalanceFilter === 'credit' ? "bg-green-500/20 text-green-500" : "bg-transparent text-muted-foreground hover:bg-white/5"
+                    )}
+                  >
+                    Em Crédito
+                  </button>
+                </div>
                 <div className="grid grid-cols-7 gap-1">
                   {['TODOS', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')].map(letter => (
                     <button
@@ -1485,17 +1565,40 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
               <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Selecionar Cliente</label>
               <Select value={linkCustomerId} onValueChange={setLinkCustomerId}>
                 <SelectTrigger className="h-16 bg-[#0d1117] border-white/5 text-lg font-bold rounded-xl">
-                  <SelectValue placeholder="Selecione um cliente..." />
+                  <SelectValue placeholder="Selecione um cliente...">
+                    {linkCustomerId ? customers.find(c => c.id === linkCustomerId)?.name : undefined}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent className="bg-[#05070a] border-white/5 max-h-[300px] custom-scrollbar">
                   {customers
-                    .filter(c => linkLetterFilter === 'TODOS' || c.name.toUpperCase().startsWith(linkLetterFilter))
+                    .filter(c => {
+                      if (linkBalanceFilter === 'debt' && (c.balance || 0) >= 0) return false;
+                      if (linkBalanceFilter === 'credit' && (c.balance || 0) <= 0) return false;
+                      if (linkLetterFilter === 'TODOS') return true;
+                      return c.name.toUpperCase().startsWith(linkLetterFilter);
+                    })
                     .sort((a, b) => a.name.localeCompare(b.name))
                     .map(customer => (
                       <SelectItem key={customer.id} value={customer.id} className="text-sm font-bold uppercase tracking-widest py-3">
-                        {customer.name}
+                        <div className="flex justify-between items-center w-full gap-4">
+                          <span>{customer.name}</span>
+                          {(customer.balance || 0) < 0 && (
+                             <span className="text-red-500 text-[10px] font-black">DÉBITO R$ {Math.abs(customer.balance || 0).toFixed(2)}</span>
+                          )}
+                          {(customer.balance || 0) > 0 && (
+                             <span className="text-green-500 text-[10px] font-black">CRÉDITO R$ {(customer.balance || 0).toFixed(2)}</span>
+                          )}
+                        </div>
                       </SelectItem>
                     ))}
+                  {customers.filter(c => {
+                      if (linkBalanceFilter === 'debt' && (c.balance || 0) >= 0) return false;
+                      if (linkBalanceFilter === 'credit' && (c.balance || 0) <= 0) return false;
+                      if (linkLetterFilter === 'TODOS') return true;
+                      return c.name.toUpperCase().startsWith(linkLetterFilter);
+                    }).length === 0 && (
+                      <div className="p-8 text-center text-muted-foreground uppercase text-[10px] font-black tracking-widest">Nenhum cliente cadastrado</div>
+                  )}
                 </SelectContent>
               </Select>
             </div>
