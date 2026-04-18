@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { addDoc, updateDoc, doc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../lib/firebase-utils';
 import { ConfirmDialog } from './ConfirmDialog';
+import { RegisterPurchaseModal } from './RegisterPurchaseModal';
 
 export function Suppliers({ user }: { user: UserProfile }) {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -111,22 +112,25 @@ export function Suppliers({ user }: { user: UserProfile }) {
           />
         </div>
         
-        <Dialog open={isModalOpen} onOpenChange={(open) => {
-          setIsModalOpen(open);
-          if (!open) resetForm();
-        }}>
-          <DialogTrigger
-            nativeButton={true}
-            render={
-              <Button 
-                aria-label="Cadastrar Novo Fornecedor"
-                className="w-full md:w-auto h-12 md:h-14 px-6 md:px-8 rounded-xl gap-2 md:gap-3 font-bold tracking-widest uppercase shadow-lg shadow-primary/20 text-[10px] md:text-sm"
-              >
-                <Plus className="w-4 h-4 md:w-5 md:h-5" />
-                Novo Fornecedor
-              </Button>
-            }
-          />
+        <div className="flex w-full md:w-auto gap-4">
+          <RegisterPurchaseModal suppliers={suppliers} />
+          
+          <Dialog open={isModalOpen} onOpenChange={(open) => {
+            setIsModalOpen(open);
+            if (!open) resetForm();
+          }}>
+            <DialogTrigger
+              nativeButton={true}
+              render={
+                <Button 
+                  aria-label="Cadastrar Novo Fornecedor"
+                  className="w-full md:w-auto h-12 md:h-14 px-6 md:px-8 rounded-xl gap-2 md:gap-3 font-bold tracking-widest uppercase shadow-lg shadow-primary/20 text-[10px] md:text-sm"
+                >
+                  <Plus className="w-4 h-4 md:w-5 md:h-5" />
+                  Novo Fornecedor
+                </Button>
+              }
+            />
           <DialogContent className="bg-[#0b1120] border-border max-w-lg text-white p-0 overflow-hidden flex flex-col max-h-[95vh] md:max-h-[90vh]">
             <div className="p-6 md:p-8 border-b border-border/50 relative flex-shrink-0">
               <div className="flex items-center gap-4">
@@ -196,6 +200,7 @@ export function Suppliers({ user }: { user: UserProfile }) {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <Card className="border-border bg-card/50 rounded-2xl overflow-hidden">

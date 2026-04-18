@@ -42,6 +42,7 @@ export interface Purchase {
   supplierId: string;
   supplierName: string;
   items: {
+    productId: string;
     productName: string;
     quantity: number;
     price: number;
