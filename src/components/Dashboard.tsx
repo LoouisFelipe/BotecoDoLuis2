@@ -7,12 +7,12 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
-import { Plus, Search, ShoppingCart, CheckCircle2, ChevronRight, LayoutGrid, List, Zap, Activity, Clock, TrendingUp, TrendingDown, Trash2, ShieldCheck, UserPlus, Menu, X, Receipt, Package, Calendar, Minus, Gamepad2, ArrowLeft, PlusCircle, Users, FlaskConical } from 'lucide-react';
+import { Plus, Search, ShoppingCart, CheckCircle2, ChevronRight, LayoutGrid, List, Zap, Activity, Clock, TrendingUp, TrendingDown, Trash2, ShieldCheck, UserPlus, UserCheck, Menu, X, Receipt, Package, Calendar, Minus, Gamepad2, ArrowLeft, PlusCircle, Users, FlaskConical } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle, DialogTrigger, DialogFooter } from './ui/dialog';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { handleFirestoreError, OperationType } from '../lib/firebase-utils';
-import { cn } from '../lib/utils';
+import { cn, getShiftDate } from '../lib/utils';
 import { ConfirmDialog } from './ConfirmDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
@@ -24,11 +24,7 @@ export function Dashboard({ user, setActiveTab }: { user: UserProfile, setActive
   const [gameModalities, setGameModalities] = useState<GameModality[]>([]);
   const [search, setSearch] = useState('');
   const [isNewOrderOpen, setIsNewOrderOpen] = useState(false);
-  const [newOrderTab, setNewOrderTab] = useState<'table' | 'fiel' | 'new'>('table');
   const [newCustomerName, setNewCustomerName] = useState('');
-  const [selectedCustomerId, setSelectedCustomerId] = useState('');
-  const [letterFilter, setLetterFilter] = useState('TODOS');
-  const [balanceFilter, setBalanceFilter] = useState<'all' | 'credit' | 'debt'>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
 
@@ -67,46 +63,19 @@ export function Dashboard({ user, setActiveTab }: { user: UserProfile, setActive
     };
   }, []);
 
-  const handleCreateOrder = async () => {
-    let customerName = '';
-    let customerId = '';
-    let type: 'table' | 'customer' = 'table';
-
+  const handleCreateOrder = async (name: string, type: 'table' | 'customer', customerId: string = '', isNewCustomer: boolean = false) => {
     setIsCreatingOrder(true);
+    let finalCustomerId = customerId;
+    let finalCustomerName = name;
+
     try {
-      if (newOrderTab === 'table') {
-        if (!newCustomerName.trim()) {
-          setIsCreatingOrder(false);
-          return;
-        }
-        customerName = newCustomerName;
-        type = 'table';
-      } else if (newOrderTab === 'fiel') {
-        if (!selectedCustomerId) {
-          setIsCreatingOrder(false);
-          return;
-        }
-        const customer = customers.find(c => c.id === selectedCustomerId);
-        if (!customer) {
-          setIsCreatingOrder(false);
-          return;
-        }
-        customerName = customer.name;
-        customerId = customer.id;
-        type = 'customer';
-      } else if (newOrderTab === 'new') {
-        if (!newCustomerName.trim()) {
-          setIsCreatingOrder(false);
-          return;
-        }
+      if (type === 'customer' && isNewCustomer) {
         try {
           const docRef = await addDoc(collection(db, 'customers'), {
-            name: newCustomerName,
+            name: name,
             createdAt: serverTimestamp()
           });
-          customerName = newCustomerName;
-          customerId = docRef.id;
-          type = 'customer';
+          finalCustomerId = docRef.id;
         } catch (error) {
           handleFirestoreError(error, OperationType.CREATE, 'customers');
           setIsCreatingOrder(false);
@@ -115,17 +84,18 @@ export function Dashboard({ user, setActiveTab }: { user: UserProfile, setActive
       }
 
       await addDoc(collection(db, 'open_orders'), {
-        customerName,
-        customerId,
+        customerName: finalCustomerName,
+        customerId: finalCustomerId,
         type,
         status: 'open',
         items: [],
         totalAmount: 0,
         createdAt: serverTimestamp(),
+        shiftDate: getShiftDate(),
         createdBy: user.uid
       });
+      
       setNewCustomerName('');
-      setSelectedCustomerId('');
       setIsNewOrderOpen(false);
       toast.success('Comanda aberta com sucesso');
     } catch (error) {
@@ -248,8 +218,6 @@ export function Dashboard({ user, setActiveTab }: { user: UserProfile, setActive
             setIsNewOrderOpen(open);
             if (!open) {
               setNewCustomerName('');
-              setSelectedCustomerId('');
-              setNewOrderTab('table');
             }
           }}>
             <DialogTrigger nativeButton={true} render={
@@ -282,187 +250,118 @@ export function Dashboard({ user, setActiveTab }: { user: UserProfile, setActive
                 </button>
               </div>
 
-              <div className="flex px-6 md:px-8 py-4 bg-[#05070a] border-b border-white/5 gap-4 md:gap-8">
-                {[
-                  { id: 'table', label: 'MESA / BALCÃO' },
-                  { id: 'fiel', label: 'CLIENTE FIEL' },
-                  { id: 'new', label: '+ NOVO CLIENTE' }
-                ].map((tab) => (
-                  <button 
-                    key={tab.id}
-                    onClick={() => setNewOrderTab(tab.id as any)}
-                    className={cn(
-                      "flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all relative",
-                      newOrderTab === tab.id ? "bg-[#161b22] text-[#0070f3]" : "text-muted-foreground hover:text-white hover:bg-white/5"
-                    )}
-                  >
-                    {tab.label}
-                    {newOrderTab === tab.id && (
-                      <motion.div layoutId="newOrderTab" className="absolute -bottom-4 left-0 right-0 h-1 bg-[#0070f3] rounded-full" />
-                    )}
-                  </button>
-                ))}
-              </div>
-
               <div className="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar space-y-8">
-                {newOrderTab === 'table' && (
-                  <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                    <div className="space-y-3">
-                      <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Identificação do Local</label>
-                      <div className="relative group">
-                        <Package className="absolute left-4 top-1/2 -translate-y-1/2 w-6 h-6 text-muted-foreground group-focus-within:text-[#0070f3] transition-colors" />
-                        <Input 
-                          placeholder="EX: MESA 05, BALCÃO 02, ÁREA EXTERNA..." 
-                          className="h-20 pl-14 bg-[#0d1117] border-white/5 focus:ring-[#0070f3]/20 focus:border-[#0070f3] text-xl font-black rounded-2xl uppercase tracking-tight"
-                          value={newCustomerName}
-                          onChange={(e) => setNewCustomerName(e.target.value)}
-                          autoFocus
-                        />
-                      </div>
-                      <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest ml-1">Use nomes curtos e fáceis de identificar no painel</p>
-                    </div>
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black tracking-widest uppercase text-[#0070f3] ml-1">Para quem é esta comanda?</label>
+                  <div className="relative group">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-6 h-6 text-muted-foreground group-focus-within:text-[#0070f3] transition-colors" />
+                    <Input 
+                      placeholder="NOME DO CLIENTE, MESA OU BALCÃO..." 
+                      className="h-20 pl-14 bg-[#0d1117] border-white/5 focus:ring-[#0070f3]/20 focus:border-[#0070f3] text-xl md:text-2xl font-black rounded-2xl uppercase tracking-tight shadow-inner"
+                      value={newCustomerName}
+                      onChange={(e) => setNewCustomerName(e.target.value)}
+                      autoFocus
+                      autoComplete="off"
+                    />
+                  </div>
+                  <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest ml-1">Digite qualquer coisa e o sistema irá sugerir as melhores opções abaixo</p>
+                </div>
 
-                    <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
-                      {['MESA 01', 'MESA 02', 'MESA 03', 'MESA 04', 'BALCÃO'].map(sug => (
+                <div className="space-y-4">
+                  {newCustomerName.trim().length === 0 ? (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                       {['MESA 01', 'MESA 02', 'MESA 03', 'BALCÃO'].map(sug => (
                         <button 
                           key={sug}
-                          onClick={() => setNewCustomerName(sug)}
-                          className="py-3 px-2 bg-[#0d1117] hover:bg-[#161b22] border border-white/5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all"
+                          onClick={() => handleCreateOrder(sug, 'table')}
+                          disabled={isCreatingOrder}
+                          className="py-6 px-4 bg-[#0d1117] hover:bg-[#161b22] border border-white/5 disabled:opacity-50 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-sm flex flex-col items-center gap-2"
                         >
+                          <Package className="w-6 h-6 text-muted-foreground" />
                           {sug}
                         </button>
                       ))}
                     </div>
-                  </div>
-                )}
-
-                {newOrderTab === 'fiel' && (
-                  <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                    <div className="space-y-4">
-                      <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Filtros de Busca</label>
-                      <div className="bg-[#0d1117] p-5 rounded-2xl border border-white/5 shadow-inner space-y-4">
-                        <div className="flex flex-col sm:flex-row gap-2">
-                          <button
-                            onClick={() => setBalanceFilter('all')}
-                            className={cn(
-                              "flex-1 h-10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
-                              balanceFilter === 'all' ? "bg-white/10 text-white" : "bg-transparent text-muted-foreground hover:bg-white/5"
-                            )}
-                          >
-                            Todos
-                          </button>
-                          <button
-                            onClick={() => setBalanceFilter('debt')}
-                            className={cn(
-                              "flex-1 h-10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
-                              balanceFilter === 'debt' ? "bg-red-500/20 text-red-500" : "bg-transparent text-muted-foreground hover:bg-white/5"
-                            )}
-                          >
-                            Em Débito
-                          </button>
-                          <button
-                            onClick={() => setBalanceFilter('credit')}
-                            className={cn(
-                              "flex-1 h-10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
-                              balanceFilter === 'credit' ? "bg-green-500/20 text-green-500" : "bg-transparent text-muted-foreground hover:bg-white/5"
-                            )}
-                          >
-                            Em Crédito
-                          </button>
+                  ) : (
+                    <div className="space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                      
+                      {/* 1. Mesa / Balcão Option */}
+                      <button 
+                        onClick={() => handleCreateOrder(newCustomerName, 'table')}
+                        disabled={isCreatingOrder}
+                        className="w-full p-4 bg-[#0d1117] hover:bg-[#161b22] border border-[#0070f3]/20 disabled:opacity-50 rounded-2xl text-left transition-all flex items-center justify-between group"
+                      >
+                        <div className="flex items-center gap-4">
+                           <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center">
+                             <Package className="w-5 h-5 text-white/50 group-hover:text-[#0070f3] transition-colors" />
+                           </div>
+                           <div>
+                             <p className="text-[10px] font-black uppercase tracking-widest text-[#0070f3] mb-1">Mesa / Balcão (Sem Cadastro)</p>
+                             <p className="text-lg font-black uppercase tracking-widest">{newCustomerName}</p>
+                           </div>
                         </div>
-                        <div className="grid grid-cols-7 sm:grid-cols-9 gap-1.5">
-                          {['TODOS', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')].map(letter => (
-                            <button
-                              key={letter}
-                              onClick={() => setLetterFilter(letter)}
-                              className={cn(
-                                "aspect-square rounded-lg text-[10px] font-black transition-all flex items-center justify-center min-w-[32px] min-h-[32px]",
-                                letterFilter === letter ? "bg-[#0070f3] text-white shadow-[0_0_15px_rgba(0,112,243,0.4)]" : "text-muted-foreground hover:text-white hover:bg-white/5"
-                              )}
-                            >
-                              {letter === 'TODOS' ? 'T' : letter}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
+                        <Plus className="w-6 h-6 text-muted-foreground group-hover:text-white" />
+                      </button>
 
-                    <div className="space-y-3">
-                      <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Selecionar Cliente Fiel</label>
-                      <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
-                        <SelectTrigger className={cn(
-                          "h-20 bg-[#0d1117] border-white/5 text-xl font-black rounded-2xl transition-all px-6",
-                          selectedCustomerId && "border-[#0070f3] ring-2 ring-[#0070f3]/20"
-                        )}>
-                          <SelectValue placeholder="BUSCAR NA LISTA...">
-                            {selectedCustomerId ? customers.find(c => c.id === selectedCustomerId)?.name : undefined}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent className="bg-[#05070a] border-white/10 max-h-[350px] custom-scrollbar rounded-2xl">
-                          {customers
-                            .filter(c => {
-                              if (balanceFilter === 'debt' && (c.balance || 0) >= 0) return false;
-                              if (balanceFilter === 'credit' && (c.balance || 0) <= 0) return false;
-                              if (letterFilter === 'TODOS') return true;
-                              return c.name.toUpperCase().startsWith(letterFilter);
-                            })
-                            .sort((a, b) => a.name.localeCompare(b.name))
-                            .map(customer => (
-                              <SelectItem key={customer.id} value={customer.id} className="text-sm font-black uppercase tracking-widest py-4 focus:bg-[#0070f3]/10 focus:text-[#0070f3]">
-                                <div className="flex justify-between items-center w-full">
-                                  <span>{customer.name}</span>
-                                  {(customer.balance || 0) < 0 && (
-                                     <span className="text-red-500 text-[10px]">DÉBITO R$ {Math.abs(customer.balance || 0).toFixed(2)}</span>
-                                  )}
-                                  {(customer.balance || 0) > 0 && (
-                                     <span className="text-green-500 text-[10px]">CRÉDITO R$ {(customer.balance || 0).toFixed(2)}</span>
-                                  )}
-                                </div>
-                              </SelectItem>
-                            ))}
-                          {customers.filter(c => {
-                              if (balanceFilter === 'debt' && (c.balance || 0) >= 0) return false;
-                              if (balanceFilter === 'credit' && (c.balance || 0) <= 0) return false;
-                              if (letterFilter === 'TODOS') return true;
-                              return c.name.toUpperCase().startsWith(letterFilter);
-                            }).length === 0 && (
-                            <div className="p-8 text-center text-muted-foreground uppercase text-[10px] font-black tracking-widest">Nenhum cliente cadastrado</div>
-                          )}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                )}
+                      {/* 2. Cliente Fiel (Matching ones) */}
+                      {customers
+                        .filter(c => c.name.toUpperCase().includes(newCustomerName.toUpperCase()))
+                        .map(customer => (
+                          <button 
+                            key={customer.id}
+                            onClick={() => handleCreateOrder(customer.name, 'customer', customer.id)}
+                            disabled={isCreatingOrder}
+                            className="w-full p-4 bg-[#0d1117] hover:bg-[#161b22] border border-green-500/20 disabled:opacity-50 rounded-2xl text-left transition-all flex items-center justify-between group"
+                          >
+                            <div className="flex items-center gap-4">
+                               <div className="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center">
+                                 <UserCheck className="w-5 h-5 text-green-500" />
+                               </div>
+                               <div>
+                                 <p className="text-[10px] font-black uppercase tracking-widest text-green-500 mb-1">Cliente Fiel Localizado</p>
+                                 <p className="text-lg font-black uppercase tracking-widest flex items-center gap-3">
+                                   {customer.name}
+                                   {(customer.balance || 0) < 0 && (
+                                     <span className="bg-red-500/20 text-red-500 px-2 py-0.5 rounded-md text-[10px]">DÉBITO R$ {Math.abs(customer.balance || 0).toFixed(2)}</span>
+                                   )}
+                                   {(customer.balance || 0) > 0 && (
+                                     <span className="bg-green-500/20 text-green-500 px-2 py-0.5 rounded-md text-[10px]">CRÉDITO R$ {(customer.balance || 0).toFixed(2)}</span>
+                                   )}
+                                 </p>
+                               </div>
+                            </div>
+                            <Plus className="w-6 h-6 text-muted-foreground group-hover:text-white" />
+                          </button>
+                        ))
+                      }
 
-                {newOrderTab === 'new' && (
-                  <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                    <div className="space-y-3">
-                      <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Cadastro de Novo Cliente</label>
-                      <div className="relative group">
-                        <UserPlus className="absolute left-4 top-1/2 -translate-y-1/2 w-6 h-6 text-muted-foreground group-focus-within:text-[#0070f3] transition-colors" />
-                        <Input 
-                          placeholder="NOME COMPLETO DO CLIENTE" 
-                          className="h-20 pl-14 bg-[#0d1117] border-white/5 focus:ring-[#0070f3]/20 focus:border-[#0070f3] text-xl font-black rounded-2xl uppercase tracking-tight"
-                          value={newCustomerName}
-                          onChange={(e) => setNewCustomerName(e.target.value)}
-                          autoFocus
-                        />
-                      </div>
-                      <p className="text-[9px] font-bold text-[#0070f3]/60 uppercase tracking-widest ml-1">O cliente será adicionado automaticamente à sua base de fiéis</p>
+                      {/* 3. New Customer Option (Only if exact match doesn't exist) */}
+                      {!customers.some(c => c.name.toUpperCase() === newCustomerName.toUpperCase()) && (
+                        <button 
+                          onClick={() => handleCreateOrder(newCustomerName, 'customer', '', true)}
+                          disabled={isCreatingOrder}
+                          className="w-full p-4 bg-[#0d1117] hover:bg-[#161b22] border border-purple-500/20 disabled:opacity-50 rounded-2xl text-left transition-all flex items-center justify-between group"
+                        >
+                          <div className="flex items-center gap-4">
+                             <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center">
+                               <UserPlus className="w-5 h-5 text-purple-500" />
+                             </div>
+                             <div>
+                               <p className="text-[10px] font-black uppercase tracking-widest text-purple-500 mb-1">Cadastrar e Abrir Comanda</p>
+                               <p className="text-lg font-black uppercase tracking-widest">{newCustomerName}</p>
+                             </div>
+                          </div>
+                          <Plus className="w-6 h-6 text-muted-foreground group-hover:text-white" />
+                        </button>
+                      )}
+
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
 
               <DialogFooter className="p-6 md:p-8 border-t border-white/5 bg-[#05070a] flex-row gap-4 flex-shrink-0">
-                <Button variant="ghost" onClick={() => setIsNewOrderOpen(false)} disabled={isCreatingOrder} className="flex-1 h-16 font-black uppercase tracking-widest text-muted-foreground hover:text-white rounded-2xl">Cancelar</Button>
-                <Button 
-                  onClick={handleCreateOrder} 
-                  disabled={isCreatingOrder || (newOrderTab === 'fiel' ? !selectedCustomerId : !newCustomerName.trim())}
-                  className="flex-1 h-16 font-black uppercase tracking-widest bg-[#0070f3] hover:bg-[#0070f3]/90 shadow-[0_0_25px_rgba(0,112,243,0.3)] rounded-2xl transition-all active:scale-95"
-                >
-                  {isCreatingOrder ? 'PROCESSANDO...' : 'ABRIR COMANDA'}
-                </Button>
+                <Button variant="ghost" onClick={() => setIsNewOrderOpen(false)} disabled={isCreatingOrder} className="flex-1 max-w-[200px] h-16 font-black uppercase tracking-widest text-muted-foreground hover:text-white rounded-2xl">Fechar</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -789,6 +688,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
       await updateDoc(doc(db, 'open_orders', order.id), {
         status: 'closed',
         closedAt: serverTimestamp(),
+        closedShiftDate: getShiftDate(),
         totalAmount: finalAmount,
         payments: checkoutPayments.map(p => ({ ...p, date: new Date() })),
         customerId: targetCustomerId === 'none' ? '' : targetCustomerId

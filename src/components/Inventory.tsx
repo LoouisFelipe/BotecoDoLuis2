@@ -784,7 +784,10 @@ export function Inventory({ user, setActiveTab }: { user: UserProfile, setActive
         >
           Todos
         </Button>
-        {categories.map(category => (
+        {categories
+          .slice()
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .map(category => (
           <Button
             key={`filter-${category.id}`}
             variant={categoryFilter === category.id ? 'default' : 'outline'}
@@ -802,6 +805,8 @@ export function Inventory({ user, setActiveTab }: { user: UserProfile, setActive
       <div className="space-y-4">
         {(() => {
           const visibleCategories = categories
+            .slice()
+            .sort((a, b) => a.name.localeCompare(b.name))
             .filter(c => categoryFilter === 'all' || c.id === categoryFilter)
             .filter(category => {
               const categoryProducts = filteredProducts.filter(p => p.categoryId === category.id);
@@ -835,7 +840,8 @@ export function Inventory({ user, setActiveTab }: { user: UserProfile, setActive
             <>
               {visibleCategories.map((category, catIdx) => {
                 const categoryProducts = filteredProducts.filter(p => p.categoryId === category.id);
-                const subcategories = Array.from(new Set(categoryProducts.map(p => p.subcategory || 'Sem Subcategoria')));
+                const subcategories = Array.from(new Set(categoryProducts.map(p => p.subcategory || 'Sem Subcategoria')))
+                  .sort((a, b) => a.localeCompare(b));
                 const isExpanded = expandedCategories.includes(category.id);
 
                 return (
@@ -862,7 +868,9 @@ export function Inventory({ user, setActiveTab }: { user: UserProfile, setActive
                     {isExpanded && (
                       <div className="px-6 pb-6 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
                         {subcategories.map((subName, subIdx) => {
-                          const subProducts = categoryProducts.filter(p => (p.subcategory || 'Sem Subcategoria') === subName);
+                          const subProducts = categoryProducts
+                            .filter(p => (p.subcategory || 'Sem Subcategoria') === subName)
+                            .sort((a, b) => a.name.localeCompare(b.name));
                           const subId = `${category.id}-${subName}-${subIdx}`;
                           const isSubExpanded = expandedSubcategories.includes(subId);
 
@@ -1014,7 +1022,10 @@ export function Inventory({ user, setActiveTab }: { user: UserProfile, setActive
                     </div>
                   </div>
                   <div className="p-4 space-y-2">
-                    {uncategorizedProducts.map((product, idx) => {
+                    {uncategorizedProducts
+                      .slice()
+                      .sort((a, b) => a.name.localeCompare(b.name))
+                      .map((product, idx) => {
                       const margin = product.cost > 0 ? ((product.price - product.cost) / product.cost) * 100 : 0;
                       return (
                         <div key={`${product.id}-${idx}`} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-card/40 border border-border/30 rounded-xl hover:border-primary/30 transition-all group/item gap-4">
