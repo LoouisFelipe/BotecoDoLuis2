@@ -7,7 +7,7 @@ service cloud.firestore {
     // ===============================================================
     
     function isAuthenticated() {
-      return request.auth != null;
+      return request.auth != null && request.auth.token.email_verified == true;
     }
 
     function isAdmin() {
@@ -19,10 +19,12 @@ service cloud.firestore {
 
     function isStaff() {
       return isAuthenticated() && 
-        (request.auth.token.email == "louisfelipecabral@gmail.com" ||
-         isAdmin() || 
-         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'staff'));
+        (request.auth.token.email.matches(".*@gmail.com") && (
+          request.auth.token.email == "louisfelipecabral@gmail.com" ||
+          isAdmin() || 
+          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'staff')
+        ));
     }
 
     function hasRequiredFields(fields) {
@@ -76,19 +78,19 @@ service cloud.firestore {
     }
 
     match /transactions/{transactionId} {
-      allow read: if isAdmin();
+      allow read: if isStaff();
       allow create: if isStaff();
       allow update, delete: if isAdmin();
     }
 
     match /expenses/{expenseId} {
-      allow read: if isAdmin();
+      allow read: if isStaff();
       allow create: if isStaff();
       allow update, delete: if isAdmin();
     }
 
     match /purchases/{purchaseId} {
-      allow read: if isAdmin();
+      allow read: if isStaff();
       allow create: if isStaff();
       allow update, delete: if isAdmin();
     }
@@ -99,7 +101,7 @@ service cloud.firestore {
     }
 
     match /bi_summaries/{summaryId} {
-      allow read: if isAdmin();
+      allow read: if isStaff();
       allow write: if isAdmin(); 
     }
 

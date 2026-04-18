@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, doc, serverTimestamp, getDoc } from 'firebase/firestore';
-import { Supplier, Product, Purchase } from '../types';
+import { Supplier, Product, Purchase, Category } from '../types';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from './ui/dialog';
@@ -201,18 +201,22 @@ export function RegisterPurchaseModal({ suppliers }: { suppliers: Supplier[] }) 
         }
       />
       <DialogContent className="bg-[#0b1120] border-border max-w-3xl text-white p-0 overflow-hidden flex flex-col max-h-[95vh] md:max-h-[90vh]">
-        <div className="p-6 md:p-8 border-b border-border/50 relative flex-shrink-0 bg-green-600/10">
-          <div className="flex items-center gap-4">
-            <div className="w-10 h-10 md:w-14 md:h-14 rounded-xl md:rounded-2xl bg-green-600/20 flex items-center justify-center border border-green-600/30">
-              <ShoppingCart className="w-5 h-5 md:w-7 md:h-7 text-green-500" />
+        <div className="p-6 md:p-8 border-b border-white/5 relative flex-shrink-0 bg-gradient-to-b from-green-500/10 to-transparent">
+          <div className="flex items-center gap-5">
+            <div className="w-12 h-12 md:w-16 md:h-16 rounded-2xl bg-green-500/20 flex items-center justify-center border border-green-500/30 shadow-[0_0_30px_rgba(34,197,94,0.15)] relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-green-500/20 to-transparent opacity-50" />
+              <ShoppingCart className="w-6 h-6 md:w-8 md:h-8 text-green-500 relative z-10" />
             </div>
             <div>
-              <DialogTitle className="text-xl md:text-3xl font-black uppercase tracking-tighter leading-none mb-1">
-                Registrar Compra
+              <DialogTitle className="text-2xl md:text-3xl font-black uppercase tracking-tighter leading-none mb-1.5">
+                Registrar <span className="text-green-500">Compra</span>
               </DialogTitle>
-              <p className="text-[9px] md:text-[10px] font-bold tracking-widest uppercase text-green-500/60 flex items-center gap-2">
-                Atualização de Estoque e Finanças
-              </p>
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                <p className="text-[10px] font-black tracking-[0.2em] uppercase text-green-500/60">
+                  Fluxo de Fornecedores & Estoque
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -318,27 +322,27 @@ export function RegisterPurchaseModal({ suppliers }: { suppliers: Supplier[] }) 
           </div>
         </div>
         
-        <div className="p-6 md:p-8 bg-[#0b1120] border-t border-border/50 mt-auto flex flex-col md:flex-row items-center justify-between gap-6 flex-shrink-0">
-          <div className="flex items-center gap-4 w-full md:w-auto p-4 md:p-0 bg-[#111827] rounded-xl md:bg-transparent border border-border/50 md:border-none">
-            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
-              <Package className="w-6 h-6 text-primary" />
+        <div className="p-6 md:p-8 bg-black/40 border-t border-white/5 mt-auto flex flex-col md:flex-row items-center justify-between gap-6 flex-shrink-0">
+          <div className="flex items-center gap-4 w-full md:w-auto p-4 md:p-5 bg-white/5 rounded-2xl border border-white/5 shadow-inner">
+            <div className="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center border border-green-500/20">
+              <ShoppingCart className="w-6 h-6 text-green-500" />
             </div>
             <div>
-              <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Valor Total da Compra</p>
-              <p className="text-2xl font-black text-white">R$ {calculateTotal().toFixed(2)}</p>
+              <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-1">Total Consolidado</p>
+              <p className="text-3xl font-black text-white">R$ {calculateTotal().toFixed(2)}</p>
             </div>
           </div>
           
-          <div className="flex w-full md:w-auto gap-4">
-            <Button variant="ghost" onClick={() => setIsOpen(false)} disabled={isSaving} className="flex-1 md:flex-none h-14 font-bold uppercase tracking-widest text-xs">
+          <div className="flex w-full md:w-auto gap-3">
+            <Button variant="outline" onClick={() => setIsOpen(false)} disabled={isSaving} className="flex-1 md:w-32 h-12 font-bold uppercase tracking-widest text-[9px] border-white/10 hover:bg-white/5">
               Cancelar
             </Button>
             <Button 
               onClick={handleSave} 
               disabled={isSaving || items.length === 0 || !supplierId} 
-              className="flex-1 md:flex-none h-14 px-8 font-bold uppercase tracking-widest bg-green-600 hover:bg-green-700 text-xs shadow-lg shadow-green-900/20"
+              className="flex-[2] md:w-48 h-12 font-black uppercase tracking-[0.15em] text-[10px] bg-green-600 hover:bg-green-700 shadow-xl shadow-green-900/30 rounded-xl border border-green-400/20"
             >
-              {isSaving ? 'Processando...' : 'Finalizar Compra'}
+              {isSaving ? 'Gravando...' : 'Finalizar Compra'}
             </Button>
           </div>
         </div>

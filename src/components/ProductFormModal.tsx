@@ -8,7 +8,7 @@ import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from './ui/select';
 import { Dialog, DialogContent, DialogTitle, DialogFooter } from './ui/dialog';
 import { Combobox } from './ui/combobox';
-import { Info, Plus, Settings, Check, Droplets, FlaskConical, Package, Wine, X } from 'lucide-react';
+import { Info, Plus, Settings, Check, Droplets, FlaskConical, Package, Wine, X, DollarSign, TrendingUp, History } from 'lucide-react';
 import { toast } from 'sonner';
 import { handleFirestoreError, OperationType } from '../lib/firebase-utils';
 import { cn } from '../lib/utils';
@@ -181,40 +181,52 @@ export function ProductFormModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-[#0b1224] border-border max-w-2xl text-white p-0 overflow-hidden flex flex-col max-h-[95vh] md:max-h-[90vh]" style={{ zIndex: 10000 }}>
-        <div className="p-6 md:p-8 border-b border-border/50 relative flex-shrink-0">
-          <div className="flex items-center gap-4">
-            <div className="w-10 h-10 md:w-14 md:h-14 rounded-xl md:rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 shadow-[0_0_20px_rgba(59,130,246,0.1)]">
-              <Package className="w-5 h-5 md:w-7 md:h-7 text-primary" />
+      <DialogContent className="bg-[#0b1224] border-border max-w-2xl text-white p-0 overflow-hidden flex flex-col h-[90vh] md:max-h-[85vh] shadow-[0_0_50px_rgba(0,0,0,0.5)] border-white/5" style={{ zIndex: 10000 }}>
+        <div className="p-6 md:p-8 border-b border-white/5 relative flex-shrink-0 bg-gradient-to-b from-white/[0.02] to-transparent">
+          <div className="flex items-center gap-5">
+            <div className="w-12 h-12 md:w-16 md:h-16 rounded-2xl bg-primary/20 flex items-center justify-center border border-primary/30 shadow-[0_0_30px_rgba(59,130,246,0.15)] relative overflow-hidden group">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-transparent opacity-50" />
+              <Package className="w-6 h-6 md:w-8 md:h-8 text-primary relative z-10 animate-pulse" />
             </div>
             <div>
-              <DialogTitle className="text-xl md:text-3xl font-black uppercase tracking-tighter leading-none mb-1">
-                {editingProduct ? 'Editar Produto' : 'Novo Produto'}
+              <DialogTitle className="text-2xl md:text-4xl font-black uppercase tracking-tighter leading-none mb-1.5 flex items-center gap-3">
+                {editingProduct ? 'Editar' : 'Novo'} 
+                <span className="text-primary">item</span>
               </DialogTitle>
-              <p className="text-[9px] md:text-[10px] font-bold tracking-widest uppercase text-primary/60 flex items-center gap-2">
-                <Settings className="w-3 h-3" /> Configuração do Inventário
-              </p>
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                <p className="text-[10px] font-black tracking-[0.2em] uppercase text-muted-foreground">
+                  Inventário <span className="text-white/40 mx-1">/</span> {productModalTab}
+                </p>
+              </div>
             </div>
           </div>
+          <button 
+            onClick={() => onOpenChange(false)}
+            className="absolute top-8 right-8 text-muted-foreground hover:text-white transition-colors"
+          >
+            <X className="w-6 h-6" />
+          </button>
         </div>
         
-        <div className="flex border-b border-border/50">
+        <div className="flex border-b border-white/5 bg-black/20">
           {[
-            { id: 'identificacao', label: 'Identificação' },
-            { id: 'precos', label: 'Preços & Estoque' },
-            { id: 'doses', label: 'Controle / Doses' }
+            { id: 'identificacao', label: 'Identificação', icon: Package },
+            { id: 'precos', label: 'Preços & Estoque', icon: DollarSign },
+            { id: 'doses', label: 'Controle / Doses', icon: FlaskConical }
           ].map((tab) => (
             <button 
               key={tab.id}
               onClick={() => setProductModalTab(tab.id as any)}
               className={cn(
-                "flex-1 py-4 text-[9px] md:text-xs font-black uppercase tracking-widest transition-all relative",
+                "flex-1 py-5 text-[10px] font-black uppercase tracking-[0.2em] transition-all relative flex items-center justify-center gap-2",
                 productModalTab === tab.id ? "text-primary bg-primary/5" : "text-muted-foreground hover:text-white hover:bg-white/5"
               )}
             >
-              {tab.label}
+              <tab.icon className={cn("w-3 h-3", productModalTab === tab.id ? "text-primary" : "text-muted-foreground/50")} />
+              <span className="hidden sm:inline">{tab.label}</span>
               {productModalTab === tab.id && (
-                <motion.div layoutId="productTabIndicator" className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+                <motion.div layoutId="productTabIndicator" className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary shadow-[0_0_10px_rgba(59,130,246,0.5)]" />
               )}
             </button>
           ))}
@@ -532,27 +544,31 @@ export function ProductFormModal({
           </div>
         </div>
 
-        <DialogFooter className="p-8 border-t border-border/50 bg-[#0b1224] gap-4">
+        <DialogFooter className="p-4 md:p-6 border-t border-white/5 bg-[#0b1224]/80 backdrop-blur-md flex items-center gap-3 mt-auto">
           <Button 
-            variant="ghost" 
+            variant="outline" 
             onClick={() => onOpenChange(false)} 
             disabled={isSavingProduct}
-            className="h-14 px-8 font-bold uppercase tracking-widest text-muted-foreground hover:text-white hover:bg-white/5"
+            className="flex-1 h-12 font-bold uppercase tracking-widest text-[9px] text-muted-foreground hover:text-white hover:bg-white/5 border-white/10"
           >
-            Cancelar
+            Sair sem salvar
           </Button>
           <Button 
             onClick={handleSaveProduct} 
             disabled={isSavingProduct}
-            className="h-14 px-10 font-bold uppercase tracking-widest bg-[#0070f3] hover:bg-[#0070f3]/90 shadow-[0_0_20px_rgba(0,112,243,0.3)] rounded-xl"
+            className="flex-[2] h-12 font-black uppercase tracking-[0.15em] text-[10px] bg-[#0070f3] hover:bg-[#0070f3]/90 shadow-[0_0_20px_rgba(0,112,243,0.3)] rounded-xl border border-white/10 relative overflow-hidden group"
           >
+            <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
             {isSavingProduct ? (
               <div className="flex items-center gap-2">
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                <span>Salvando...</span>
+                <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <span>Processando...</span>
               </div>
             ) : (
-              editingProduct ? 'Salvar Alterações' : 'Salvar Produto'
+              <div className="flex items-center gap-2">
+                <Check className="w-3.5 h-3.5" />
+                <span>{editingProduct ? 'Salvar Alterações' : 'Concluir Cadastro'}</span>
+              </div>
             )}
           </Button>
         </DialogFooter>
