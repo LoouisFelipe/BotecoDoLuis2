@@ -223,25 +223,37 @@ export function RegisterPurchaseModal({ suppliers }: { suppliers: Supplier[] }) 
 
         <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6 md:space-y-8 custom-scrollbar">
           
-          <div className="space-y-4">
-            <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground border-b border-border/50 pb-2">Informações Iniciais</h3>
+          <div className="space-y-6">
+            <h3 className="text-sm font-black uppercase tracking-[0.2em] text-muted-foreground border-b border-white/5 pb-2 flex items-center gap-2">
+              <Package className="w-4 h-4 text-primary" />
+              Informações Gerais
+            </h3>
             <div className="space-y-2">
-              <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Fornecedor</label>
+              <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Fornecedor Responsável</label>
               <Combobox
                 options={suppliers.map(s => ({ label: s.name, value: s.id }))}
                 value={supplierId}
                 onSelect={setSupplierId}
-                placeholder="Selecione ou crie o fornecedor..."
+                placeholder="Selecione ou digite o nome do fornecedor"
                 allowCustom={true}
               />
             </div>
           </div>
 
-          <div className="space-y-4">
-            <div className="flex items-center justify-between border-b border-border/50 pb-2">
-              <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Itens da Compra</h3>
-              <Button size="sm" variant="outline" onClick={handleAddItem} className="gap-2 text-[10px] uppercase font-bold tracking-widest h-8 border-primary/20 hover:bg-primary/10">
-                <Plus className="w-3 h-3" /> Adicionar Produto
+          <div className="space-y-6">
+            <div className="flex items-center justify-between border-b border-white/5 pb-2">
+              <h3 className="text-sm font-black uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
+                <ShoppingCart className="w-4 h-4 text-green-500" />
+                Itens da Compra
+              </h3>
+              <Button 
+                size="sm" 
+                variant="outline" 
+                onClick={handleAddItem} 
+                className="gap-2 text-[10px] uppercase font-black tracking-[0.1em] h-10 border-green-500/20 hover:bg-green-500/10 hover:text-green-500 transition-all shadow-lg shadow-green-500/5 group"
+              >
+                <Plus className="w-3.5 h-3.5 group-hover:rotate-90 transition-transform" /> 
+                Adicionar Item
               </Button>
             </div>
             <ProductFormModal
@@ -254,22 +266,26 @@ export function RegisterPurchaseModal({ suppliers }: { suppliers: Supplier[] }) 
             />
 
             {items.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground text-xs uppercase tracking-widest font-bold bg-[#111827]/50 rounded-xl border border-dashed border-border/50">
-                Nenhum item adicionado.
+              <div className="text-center py-12 text-muted-foreground text-[10px] uppercase tracking-[0.2em] font-black bg-white/[0.02] rounded-2xl border border-dashed border-white/10 flex flex-col items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center">
+                  <Package className="w-6 h-6 opacity-20" />
+                </div>
+                Nenhum item adicionado à lista.
               </div>
             ) : (
               <div className="space-y-4">
                 {items.map((item, index) => (
-                  <div key={index} className="flex flex-col md:flex-row gap-4 items-start md:items-center bg-[#111827]/80 p-4 rounded-xl border border-border/50 relative group">
+                  <div key={index} className="flex flex-col md:grid md:grid-cols-12 gap-4 items-start md:items-end bg-white/[0.03] p-4 md:p-6 rounded-2xl border border-white/5 relative group hover:bg-white/[0.05] transition-all">
                     <button 
                       onClick={() => handleRemoveItem(index)}
-                      className="absolute -top-2 -right-2 w-6 h-6 bg-red-500/20 text-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500 hover:text-white"
+                      className="absolute -top-2 -right-2 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:scale-110 shadow-lg z-10"
                       title="Remover Item"
                     >
-                      <Trash2 className="w-3 h-3" />
+                      <Trash2 className="w-4 h-4" />
                     </button>
-                    <div className="flex-1 w-full space-y-1">
-                      <label className="text-[9px] font-bold tracking-widest uppercase text-muted-foreground">Produto</label>
+                    
+                    <div className="col-span-12 md:col-span-5 space-y-2 w-full">
+                      <label className="text-[10px] font-black tracking-widest uppercase text-primary ml-1">Produto</label>
                       <Combobox
                         options={products.map(p => {
                           const fullName = p.subcategory ? `${p.name} - ${p.subcategory}` : p.name;
@@ -282,36 +298,39 @@ export function RegisterPurchaseModal({ suppliers }: { suppliers: Supplier[] }) 
                         })}
                         value={item.productId}
                         onSelect={(val) => handleUpdateItem(index, 'productId', val)}
-                        placeholder="Buscar ou criar produto..."
+                        placeholder="Buscar produto..."
                         allowCustom={true}
                       />
                     </div>
-                    <div className="w-full md:w-24 space-y-1">
-                      <label className="text-[9px] font-bold tracking-widest uppercase text-muted-foreground">Qtd</label>
+
+                    <div className="col-span-6 md:col-span-2 space-y-2 w-full">
+                      <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Qtd</label>
                       <Input 
                         type="number" 
                         min="0"
-                        className="h-12 bg-black/40 border-border font-bold text-center w-full"
+                        className="h-14 bg-black/40 border-white/10 focus:border-green-500/50 font-black text-center w-full rounded-xl"
                         value={item.quantity}
                         onChange={(e) => handleUpdateItem(index, 'quantity', e.target.value)}
                         placeholder="0"
                       />
                     </div>
-                    <div className="w-full md:w-32 space-y-1">
-                      <label className="text-[9px] font-bold tracking-widest uppercase text-muted-foreground">Custo Unit (R$)</label>
+
+                    <div className="col-span-6 md:col-span-2 space-y-2 w-full">
+                      <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Custo (R$)</label>
                       <Input 
                         type="number" 
                         step="0.01"
                         min="0"
-                        className="h-12 bg-black/40 border-border font-bold text-right w-full"
+                        className="h-14 bg-black/40 border-white/10 focus:border-green-500/50 font-black text-right w-full rounded-xl"
                         value={item.price}
                         onChange={(e) => handleUpdateItem(index, 'price', e.target.value)}
                         placeholder="0.00"
                       />
                     </div>
-                    <div className="w-full md:w-24 space-y-1">
-                      <label className="text-[9px] font-bold tracking-widest uppercase text-muted-foreground">Subtotal</label>
-                      <div className="h-12 flex items-center justify-end font-bold text-white pr-2 text-sm w-full">
+
+                    <div className="col-span-12 md:col-span-3 space-y-2 w-full">
+                      <label className="text-[10px] font-black tracking-widest uppercase text-green-500 ml-1">Subtotal</label>
+                      <div className="h-14 flex items-center justify-end bg-green-500/10 border border-green-500/20 rounded-xl px-4 font-black text-green-500 text-sm w-full">
                         R$ {calculateSubtotal(item.quantity, item.price).toFixed(2)}
                       </div>
                     </div>

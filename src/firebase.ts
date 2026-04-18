@@ -6,13 +6,13 @@ import { getAnalytics } from 'firebase/analytics';
 
 // Configuração do Firebase com suporte a overrides de ambiente e fallbacks seguros
 const config = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyBWMVE765V8nqz7gKwyBE2-SQ5_hNAPkDM",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "botecodoluis2.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "botecodoluis2",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "botecodoluis2.firebasestorage.app",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "959264021711",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:959264021711:web:e9b409f0bbdb26df092bba",
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-3LEXX8S4X8"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
 console.log("Firebase Config Initializing with Project:", config.projectId);

@@ -3,7 +3,7 @@
 
 env:
   - variable: GEMINI_API_KEY
-    value: AIzaSyD4I1ku6OGToHwBLXhYNrUw-GVbkBfz1n0
+    value: 
     availability:
       - BUILD
       - RUNTIME
@@ -18,7 +18,7 @@ env:
       - BUILD
       - RUNTIME
   - variable: VITE_FIREBASE_API_KEY
-    value: AIzaSyBWMVE765V8nqz7gKwyBE2-SQ5_hNAPkDM
+    value: 
     availability:
       - BUILD
       - RUNTIME
