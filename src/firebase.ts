@@ -4,8 +4,24 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import { getAnalytics } from 'firebase/analytics';
 
-// Configuração do Firebase utilizando o arquivo gerado pelo provisionamento
-import firebaseConfig from '../firebase-applet-config.json';
+// Configuração do Firebase utilizando Variáveis de Ambiente (Padrão Vite)
+// O arquivo firebase-applet-config.json é usado como fallback local se necessário, 
+// mas para o build em CI/CD usamos as variáveis injetadas.
+
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
+  firestoreDatabaseId: import.meta.env.VITE_FIREBASE_DATABASE_ID || 'default'
+};
+
+if (!firebaseConfig.apiKey) {
+  console.warn("Firebase API Key não detectada. Verifique suas variáveis de ambiente.");
+}
 
 console.log("Firebase Config Initializing with Project:", firebaseConfig.projectId);
 
