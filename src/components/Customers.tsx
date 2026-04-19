@@ -19,8 +19,14 @@ import { Badge } from './ui/badge';
 import { format } from 'date-fns';
 import { Order } from '../types';
 
+import { useFetchCollection } from '../hooks/useFetchCollection';
+
 export function Customers({ user }: { user: UserProfile }) {
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const customerConstraints = React.useMemo(() => [orderBy('name', 'asc')], []);
+
+  const { data: customers } = useFetchCollection<Customer>('customers', {
+    constraints: customerConstraints
+  });
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
@@ -43,14 +49,6 @@ export function Customers({ user }: { user: UserProfile }) {
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [address, setAddress] = useState('');
-
-  useEffect(() => {
-    const q = query(collection(db, 'customers'), orderBy('name', 'asc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setCustomers(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Customer)));
-    });
-    return () => unsubscribe();
-  }, []);
 
   const handleSave = async () => {
     if (!name) return;

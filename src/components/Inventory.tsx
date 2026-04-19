@@ -21,9 +21,11 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Combobox } from './ui/combobox';
 import { Textarea } from './ui/textarea';
 
+import { useFetchCollection } from '../hooks/useFetchCollection';
+
 export function Inventory({ user, setActiveTab }: { user: UserProfile, setActiveTab: (tab: string) => void }) {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const { data: products } = useFetchCollection<Product>('products');
+  const { data: categories } = useFetchCollection<Category>('categories');
   const [search, setSearch] = useState('');
   const [stockFilter, setStockFilter] = useState<'all' | 'critical'>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
@@ -89,21 +91,6 @@ export function Inventory({ user, setActiveTab }: { user: UserProfile, setActive
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
   };
-
-  useEffect(() => {
-    const unsubProducts = onSnapshot(collection(db, 'products'), (snapshot) => {
-      setProducts(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Product)));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'products'));
-
-    const unsubCategories = onSnapshot(collection(db, 'categories'), (snapshot) => {
-      setCategories(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Category)));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'categories'));
-
-    return () => {
-      unsubProducts();
-      unsubCategories();
-    };
-  }, []);
 
   useEffect(() => {
     if (categoryFilter !== 'all') {

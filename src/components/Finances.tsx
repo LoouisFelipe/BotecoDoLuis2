@@ -18,9 +18,29 @@ import { ptBR } from 'date-fns/locale';
 import { handleFirestoreError, OperationType } from '../lib/firebase-utils';
 import { cn } from '../lib/utils';
 
+import { useFetchCollection } from '../hooks/useFetchCollection';
+
 export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveTab: (tab: string) => void }) {
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const transConstraints = React.useMemo(() => [orderBy('date', 'desc'), limit(500)], []);
+  const expConstraints = React.useMemo(() => [orderBy('date', 'desc'), limit(500)], []);
+
+  const { data: rawTransactions } = useFetchCollection<Transaction>('transactions', {
+    constraints: transConstraints
+  });
+  const { data: rawExpenses } = useFetchCollection<Transaction>('expenses', {
+    constraints: expConstraints
+  });
+  const { data: customers } = useFetchCollection<Customer>('customers');
+
+  const transactions = React.useMemo(() => {
+    const merged = [...rawTransactions, ...rawExpenses.map(e => ({ ...e, type: 'expense' as const }))];
+    return merged.sort((a, b) => {
+      const dateA = a.date?.toDate ? a.date.toDate().getTime() : 0;
+      const dateB = b.date?.toDate ? b.date.toDate().getTime() : 0;
+      return dateB - dateA;
+    }).slice(0, 500);
+  }, [rawTransactions, rawExpenses]);
+
   const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense'>('all');
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [isFiadoModalOpen, setIsFiadoModalOpen] = useState(false);
@@ -69,44 +89,6 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
-
-  useEffect(() => {
-    const qTransactions = query(collection(db, 'transactions'), orderBy('date', 'desc'), limit(500));
-    const qExpenses = query(collection(db, 'expenses'), orderBy('date', 'desc'), limit(500));
-    const qCustomers = query(collection(db, 'customers'));
-
-    let transData: Transaction[] = [];
-    let expData: Transaction[] = [];
-
-    const updateMerged = () => {
-      const merged = [...transData, ...expData].sort((a, b) => {
-        const dateA = a.date?.toDate ? a.date.toDate().getTime() : 0;
-        const dateB = b.date?.toDate ? b.date.toDate().getTime() : 0;
-        return dateB - dateA;
-      }).slice(0, 500);
-      setTransactions(merged);
-    };
-
-    const unsubTransactions = onSnapshot(qTransactions, (snapshot) => {
-      transData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Transaction));
-      updateMerged();
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'transactions'));
-
-    const unsubExpenses = onSnapshot(qExpenses, (snapshot) => {
-      expData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id, type: 'expense' } as Transaction));
-      updateMerged();
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'expenses'));
-
-    const unsubCustomers = onSnapshot(qCustomers, (snapshot) => {
-      setCustomers(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Customer)));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'customers'));
-
-    return () => {
-      unsubTransactions();
-      unsubExpenses();
-      unsubCustomers();
-    };
-  }, []);
 
   const handleAddExpense = async () => {
     if (!amount || !category) return;

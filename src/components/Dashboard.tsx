@@ -16,52 +16,24 @@ import { cn, getShiftDate } from '../lib/utils';
 import { ConfirmDialog } from './ConfirmDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
+import { useFetchCollection } from '../hooks/useFetchCollection';
+
 export function Dashboard({ user, setActiveTab }: { user: UserProfile, setActiveTab: (tab: string) => void }) {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [gameModalities, setGameModalities] = useState<GameModality[]>([]);
+  const orderConstraints = React.useMemo(() => [where('status', '==', 'open'), orderBy('createdAt', 'desc')], []);
+  
+  const { data: orders } = useFetchCollection<Order>('open_orders', {
+    constraints: orderConstraints
+  });
+  const { data: products } = useFetchCollection<Product>('products');
+  const { data: customers } = useFetchCollection<Customer>('customers');
+  const { data: categories } = useFetchCollection<Category>('categories');
+  const { data: gameModalities } = useFetchCollection<GameModality>('game_modalities');
+
   const [search, setSearch] = useState('');
   const [isNewOrderOpen, setIsNewOrderOpen] = useState(false);
   const [newCustomerName, setNewCustomerName] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
-
-  useEffect(() => {
-    const q = query(
-      collection(db, 'open_orders'), 
-      where('status', '==', 'open'),
-      orderBy('createdAt', 'desc')
-    );
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setOrders(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Order)));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'open_orders'));
-
-    const unsubProducts = onSnapshot(collection(db, 'products'), (snapshot) => {
-      setProducts(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Product)));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'products'));
-
-    const unsubCustomers = onSnapshot(collection(db, 'customers'), (snapshot) => {
-      setCustomers(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Customer)));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'customers'));
-
-    const unsubCategories = onSnapshot(collection(db, 'categories'), (snapshot) => {
-      setCategories(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Category)));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'categories'));
-
-    const unsubGames = onSnapshot(collection(db, 'game_modalities'), (snapshot) => {
-      setGameModalities(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as GameModality)));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'game_modalities'));
-
-    return () => {
-      unsubscribe();
-      unsubProducts();
-      unsubCustomers();
-      unsubCategories();
-      unsubGames();
-    };
-  }, []);
 
   const handleCreateOrder = async (name: string, type: 'table' | 'customer', customerId: string = '', isNewCustomer: boolean = false) => {
     setIsCreatingOrder(true);
@@ -1196,110 +1168,125 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                           {/* Level 1: Categories */}
                           {!selectedMenuCategory && (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-3">
-                              {sortedCategories.map(category => (
-                                <button 
-                                  key={`cat-${category.id}`}
-                                  onClick={() => setSelectedMenuCategory(category.id)}
-                                  className="w-full p-4 flex items-center justify-between bg-[#0d1117] border border-white/5 rounded-2xl hover:bg-[#161b22] hover:border-[#0070f3]/30 transition-all group active:scale-95"
-                                >
-                                  <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-muted-foreground group-hover:bg-[#0070f3]/10 group-hover:text-[#0070f3] transition-all">
-                                      <Package className="w-5 h-5" />
+                              <AnimatePresence>
+                                {sortedCategories.map(category => (
+                                  <motion.button 
+                                    key={`cat-${category.id}`}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, scale: 0.95 }}
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    onClick={() => setSelectedMenuCategory(category.id)}
+                                    className="w-full p-4 flex items-center justify-between bg-[#0d1117] border border-white/5 rounded-2xl hover:bg-[#161b22] hover:border-[#0070f3]/30 transition-all group relative overflow-hidden"
+                                  >
+                                    <div className="flex items-center gap-4">
+                                      <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-muted-foreground group-hover:bg-[#0070f3]/10 group-hover:text-[#0070f3] transition-all">
+                                        <Package className="w-5 h-5" />
+                                      </div>
+                                      <div className="text-left">
+                                        <span className="font-black text-[11px] uppercase tracking-widest block text-white group-hover:text-[#0070f3] transition-colors">{category.name}</span>
+                                        <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">
+                                          {products.filter(p => (p.categoryId || 'Outros') === category.id).length} Produtos
+                                        </span>
+                                      </div>
                                     </div>
-                                    <div className="text-left">
-                                      <span className="font-black text-[11px] uppercase tracking-widest block text-white group-hover:text-[#0070f3] transition-colors">{category.name}</span>
-                                      <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">
-                                        {products.filter(p => (p.categoryId || 'Outros') === category.id).length} Produtos
-                                      </span>
-                                    </div>
-                                  </div>
-                                  <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-white transition-all transform group-hover:translate-x-1" />
-                                </button>
-                              ))}
+                                    <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-white transition-all transform group-hover:translate-x-1" />
+                                    <div className="absolute inset-0 bg-gradient-to-r from-[#0070f3]/0 via-[#0070f3]/5 to-[#0070f3]/0 translate-x-[-100%] group-hover:animate-shimmer" />
+                                  </motion.button>
+                                ))}
+                              </AnimatePresence>
                             </div>
                           )}
 
                           {/* Level 2: Subcategories */}
                           {selectedMenuCategory && !selectedMenuSubcategory && (
-                            <motion.div 
-                              initial={{ x: 20, opacity: 0 }}
-                              animate={{ x: 0, opacity: 1 }}
-                              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-3"
-                            >
-                              {Array.from(new Set(
-                                products
-                                  .filter(p => (p.categoryId || 'Outros') === selectedMenuCategory)
-                                  .map(p => p.subcategory || 'Diversos')
-                              )).sort().map(subcategory => (
-                                <button 
-                                  key={`subcat-${subcategory}`}
-                                  onClick={() => setSelectedMenuSubcategory(subcategory)}
-                                  className="w-full p-4 flex items-center justify-between bg-[#0d1117] border border-white/5 rounded-2xl hover:bg-[#161b22] hover:border-[#0070f3]/30 transition-all group active:scale-95 text-left"
-                                >
-                                  <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 rounded-xl bg-[#0070f3]/5 flex items-center justify-center text-[#0070f3]">
-                                      <Filter className="w-5 h-5" />
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-3">
+                              <AnimatePresence mode="wait">
+                                {Array.from(new Set(
+                                  products
+                                    .filter(p => (p.categoryId || 'Outros') === selectedMenuCategory)
+                                    .map(p => p.subcategory || 'Diversos')
+                                )).sort().map(subcategory => (
+                                  <motion.button 
+                                    key={`subcat-${subcategory}`}
+                                    initial={{ x: 20, opacity: 0 }}
+                                    animate={{ x: 0, opacity: 1 }}
+                                    exit={{ x: -20, opacity: 0 }}
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    onClick={() => setSelectedMenuSubcategory(subcategory)}
+                                    className="w-full p-4 flex items-center justify-between bg-[#0d1117] border border-white/5 rounded-2xl hover:bg-[#161b22] hover:border-[#0070f3]/30 transition-all group relative overflow-hidden text-left"
+                                  >
+                                    <div className="flex items-center gap-4">
+                                      <div className="w-10 h-10 rounded-xl bg-[#0070f3]/5 flex items-center justify-center text-[#0070f3]">
+                                        <Filter className="w-5 h-5" />
+                                      </div>
+                                      <div className="text-left">
+                                        <span className="font-black text-[11px] uppercase tracking-widest block text-white group-hover:text-[#0070f3] transition-colors">{subcategory}</span>
+                                        <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">
+                                          {products.filter(p => (p.categoryId || 'Outros') === selectedMenuCategory && (p.subcategory || 'Diversos') === subcategory).length} Itens
+                                        </span>
+                                      </div>
                                     </div>
-                                    <div className="text-left">
-                                      <span className="font-black text-[11px] uppercase tracking-widest block text-white group-hover:text-[#0070f3] transition-colors">{subcategory}</span>
-                                      <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">
-                                        {products.filter(p => (p.categoryId || 'Outros') === selectedMenuCategory && (p.subcategory || 'Diversos') === subcategory).length} Itens
-                                      </span>
-                                    </div>
-                                  </div>
-                                  <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-white transition-all transform group-hover:translate-x-1" />
-                                </button>
-                              ))}
-                            </motion.div>
+                                    <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-white transition-all transform group-hover:translate-x-1" />
+                                    <div className="absolute inset-0 bg-gradient-to-r from-[#0070f3]/0 via-[#0070f3]/5 to-[#0070f3]/0 translate-x-[-100%] group-hover:animate-shimmer" />
+                                  </motion.button>
+                                ))}
+                              </AnimatePresence>
+                            </div>
                           )}
 
                           {/* Level 3: Products */}
                           {selectedMenuCategory && selectedMenuSubcategory && (
-                            <motion.div 
-                              initial={{ x: 20, opacity: 0 }}
-                              animate={{ x: 0, opacity: 1 }}
-                              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-2"
-                            >
-                              {products
-                                .filter(p => (p.categoryId || 'Outros') === selectedMenuCategory && (p.subcategory || 'Diversos') === selectedMenuSubcategory)
-                                .map(product => (
-                                  <button
-                                    key={`prod-${product.id}`}
-                                    onClick={() => {
-                                      if (product.isOpenValue) {
-                                        setSelectedProduct(product);
-                                        setIsProductValueModalOpen(true);
-                                      } else {
-                                        handleAddItem(product);
-                                      }
-                                    }}
-                                    className="w-full p-4 flex items-center justify-between bg-[#0d1117] border border-white/5 rounded-2xl hover:bg-white/10 transition-all text-left group active:scale-95"
-                                  >
-                                    <div className="min-w-0 pr-2">
-                                      <p className="font-black text-[11px] uppercase tracking-wider group-hover:text-[#0070f3] transition-colors truncate">{product.name}</p>
-                                      <div className="flex flex-col gap-0.5 mt-1">
-                                        <p className="text-[10px] text-[#0070f3] font-black tracking-widest">
-                                          {product.isOpenValue ? 'VALOR ABERTO' : `R$ ${product.price.toFixed(2)}`}
-                                        </p>
-                                        {product.isDoseControl && (
-                                          <p className="text-[9px] text-white/50 font-black uppercase tracking-widest flex items-center gap-1">
-                                            <FlaskConical className="w-2.5 h-2.5" />
-                                            {product.linkedProductId ? (
-                                              <>{products.find(p => p.id === product.linkedProductId)?.currentBottleVolume || 0}ml</>
-                                            ) : (
-                                              <>{product.currentBottleVolume || 0}ml</>
-                                            )}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-2">
+                              <AnimatePresence mode="wait">
+                                {products
+                                  .filter(p => (p.categoryId || 'Outros') === selectedMenuCategory && (p.subcategory || 'Diversos') === selectedMenuSubcategory)
+                                  .map(product => (
+                                    <motion.button
+                                      key={`prod-${product.id}`}
+                                      initial={{ x: 20, opacity: 0 }}
+                                      animate={{ x: 0, opacity: 1 }}
+                                      exit={{ x: -20, opacity: 0 }}
+                                      whileHover={{ scale: 1.02, boxShadow: '0 0 20px rgba(0, 112, 243, 0.15)' }}
+                                      whileTap={{ scale: 0.98 }}
+                                      onClick={() => {
+                                        if (product.isOpenValue) {
+                                          setSelectedProduct(product);
+                                          setIsProductValueModalOpen(true);
+                                        } else {
+                                          handleAddItem(product);
+                                        }
+                                      }}
+                                      className="w-full p-4 flex items-center justify-between bg-[#0d1117] border border-white/5 rounded-2xl hover:bg-[#161b22] hover:border-[#0070f3]/20 transition-all text-left group relative overflow-hidden"
+                                    >
+                                      <div className="min-w-0 pr-2">
+                                        <p className="font-black text-[11px] uppercase tracking-wider group-hover:text-[#0070f3] transition-colors truncate">{product.name}</p>
+                                        <div className="flex flex-col gap-0.5 mt-1">
+                                          <p className="text-[10px] text-[#0070f3] font-black tracking-widest">
+                                            {product.isOpenValue ? 'VALOR ABERTO' : `R$ ${product.price.toFixed(2)}`}
                                           </p>
-                                        )}
+                                          {product.isDoseControl && (
+                                            <p className="text-[9px] text-white/50 font-black uppercase tracking-widest flex items-center gap-1">
+                                              <FlaskConical className="w-2.5 h-2.5" />
+                                              {product.linkedProductId ? (
+                                                <>{products.find(p => p.id === product.linkedProductId)?.currentBottleVolume || 0}ml</>
+                                              ) : (
+                                                <>{product.currentBottleVolume || 0}ml</>
+                                              )}
+                                            </p>
+                                          )}
+                                        </div>
                                       </div>
-                                    </div>
-                                    <div className="w-9 h-9 flex-shrink-0 rounded-xl bg-white/5 flex items-center justify-center group-hover:bg-[#0070f3] group-hover:text-white transition-all">
-                                      <Plus className="w-5 h-5" />
-                                    </div>
-                                  </button>
-                                ))
-                              }
-                            </motion.div>
+                                      <div className="w-9 h-9 flex-shrink-0 rounded-xl bg-white/5 flex items-center justify-center group-hover:bg-[#0070f3] group-hover:text-white transition-all shadow-sm">
+                                        <Plus className="w-5 h-5" />
+                                      </div>
+                                      <div className="absolute inset-0 bg-[#0070f3]/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    </motion.button>
+                                  ))}
+                              </AnimatePresence>
+                            </div>
                           )}
                         </div>
                       )}

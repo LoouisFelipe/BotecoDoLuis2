@@ -16,12 +16,16 @@ service cloud.firestore {
          request.auth.uid == "e5SB016rBhWuYEKifTIYSCfE5Bq2");
     }
 
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
     function isAdmin() {
       return isOwner() || (
         authenticated() && 
         request.auth.token.email_verified == true && 
         exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+        getUserData().role == 'admin'
       );
     }
 
@@ -30,17 +34,31 @@ service cloud.firestore {
         authenticated() && 
         request.auth.token.email_verified == true && 
         exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'staff'
+        getUserData().role == 'staff'
       );
     }
 
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
     // ===============================================================
-    // Rules
+    // Collection Rules
     // ===============================================================
 
     match /users/{userId} {
       allow read: if authenticated() && (request.auth.uid == userId || isAdmin());
       allow create, update: if authenticated() && (request.auth.uid == userId || isAdmin());
+      // Prevent role escalation from non-admins
+      allow update: if authenticated() && request.auth.uid == userId && !isAdmin() && !incoming().diff(existing()).affectedKeys().hasAny(['role']);
     }
 
     match /categories/{categoryId} {
@@ -69,24 +87,24 @@ service cloud.firestore {
     }
 
     match /game_sessions/{sessionId} {
-      allow read: if isStaff();
+      allow list, get: if isStaff();
       allow create: if isStaff();
       allow update, delete: if isAdmin();
     }
 
     match /orders/{orderId} {
-      allow read: if authenticated();
+      allow read: if isStaff();
       allow create, update: if isStaff();
       allow delete: if isAdmin();
     }
 
     match /closed_orders/{orderId} {
-      allow read: if authenticated();
+      allow read: if isStaff();
       allow write: if isAdmin();
     }
 
     match /open_orders/{orderId} {
-      allow read: if authenticated();
+      allow read: if isStaff();
       allow create, update: if isStaff();
       allow delete: if isAdmin();
     }
@@ -124,7 +142,7 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // Explicitly allow owner to do everything
+    // Global Catch-all for Safety
     match /{document=**} {
       allow read, write: if isOwner();
     }

@@ -19,17 +19,33 @@ import { BottomNav } from './components/BottomNav';
 import { LayoutDashboard, Package, Receipt, BarChart3, LogOut, Shield, Users, Truck, Settings, Gamepad2, User, Sparkles, Activity, Globe, Database, Menu, X as CloseIcon, Plus } from 'lucide-react';
 import { auth } from './firebase';
 import { Button } from './components/ui/button';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { cn } from './lib/utils';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTabState] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // Close sidebar when tab changes on mobile
+  // Named routes logic / Sync with URL
   useEffect(() => {
-    setIsSidebarOpen(false);
-  }, [activeTab]);
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace('#', '');
+      if (hash) {
+        setActiveTabState(hash);
+      }
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    handleHashChange(); // Initial load
+
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  const setActiveTab = useCallback((tab: string) => {
+    setActiveTabState(tab);
+    window.location.hash = tab;
+    setIsSidebarOpen(false); // Close sidebar on change (mobile)
+  }, []);
 
   const menuItems = [
     { id: 'dashboard', label: 'CONTROLE DIÁRIO', icon: LayoutDashboard },

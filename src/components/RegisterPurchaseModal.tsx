@@ -11,35 +11,30 @@ import { toast } from 'sonner';
 import { getShiftDate } from '../lib/utils';
 import { ShoppingCart, Plus, Trash2, Package } from 'lucide-react';
 import { handleFirestoreError, OperationType } from '../lib/firebase-utils';
+import { useFetchCollection } from '../hooks/useFetchCollection';
 
 export function RegisterPurchaseModal({ suppliers }: { suppliers: Supplier[] }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [products, setProducts] = useState<Product[]>([]);
+  const productConstraints = React.useMemo(() => [orderBy('name', 'asc')], []);
+  
+  const { data: products } = useFetchCollection<Product>('products', {
+    constraints: productConstraints,
+    enabled: isOpen
+  });
+  
+  const { data: categories } = useFetchCollection<Category>('categories', {
+    enabled: isOpen
+  });
+
   const [isSaving, setIsSaving] = useState(false);
 
   // Form states
   const [supplierId, setSupplierId] = useState('');
   const [items, setItems] = useState<{ productId: string; productName: string; quantity: number | ''; price: number | '' }[]>([]);
 
-  const [categories, setCategories] = useState<Category[]>([]);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [productModalInitialName, setProductModalInitialName] = useState('');
   const [activeItemIndex, setActiveItemIndex] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const q = query(collection(db, 'products'), orderBy('name', 'asc'));
-    const unsubscribeProducts = onSnapshot(q, (snapshot) => {
-      setProducts(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Product)));
-    });
-    const subCategories = onSnapshot(collection(db, 'categories'), (snapshot) => {
-      setCategories(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Category)));
-    });
-    return () => {
-      unsubscribeProducts();
-      subCategories();
-    };
-  }, [isOpen]);
 
   const handleAddItem = () => {
     setItems([...items, { productId: '', productName: '', quantity: '', price: '' }]);

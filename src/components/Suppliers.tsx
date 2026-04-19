@@ -15,8 +15,14 @@ import { handleFirestoreError, OperationType } from '../lib/firebase-utils';
 import { ConfirmDialog } from './ConfirmDialog';
 import { RegisterPurchaseModal } from './RegisterPurchaseModal';
 
+import { useFetchCollection } from '../hooks/useFetchCollection';
+
 export function Suppliers({ user }: { user: UserProfile }) {
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const supplierConstraints = React.useMemo(() => [orderBy('name', 'asc')], []);
+  
+  const { data: suppliers } = useFetchCollection<Supplier>('suppliers', {
+    constraints: supplierConstraints
+  });
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
@@ -29,14 +35,6 @@ export function Suppliers({ user }: { user: UserProfile }) {
   const [contact, setContact] = useState('');
   const [phone, setPhone] = useState('');
   const [category, setCategory] = useState('');
-
-  useEffect(() => {
-    const q = query(collection(db, 'suppliers'), orderBy('name', 'asc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setSuppliers(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Supplier)));
-    });
-    return () => unsubscribe();
-  }, []);
 
   const handleSave = async () => {
     if (!name) return;
