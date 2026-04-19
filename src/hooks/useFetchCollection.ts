@@ -26,6 +26,7 @@ export function useFetchCollection<T = DocumentData>(
   const [error, setError] = useState<FirestoreError | null>(null);
 
   const { enabled = true } = options;
+  const constraintsKey = JSON.stringify(options.constraints || []);
 
   useEffect(() => {
     if (!enabled) {
@@ -69,7 +70,7 @@ export function useFetchCollection<T = DocumentData>(
       console.error(`Query construction error for ${collectionName}:`, err);
       setLoading(false);
     }
-  }, [collectionName, enabled, options.constraints, options.onError]);
+  }, [collectionName, enabled, constraintsKey, options.onError]);
 
   return { data, loading, error };
 }

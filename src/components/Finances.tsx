@@ -159,108 +159,88 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
 
   return (
     <div className="space-y-8">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* Financial Health - Metrics Banner */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         <Card 
           className={cn(
-            "border-border bg-card/50 rounded-2xl overflow-hidden group cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98]",
-            typeFilter === 'income' && "ring-2 ring-green-500/50 bg-green-500/5"
+            "bg-card/30 border-border/50 overflow-hidden relative group cursor-pointer transition-all",
+            typeFilter === 'income' && "ring-2 ring-green-500/50 bg-green-500/10"
           )}
           onClick={() => setTypeFilter(typeFilter === 'income' ? 'all' : 'income')}
         >
-          <CardHeader className="pb-2">
-            <div className="flex justify-between items-start">
-              <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Entradas Recentes</p>
-              <div className="p-2 rounded-lg bg-green-500/10 text-green-500">
-                <ArrowUpRight className="w-4 h-4" />
-              </div>
+          <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <CardContent className="p-6 flex items-center gap-5 relative z-10">
+            <div className="w-12 h-12 rounded-2xl bg-green-500/10 flex items-center justify-center border border-green-500/20 shadow-[0_0_20px_rgba(34,197,94,0.1)] group-hover:scale-110 transition-transform">
+              <ArrowUpRight className="w-6 h-6 text-green-500" />
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-black tracking-tight text-green-500">
-              <span className="text-sm font-bold mr-1">R$</span>
-              {totalIncome.toFixed(2)}
+            <div>
+              <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-1">Entradas (Periodo)</p>
+              <h3 className="text-2xl font-black text-green-500 leading-none">R$ {totalIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
             </div>
-            <p className="text-[10px] text-muted-foreground mt-1 font-bold tracking-widest uppercase">{getFilterLabel()}</p>
           </CardContent>
         </Card>
         
         <Card 
           className={cn(
-            "border-border bg-card/50 rounded-2xl overflow-hidden group cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98]",
-            typeFilter === 'expense' && "ring-2 ring-red-500/50 bg-red-500/5"
+            "bg-card/30 border-border/50 overflow-hidden relative group cursor-pointer transition-all",
+            typeFilter === 'expense' && "ring-2 ring-red-500/50 bg-red-500/10"
           )}
           onClick={() => setTypeFilter(typeFilter === 'expense' ? 'all' : 'expense')}
         >
-          <CardHeader className="pb-2">
-            <div className="flex justify-between items-start">
-              <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Saídas Recentes</p>
-              <div className="p-2 rounded-lg bg-red-500/10 text-red-500">
-                <ArrowDownRight className="w-4 h-4" />
-              </div>
+          <div className="absolute inset-0 bg-gradient-to-br from-red-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <CardContent className="p-6 flex items-center gap-5 relative z-10">
+            <div className="w-12 h-12 rounded-2xl bg-red-500/10 flex items-center justify-center border border-red-500/20 shadow-[0_0_20px_rgba(239,68,68,0.1)]">
+              <ArrowDownRight className="w-6 h-6 text-red-500" />
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-black tracking-tight text-red-500">
-              <span className="text-sm font-bold mr-1">R$</span>
-              {totalExpense.toFixed(2)}
+            <div>
+              <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-1">Saídas (Periodo)</p>
+              <h3 className="text-2xl font-black text-red-500 leading-none">R$ {totalExpense.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
             </div>
-            <p className="text-[10px] text-muted-foreground mt-1 font-bold tracking-widest uppercase">{getFilterLabel()}</p>
           </CardContent>
         </Card>
 
-        <Card className="border-border bg-primary rounded-2xl overflow-hidden group">
-          <CardHeader className="pb-2">
-            <div className="flex justify-between items-start">
-              <p className="text-[10px] font-bold tracking-widest uppercase text-white/70">Saldo do Período</p>
-              <div className="p-2 rounded-lg bg-white/10 text-white">
-                <TrendingUp className="w-4 h-4" />
-              </div>
+        <Card className="bg-primary/90 border-primary overflow-hidden relative group">
+          <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+          <CardContent className="p-6 flex items-center gap-5 relative z-10">
+            <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center border border-white/30 shadow-lg">
+              <TrendingUp className="w-6 h-6 text-white" />
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-black tracking-tight text-white">
-              <span className="text-sm font-bold mr-1">R$</span>
-              {(totalIncome - totalExpense).toFixed(2)}
+            <div>
+              <p className="text-[10px] font-black tracking-widest uppercase text-white/70 mb-1">Lucro Operacional</p>
+              <h3 className="text-2xl font-black text-white leading-none">R$ {(totalIncome - totalExpense).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
             </div>
-            <p className="text-[10px] text-white/70 mt-1 font-bold tracking-widest uppercase">Fluxo de Caixa</p>
           </CardContent>
         </Card>
 
         <Card 
-          className="border-border bg-[#0d1117] border-orange-500/20 rounded-2xl overflow-hidden group cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98]"
+          className="bg-card/30 border-orange-500/20 overflow-hidden relative group cursor-pointer transition-all"
           onClick={() => setIsFiadoModalOpen(true)}
         >
-          <CardHeader className="pb-2">
-            <div className="flex justify-between items-start">
-              <p className="text-[10px] font-bold tracking-widest uppercase text-orange-500">Fiado Pendente</p>
-              <div className="p-2 rounded-lg bg-orange-500/10 text-orange-500">
-                <Users className="w-4 h-4" />
-              </div>
+          <div className="absolute inset-0 bg-gradient-to-br from-orange-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <CardContent className="p-6 flex items-center gap-5 relative z-10">
+            <div className="w-12 h-12 rounded-2xl bg-orange-500/10 flex items-center justify-center border border-orange-500/20 shadow-[0_0_20px_rgba(249,115,22,0.1)]">
+              <Users className="w-6 h-6 text-orange-500" />
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-black tracking-tight text-orange-500">
-              <span className="text-sm font-bold mr-1">R$</span>
-              {totalFiado.toFixed(2)}
+            <div>
+              <p className="text-[10px] font-black tracking-widest uppercase text-orange-500/80 mb-1">Fiado Pendente</p>
+              <h3 className="text-2xl font-black text-orange-500 leading-none">R$ {totalFiado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
             </div>
-            <p className="text-[10px] text-muted-foreground mt-1 font-bold tracking-widest uppercase">Contas a Receber</p>
           </CardContent>
         </Card>
       </div>
 
       <div className="flex flex-col md:flex-row justify-between items-center gap-4 md:gap-6">
         <div className="flex items-center gap-4 w-full md:w-auto">
-          <div className="bg-white/5 p-2 rounded-lg">
-            <Receipt className="text-primary w-5 h-5" />
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+            <Receipt className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="font-bold text-base md:text-lg uppercase tracking-wider">Histórico de Transações</h3>
-            <p className="text-[9px] md:text-[10px] text-muted-foreground tracking-widest uppercase font-semibold">Monitoramento Financeiro</p>
+            <h3 className="font-black uppercase tracking-tighter text-lg leading-tight">Histórico Nexus</h3>
+            <p className="text-[10px] text-muted-foreground tracking-widest uppercase font-bold">Monitoramento de Fluxo {getFilterLabel()}</p>
           </div>
         </div>
 
-        <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto mt-4 md:mt-0">
-          <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto items-center">
+        <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto mt-4 md:mt-0 items-center">
             <Select value={dateFilter} onValueChange={(val: any) => setDateFilter(val)}>
               <SelectTrigger className="w-full md:w-[180px] h-12 md:h-14 px-4 md:px-6 rounded-xl gap-2 md:gap-3 font-bold tracking-widest uppercase border-border hover:bg-white/5 text-[10px] md:text-sm bg-card/50">
                 <Filter className="w-4 h-4 md:w-5 md:h-5 text-primary" />
@@ -330,8 +310,6 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
                 </Popover>
               </div>
             )}
-          </div>
-
           <Dialog open={isExpenseModalOpen} onOpenChange={setIsExpenseModalOpen}>
             <DialogTrigger
               nativeButton={true}

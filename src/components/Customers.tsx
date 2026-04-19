@@ -189,82 +189,74 @@ export function Customers({ user }: { user: UserProfile }) {
 
   return (
     <div className="space-y-8">
-      {/* Customer Insights */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <motion.div 
+      {/* Customer Insights - Metrics Banner */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+        <Card 
+          className={cn(
+            "bg-card/30 border-border/50 overflow-hidden relative group cursor-pointer transition-all",
+            balanceFilter === 'all' && "ring-2 ring-primary/50 bg-primary/10"
+          )}
           onClick={() => setBalanceFilter('all')}
-          whileHover={{ y: -4 }}
-          className={cn(
-            "cursor-pointer transition-all",
-            balanceFilter === 'all' ? "ring-2 ring-primary ring-offset-4 ring-offset-[#05070a]" : "opacity-80 hover:opacity-100"
-          )}
         >
-          <Card className="bg-card border-border overflow-hidden relative">
-            {balanceFilter === 'all' && <div className="absolute inset-0 bg-primary/5 animate-pulse" />}
-            <CardContent className="p-4 flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
-                <Users className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Total de Clientes</p>
-                <p className="text-sm font-black uppercase tracking-tighter">{customers.length} Cadastrados</p>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div 
-          onClick={() => setBalanceFilter('debt')}
-          whileHover={{ y: -4 }}
-          className={cn(
-            "cursor-pointer transition-all",
-            balanceFilter === 'debt' ? "ring-2 ring-red-500 ring-offset-4 ring-offset-[#05070a]" : "opacity-80 hover:opacity-100"
-          )}
-        >
-          <Card className="bg-card border-border overflow-hidden relative">
-            {balanceFilter === 'debt' && <div className="absolute inset-0 bg-red-500/5 animate-pulse" />}
-            <CardContent className="p-4 flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center text-red-500 border border-red-500/20">
-                <TrendingDown className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Total em Dívida</p>
-                <p className="text-sm font-black uppercase tracking-tighter text-red-500">R$ {totalDebt.toFixed(2)}</p>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div 
-          onClick={() => setBalanceFilter('credit')}
-          whileHover={{ y: -4 }}
-          className={cn(
-            "cursor-pointer transition-all",
-            balanceFilter === 'credit' ? "ring-2 ring-green-500 ring-offset-4 ring-offset-[#05070a]" : "opacity-80 hover:opacity-100"
-          )}
-        >
-          <Card className="bg-card border-border overflow-hidden relative">
-            {balanceFilter === 'credit' && <div className="absolute inset-0 bg-green-500/5 animate-pulse" />}
-            <CardContent className="p-4 flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center text-green-500 border border-green-500/20">
-                <TrendingUp className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Total em Crédito</p>
-                <p className="text-sm font-black uppercase tracking-tighter text-green-500">R$ {totalCredit.toFixed(2)}</p>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <Card className="bg-card border-border">
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center text-yellow-500 border border-yellow-500/20">
-              <Star className="w-5 h-5" />
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <CardContent className="p-6 flex items-center gap-5 relative z-10">
+            <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 shadow-[0_0_20px_rgba(var(--primary),0.1)] group-hover:scale-110 transition-transform">
+              <Users className="w-6 h-6 text-primary" />
             </div>
             <div>
-              <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Clientes VIP</p>
-              <p className="text-sm font-black uppercase tracking-tighter">Top 5% Ativos</p>
+              <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-1">Total de Clientes</p>
+              <h3 className="text-2xl font-black text-white leading-none">{customers.length} <span className="text-[10px] text-primary font-black">MEMBROS</span></h3>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card 
+          className={cn(
+            "bg-card/30 border-border/50 overflow-hidden relative group cursor-pointer transition-all",
+            balanceFilter === 'debt' && "ring-2 ring-red-500/50 bg-red-500/10"
+          )}
+          onClick={() => setBalanceFilter('debt')}
+        >
+          <div className="absolute inset-0 bg-gradient-to-br from-red-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <CardContent className="p-6 flex items-center gap-5 relative z-10">
+            <div className="w-12 h-12 rounded-2xl bg-red-500/10 flex items-center justify-center border border-red-500/20 shadow-[0_0_20px_rgba(239,68,68,0.1)] group-hover:scale-110 transition-transform">
+              <TrendingDown className="w-6 h-6 text-red-500" />
+            </div>
+            <div>
+              <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-1">Pendentes (Fiado)</p>
+              <h3 className="text-2xl font-black text-red-500 leading-none">R$ {totalDebt.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card 
+          className={cn(
+            "bg-card/30 border-border/50 overflow-hidden relative group cursor-pointer transition-all",
+            balanceFilter === 'credit' && "ring-2 ring-green-500/50 bg-green-500/10"
+          )}
+          onClick={() => setBalanceFilter('credit')}
+        >
+          <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <CardContent className="p-6 flex items-center gap-5 relative z-10">
+            <div className="w-12 h-12 rounded-2xl bg-green-500/10 flex items-center justify-center border border-green-500/20 shadow-[0_0_20px_rgba(34,197,94,0.1)] group-hover:scale-110 transition-transform">
+              <TrendingUp className="w-6 h-6 text-green-500" />
+            </div>
+            <div>
+              <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-1">Total em Crédito</p>
+              <h3 className="text-2xl font-black text-green-500 leading-none">R$ {totalCredit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-card/30 border-orange-500/20 overflow-hidden relative group">
+          <div className="absolute inset-0 bg-gradient-to-br from-orange-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <CardContent className="p-6 flex items-center gap-5 relative z-10">
+            <div className="w-12 h-12 rounded-2xl bg-orange-500/10 flex items-center justify-center border border-orange-500/20 shadow-[0_0_20px_rgba(249,115,22,0.1)]">
+              <Star className="w-6 h-6 text-orange-500" />
+            </div>
+            <div>
+              <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-1">Fidelidade Nexus</p>
+              <h3 className="text-xl font-black text-white leading-none">Top 5% Ativos</h3>
             </div>
           </CardContent>
         </Card>
@@ -276,7 +268,7 @@ export function Customers({ user }: { user: UserProfile }) {
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 md:w-5 md:h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
             <Input 
               placeholder="PESQUISAR CLIENTE..." 
-              className="pl-10 md:pl-12 h-12 md:h-14 bg-card/50 border-border rounded-2xl text-xs md:text-sm font-bold tracking-widest focus:ring-primary/20 focus:border-primary transition-all"
+              className="pl-10 md:pl-12 h-12 md:h-14 bg-card/50 border-border rounded-xl text-xs md:text-sm font-black tracking-widest focus:ring-primary/20 focus:border-primary transition-all uppercase"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />

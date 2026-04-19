@@ -99,40 +99,37 @@ export function Dashboard({ user, setActiveTab }: { user: UserProfile, setActive
 
   return (
     <div className="space-y-8">
-      {/* Quick Actions & Status Bar */}
-      <div className="hidden md:grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-primary/5 border-primary/20 shadow-lg shadow-primary/5">
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center text-primary">
-              <Zap className="w-5 h-5" />
+      {/* Digital Operations Dashboard - Metrics Banner */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+        <Card className="bg-card/30 border-border/50 overflow-hidden relative group cursor-pointer" onClick={() => setIsNewOrderOpen(true)}>
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <CardContent className="p-6 flex items-center gap-5 relative z-10">
+            <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 shadow-[0_0_20px_rgba(59,130,246,0.1)] group-hover:scale-110 transition-transform">
+              <Zap className="w-6 h-6 text-primary" />
             </div>
             <div>
-              <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Ações Rápidas</p>
-              <button 
-                onClick={() => setIsNewOrderOpen(true)}
-                className="text-sm font-black uppercase tracking-tighter hover:text-primary transition-colors"
-              >
-                Abrir Comanda
-              </button>
+              <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-1">Acesso Rápido</p>
+              <h3 className="text-xl font-black text-white leading-none">ABRIR COMANDA</h3>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-card border-border">
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center text-green-500">
-              <Activity className="w-5 h-5" />
+        <Card className="bg-card/30 border-border/50 overflow-hidden relative group">
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <CardContent className="p-6 flex items-center gap-5 relative z-10">
+            <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center border border-blue-500/20 shadow-[0_0_20px_rgba(59,130,246,0.1)]">
+              <Clock className="w-6 h-6 text-blue-500" />
             </div>
             <div className="flex-1">
-              <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Status do Sistema</p>
-              <p className="text-sm font-black uppercase tracking-tighter">Data Hub Ativo</p>
+              <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-1">Atendimento Ativo</p>
+              <h3 className="text-2xl font-black text-white leading-none">{orders.length} <span className="text-[10px] text-blue-500 font-black">ATIVAS</span></h3>
             </div>
             {user.uid === 'e5SB016rBhWuYEKifTIYSCfE5Bq2' && (
               <Button 
                 variant="ghost" 
                 size="icon" 
                 onClick={bootstrapAdmin}
-                className="text-primary/40 hover:text-primary transition-colors"
+                className="text-primary/40 hover:text-primary transition-colors h-8 w-8"
                 title="Sincronizar Admin"
               >
                 <ShieldCheck className="w-4 h-4" />
@@ -141,34 +138,28 @@ export function Dashboard({ user, setActiveTab }: { user: UserProfile, setActive
           </CardContent>
         </Card>
 
-        <Card 
-          className="bg-card border-border cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98]"
-          onClick={() => setSearch('')}
-        >
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500">
-              <Clock className="w-5 h-5" />
+        <Card className="bg-card/30 border-border/50 overflow-hidden relative group cursor-pointer" onClick={() => setActiveTab('finances')}>
+          <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <CardContent className="p-6 flex items-center gap-5 relative z-10">
+            <div className="w-12 h-12 rounded-2xl bg-green-500/10 flex items-center justify-center border border-green-500/20 shadow-[0_0_20px_rgba(34,197,94,0.1)]">
+              <TrendingUp className="w-6 h-6 text-green-500" />
             </div>
             <div>
-              <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Comandas Abertas</p>
-              <p className="text-sm font-black uppercase tracking-tighter">{orders.length} Ativas</p>
+              <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-1">Faturamento Bruto</p>
+              <h3 className="text-2xl font-black text-white leading-none">R$ {orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
             </div>
           </CardContent>
         </Card>
 
-        <Card 
-          className="bg-card border-border cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98]"
-          onClick={() => setActiveTab('finances')}
-        >
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center text-yellow-500">
-              <TrendingUp className="w-5 h-5" />
+        <Card className="bg-card/30 border-border/50 overflow-hidden relative group">
+          <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <CardContent className="p-6 flex items-center gap-5 relative z-10">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center border border-amber-500/20 shadow-[0_0_20px_rgba(245,158,11,0.1)]">
+              <Activity className="w-6 h-6 text-amber-500" />
             </div>
             <div>
-              <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Vendas Hoje</p>
-              <p className="text-sm font-black uppercase tracking-tighter">
-                R$ {orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0).toFixed(2)}
-              </p>
+              <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-1">Fluxo de Dados</p>
+              <h3 className="text-2xl font-black text-white leading-none">NEXUS <span className="text-[10px] text-amber-500 font-black">ONLINE</span></h3>
             </div>
           </CardContent>
         </Card>
@@ -176,10 +167,10 @@ export function Dashboard({ user, setActiveTab }: { user: UserProfile, setActive
 
       <div className="flex flex-col md:flex-row justify-between items-center gap-4 md:gap-6">
         <div className="relative flex-1 w-full group">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-[#0070f3] transition-colors" />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
           <Input 
             placeholder="PESQUISAR MESA OU CLIENTE..." 
-            className="pl-12 h-16 bg-[#0d1117] border-white/5 rounded-2xl text-sm font-bold tracking-widest focus:ring-[#0070f3]/20 focus:border-[#0070f3] transition-all uppercase"
+            className="pl-12 h-14 bg-card/50 border-border rounded-xl text-xs md:text-sm font-bold tracking-widest focus:ring-primary/20 focus:border-primary transition-all uppercase"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />

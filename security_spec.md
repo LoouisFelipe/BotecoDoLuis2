@@ -1,27 +1,26 @@
-# Security Specification - Boteco do Luis
+# Security Specification - Bar do Luis (Nexus/Boteco 360)
 
-## 1. Data Invariants
-- A `game_session` must have a valid `modalityId` and `amount`.
-- A `transaction` must reference a valid `type` (income/expense).
-- User roles can only be updated by the owner or an admin.
-- Only the owner (`louisfelipecabral@gmail.com`) has full root access.
+## Data Invariants
+1. **User Role Integrity:** Only the hardcoded owner or verified admins can promote staff or change roles.
+2. **Financial Traceability:** Every `income` transaction must reference be associated with a valid event (order, game session, or debt payment).
+3. **Identity Verification:** All write operations must verify that the `authorId` or similar field matches the authenticated UID.
+4. **Terminal State Locking:** Closed orders cannot be modified.
+5. **Inventory Consistency:** Product stock updates should ideally be atomic, though current client-side logic updates them after purchase. Rules should at least prevent arbitrary stock changes by non-admins.
+6. **PII Protection:** Customer data (phone, address) restricted to staff and admins.
 
-## 2. The "Dirty Dozen" Payloads (Security Test Cases)
+## The "Dirty Dozen" Payloads
+1. **Identity Spoofing:** Create a game session using another user's `userId`.
+2. **Role Escalation:** A staff user trying to update their own `role` to `admin` in `/users/{userId}`.
+3. **Unauthorized Query:** A guest (unauthenticated) trying to list `game_sessions`.
+4. **Inventory Tampering:** Staff user trying to change a product's price.
+5. **Shadow Field Injection:** Adding `isVerified: true` to a customer document to bypass logic.
+6. **Orphaned Transaction:** Creating a transaction without a `type` or with invalid `amount`.
+7. **Deletion of Closed Records:** Staff trying to delete a `closed_order`.
+8. **Negative Purchase:** Registering a purchase with a negative price/quantity.
+9. **Fake Debt Payment:** Customer trying to reduce their own debt balance.
+10. **ID Poisoning:** Creating a product with a 1MB string as the ID.
+11. **System Field Overwrite:** Modifying `updatedAt` to a past date instead of `serverTimestamp`.
+12. **Anonymous Access:** Any read request without a valid session.
 
-1. **Identity Spoofing**: Attempt to create a game session with a different `userId`.
-2. **Privilege Escalation**: A staff user trying to update their own role to 'admin' in `/users/{uid}`.
-3. **Ghost Field Injection**: Adding an `isVerified: true` field to a `product` by a non-admin.
-4. **State Shortcutting**: Skipping the status flow in `orders`.
-5. **ID Poisoning**: Using a 2KB string as a `sessionId`.
-6. **Negative Amount**: Creating a transaction with a negative amount to manipulate totals (unless logical).
-7. **Orphaned Record**: Creating a game session for a non-existent modality.
-8. **Unauthorized Deletion**: A staff user trying to delete a closed transaction.
-9. **Timestamp Manipulation**: Providing a custom `date` from the client that is not `request.time`.
-10. **PII Blanket Read**: Trying to list all users as a regular staff member.
-11. **Shadow Category**: Creating a product with a category that doesn't exist.
-12. **Recursive Cost Attack**: Performing a query that triggers excessive `get()` calls in rules.
-
-## 3. Test Runner (Mock Tests)
-- `test('game_sessions_list_denied_for_unauthenticated')`: Expect fail.
-- `test('game_sessions_write_denied_for_staff_on_admin_fields')`: Expect fail.
-- `test('owner_bypass')`: Expect success for all operations by owner.
+## Test Strategy (Phase 0)
+We will verify that these payloads return `PERMISSION_DENIED` using the security rules.

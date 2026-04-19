@@ -1,30 +1,35 @@
 import React from 'react';
 import { LayoutDashboard, Receipt, Gamepad2, Package, Users } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { useLocation, useNavigate } from 'react-router-dom';
 
-interface BottomNavProps {
-  activeTab: string;
-  setActiveTab: (tab: string) => void;
-}
+export function BottomNav() {
+  const location = useLocation();
+  const navigate = useNavigate();
 
-export function BottomNav({ activeTab, setActiveTab }: BottomNavProps) {
+  const activeTab = location.pathname === '/' ? 'dashboard' : location.pathname.split('/')[1];
+
   const navItems = [
-    { id: 'dashboard', label: 'CONTROLE', icon: LayoutDashboard, badge: 5 },
-    { id: 'finances', label: 'FINANCEIRO', icon: Receipt },
-    { id: 'games', label: 'BANCA', icon: Gamepad2 },
-    { id: 'inventory', label: 'PRODUTOS', icon: Package, badge: 14 },
-    { id: 'clients', label: 'CLIENTES', icon: Users },
+    { id: 'dashboard', label: 'CONTROLE', icon: LayoutDashboard, badge: 5, path: '/' },
+    { id: 'finances', label: 'FINANCEIRO', icon: Receipt, path: '/finances' },
+    { id: 'games', label: 'BANCA', icon: Gamepad2, path: '/games' },
+    { id: 'inventory', label: 'PRODUTOS', icon: Package, badge: 14, path: '/inventory' },
+    { id: 'clients', label: 'CLIENTES', icon: Users, path: '/clients' },
   ];
+
+  const handleNav = (path: string) => {
+    navigate(path);
+  };
 
   return (
     <nav className="lg:hidden fixed bottom-6 left-4 right-4 z-50">
       <div className="bg-[#0d1117]/80 backdrop-blur-xl border border-white/10 rounded-3xl p-2 flex items-center justify-between shadow-2xl">
         {navItems.map((item) => {
-          const isActive = activeTab === item.id;
+          const isActive = activeTab === item.id || (item.id === 'dashboard' && location.pathname === '/');
           return (
             <button
               key={item.id}
-              onClick={() => setActiveTab(item.id)}
+              onClick={() => handleNav(item.path)}
               className={cn(
                 "relative flex flex-col items-center justify-center flex-1 py-2 transition-all duration-300 rounded-2xl",
                 isActive ? "bg-[#0070f3] text-white shadow-lg shadow-[#0070f3]/20" : "text-muted-foreground"

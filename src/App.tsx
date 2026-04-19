@@ -13,55 +13,55 @@ import { Reports } from './components/Reports';
 import { Games } from './components/Games';
 import { Customers } from './components/Customers';
 import { Suppliers } from './components/Suppliers';
+import { Users as UsersComponent } from './components/Users';
 import { AIAssistant } from './components/AIAssistant';
 import { Settings as SettingsComponent } from './components/Settings';
 import { BottomNav } from './components/BottomNav';
 import { LayoutDashboard, Package, Receipt, BarChart3, LogOut, Shield, Users, Truck, Settings, Gamepad2, User, Sparkles, Activity, Globe, Database, Menu, X as CloseIcon, Plus } from 'lucide-react';
 import { auth } from './firebase';
 import { Button } from './components/ui/button';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useMemo } from 'react';
 import { cn } from './lib/utils';
+import { Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
 
 export default function App() {
-  const [activeTab, setActiveTabState] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
 
-  // Named routes logic / Sync with URL
-  useEffect(() => {
-    const handleHashChange = () => {
-      const hash = window.location.hash.replace('#', '');
-      if (hash) {
-        setActiveTabState(hash);
-      }
-    };
+  // Map routes to tab IDs for backward compatibility inside components if needed
+  const activeTab = useMemo(() => {
+    const path = location.pathname.split('/')[1] || 'dashboard';
+    if (path === 'clients') return 'clients'; // Handle specific mapping if needed
+    return path;
+  }, [location.pathname]);
 
-    window.addEventListener('hashchange', handleHashChange);
-    handleHashChange(); // Initial load
-
-    return () => window.removeEventListener('hashchange', handleHashChange);
-  }, []);
-
-  const setActiveTab = useCallback((tab: string) => {
-    setActiveTabState(tab);
-    window.location.hash = tab;
+  const setActiveTab = (tab: string) => {
+    const path = tab === 'dashboard' ? '/' : `/${tab}`;
+    navigate(path);
     setIsSidebarOpen(false); // Close sidebar on change (mobile)
-  }, []);
+  };
 
   const menuItems = [
-    { id: 'dashboard', label: 'CONTROLE DIÁRIO', icon: LayoutDashboard },
-    { id: 'finances', label: 'FINANCEIRO', icon: Receipt },
-    { id: 'inventory', label: 'PRODUTOS', icon: Package },
-    { id: 'reports', label: 'RELATÓRIOS', icon: BarChart3 },
-    { id: 'ai', label: 'ASSISTENTE IA', icon: Sparkles },
+    { id: 'dashboard', label: 'CONTROLE DIÁRIO', icon: LayoutDashboard, path: '/' },
+    { id: 'finances', label: 'FINANCEIRO', icon: Receipt, path: '/finances' },
+    { id: 'inventory', label: 'PRODUTOS', icon: Package, path: '/inventory' },
+    { id: 'reports', label: 'RELATÓRIOS', icon: BarChart3, path: '/reports' },
+    { id: 'ai', label: 'ASSISTENTE IA', icon: Sparkles, path: '/ai' },
   ];
 
   const secondaryItems = [
-    { id: 'games', label: 'BANCA JOGOS', icon: Gamepad2 },
-    { id: 'clients', label: 'CLIENTES', icon: Users },
-    { id: 'suppliers', label: 'FORNECEDORES', icon: Truck },
-    { id: 'users', label: 'USUÁRIOS', icon: User },
-    { id: 'settings', label: 'AJUSTES', icon: Settings },
+    { id: 'games', label: 'BANCA JOGOS', icon: Gamepad2, path: '/games' },
+    { id: 'clients', label: 'CLIENTES', icon: Users, path: '/clients' },
+    { id: 'suppliers', label: 'FORNECEDORES', icon: Truck, path: '/suppliers' },
+    { id: 'users', label: 'USUÁRIOS', icon: User, path: '/users' },
+    { id: 'settings', label: 'AJUSTES', icon: Settings, path: '/settings' },
   ];
+
+  const allItems = [...menuItems, ...secondaryItems];
+  const currentLabel = allItems.find(i => 
+    i.path === location.pathname || (i.path === '/' && location.pathname === '')
+  )?.label || 'CONTROLE DIÁRIO';
 
   return (
     <ErrorBoundary>
@@ -110,7 +110,7 @@ export default function App() {
                         key={`nav-main-${item.id}`}
                         onClick={() => setActiveTab(item.id)}
                         className={cn(
-                          "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all",
+                          "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all text-left",
                           activeTab === item.id 
                             ? "bg-primary text-white shadow-lg shadow-primary/20" 
                             : "text-sidebar-foreground hover:bg-white/5 hover:text-white"
@@ -129,7 +129,7 @@ export default function App() {
                       key={`nav-sec-${item.id}`}
                       onClick={() => setActiveTab(item.id)}
                       className={cn(
-                        "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all",
+                        "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all text-left",
                         activeTab === item.id 
                           ? "bg-primary text-white shadow-lg shadow-primary/20" 
                           : "text-sidebar-foreground hover:bg-white/5 hover:text-white"
@@ -184,9 +184,7 @@ export default function App() {
                   </div>
                   <div>
                     <h2 className="font-bold text-sm md:text-lg uppercase tracking-wider truncate max-w-[150px] md:max-w-none">
-                      {menuItems.find(i => i.id === activeTab)?.label || 
-                       secondaryItems.find(i => i.id === activeTab)?.label || 
-                       'CONTROLE DIÁRIO'}
+                      {currentLabel}
                     </h2>
                     <p className="text-[9px] md:text-[10px] text-muted-foreground tracking-widest uppercase font-semibold">Data Hub Ativo</p>
                   </div>
@@ -214,19 +212,24 @@ export default function App() {
               </header>
 
               <main className="flex-1 p-4 md:p-8 overflow-y-auto custom-scrollbar">
-                {activeTab === 'dashboard' && <Dashboard user={user} setActiveTab={setActiveTab} />}
-                {activeTab === 'inventory' && <Inventory user={user} setActiveTab={setActiveTab} />}
-                {activeTab === 'finances' && <Finances user={user} setActiveTab={setActiveTab} />}
-                {activeTab === 'reports' && <Reports user={user} setActiveTab={setActiveTab} />}
-                {activeTab === 'ai' && <AIAssistant user={user} />}
-                {activeTab === 'games' && <Games user={user} />}
-                {activeTab === 'clients' && <Customers user={user} />}
-                {activeTab === 'suppliers' && <Suppliers user={user} />}
-                {activeTab === 'settings' && <SettingsComponent user={user} />}
+                <Routes>
+                  <Route path="/" element={<Dashboard user={user} setActiveTab={setActiveTab} />} />
+                  <Route path="/inventory" element={<Inventory user={user} setActiveTab={setActiveTab} />} />
+                  <Route path="/finances" element={<Finances user={user} setActiveTab={setActiveTab} />} />
+                  <Route path="/reports" element={<Reports user={user} setActiveTab={setActiveTab} />} />
+                  <Route path="/ai" element={<AIAssistant user={user} />} />
+                  <Route path="/games" element={<Games user={user} />} />
+                  <Route path="/clients" element={<Customers user={user} />} />
+                  <Route path="/suppliers" element={<Suppliers user={user} />} />
+                  <Route path="/users" element={<UsersComponent user={user} />} />
+                  <Route path="/settings" element={<SettingsComponent user={user} />} />
+                  {/* Fallback */}
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
               </main>
 
               {/* Mobile Navigation */}
-              <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
+              <BottomNav />
             </div>
             <Toaster position="top-right" />
           </div>

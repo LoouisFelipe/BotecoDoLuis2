@@ -3,7 +3,7 @@ import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Input } from './ui/input';
 import { geminiService } from '../services/geminiService';
-import { Bot, Send, Sparkles, Loader2, Shield, Info, Users, Target, Code, Database as DbIcon, CheckCircle, Lock, Zap, Globe, Activity } from 'lucide-react';
+import { Bot, Send, Sparkles, Loader2, Shield, Info, Users, Target, Code, Database as DbIcon, CheckCircle, Lock, Zap, Globe, Activity, Package, TrendingUp, PlusCircle, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import Markdown from 'react-markdown';
 import { collection, getDocs, query, where, Timestamp } from 'firebase/firestore';
@@ -109,137 +109,168 @@ export function AIAssistant({ user }: { user: any }) {
   ];
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between">
+    <div className="space-y-8 max-w-5xl mx-auto animate-in fade-in duration-500">
+      <div className="flex flex-col md:flex-row items-center justify-between gap-6 pb-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">ASSISTENTE IA</h1>
-          <p className="text-muted-foreground">Inteligência artificial para potencializar o Boteco do Luis</p>
+          <h1 className="text-3xl font-black tracking-tighter uppercase mb-1">Nexus Intelligence</h1>
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">IA Estratégica para o PDV Noturno</p>
         </div>
-        <div className="bg-primary/10 p-3 rounded-full">
-          <Bot className="w-8 h-8 text-primary" />
+        <div className="flex items-center gap-3">
+          <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 shadow-xl shadow-primary/10">
+            <Bot className="w-8 h-8 text-primary" />
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="md:col-span-2 space-y-6">
-          <Card className="border-border bg-card/50">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm uppercase tracking-wider flex items-center gap-2">
+      {/* AI Context Insights - Metrics Banner */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+        <Card className="bg-card/30 border-border/50 overflow-hidden relative group">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <CardContent className="p-6 flex items-center gap-5 relative z-10">
+            <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 shadow-[0_0_20px_rgba(var(--primary),0.1)]">
+              <Package className="w-6 h-6 text-primary" />
+            </div>
+            <div>
+              <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-1">Stock Context</p>
+              <h3 className="text-2xl font-black text-white leading-none">{context?.productCount || '...'} <span className="text-[10px] text-primary font-black">ITEMS</span></h3>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-card/30 border-border/50 overflow-hidden relative group">
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <CardContent className="p-6 flex items-center gap-5 relative z-10">
+            <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center border border-blue-500/20 shadow-[0_0_20px_rgba(59,130,246,0.1)]">
+              <Users className="w-6 h-6 text-blue-500" />
+            </div>
+            <div>
+              <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-1">Active Flow</p>
+              <h3 className="text-2xl font-black text-white leading-none">{context?.openOrdersCount || '...'} <span className="text-[10px] text-blue-500 font-black">CLIENTS</span></h3>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-card/30 border-green-500/20 overflow-hidden relative group">
+          <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <CardContent className="p-6 flex items-center gap-5 relative z-10">
+            <div className="w-12 h-12 rounded-2xl bg-green-500/10 flex items-center justify-center border border-green-500/20 shadow-[0_0_20px_rgba(34,197,94,0.1)]">
+              <TrendingUp className="w-6 h-6 text-green-500" />
+            </div>
+            <div>
+              <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-1">Today's Pulse</p>
+              <h3 className="text-2xl font-black text-white leading-none">R$ {context?.todayRevenue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}</h3>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 space-y-8">
+          <Card className="bg-card/30 border-border/50 overflow-hidden rounded-3xl">
+            <CardHeader className="bg-white/[0.02] border-b border-white/5 p-6">
+              <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-primary" />
-                Modo de Inteligência
+                Intelligence configuration
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-2">
+            <CardContent className="p-6 space-y-8">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 {[
                   { id: 'normal', name: 'Normal', icon: Zap, color: 'text-blue-500', desc: 'Rápido e eficiente' },
-                  { id: 'search', name: 'Pesquisa Google', icon: Globe, color: 'text-green-500', desc: 'Dados atualizados da web' },
-                  { id: 'thinking', name: 'Análise Profunda', icon: Activity, color: 'text-orange-500', desc: 'Raciocínio complexo' },
+                  { id: 'search', name: 'Search grounded', icon: Globe, color: 'text-green-500', desc: 'Dados da web' },
+                  { id: 'thinking', name: 'Deep Thinking', icon: Activity, color: 'text-orange-500', desc: 'Raciocínio complexo' },
                 ].map((mode) => (
                   <button
                     key={mode.id}
                     onClick={() => setAiMode(mode.id as any)}
                     className={cn(
-                      "flex-1 flex flex-col items-center gap-2 p-3 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all border",
+                      "flex flex-col items-start gap-4 p-5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border",
                       aiMode === mode.id
-                        ? "bg-primary/20 border-primary text-primary shadow-sm"
-                        : "bg-white/5 border-transparent text-muted-foreground hover:bg-white/10"
+                        ? "bg-primary/10 border-primary/40 text-primary shadow-lg shadow-primary/5"
+                        : "bg-white/5 border-white/5 text-muted-foreground hover:bg-white/10"
                     )}
                   >
-                    <mode.icon className={cn("w-4 h-4", aiMode === mode.id ? mode.color : "text-muted-foreground")} />
-                    <span>{mode.name}</span>
-                    <span className="text-[8px] opacity-60 normal-case font-medium">{mode.desc}</span>
+                    <mode.icon className={cn("w-6 h-6", aiMode === mode.id ? mode.color : "text-muted-foreground")} />
+                    <div className="text-left">
+                      <p className="leading-none mb-1">{mode.name}</p>
+                      <p className="text-[8px] opacity-60 normal-case font-medium">{mode.desc}</p>
+                    </div>
                   </button>
                 ))}
+              </div>
+
+              <div className="space-y-3">
+                <p className="text-[10px] font-black uppercase tracking-widest text-[#0070f3] ml-1">Especialista Ativo</p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {AGENTS.map((agent) => (
+                    <button
+                      key={agent.id}
+                      onClick={() => setSelectedAgent(agent.id)}
+                      className={cn(
+                        "flex items-center gap-2 px-4 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all border",
+                        selectedAgent === agent.id
+                          ? "bg-primary text-white border-primary shadow-lg shadow-primary/20"
+                          : "bg-white/5 border-white/5 text-muted-foreground hover:bg-white/10"
+                      )}
+                    >
+                      <agent.icon className="w-4 h-4" />
+                      <span className="truncate">{agent.name.split(' ')[0]}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border-border bg-card/50">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm uppercase tracking-wider flex items-center gap-2">
-                <Users className="w-4 h-4 text-primary" />
-                Selecione o Especialista
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-2">
-                {AGENTS.map((agent) => (
-                  <button
-                    key={agent.id}
-                    onClick={() => setSelectedAgent(agent.id)}
-                    className={cn(
-                      "flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all border",
-                      selectedAgent === agent.id
-                        ? "bg-primary/20 border-primary text-primary shadow-sm"
-                        : "bg-white/5 border-transparent text-muted-foreground hover:bg-white/10"
-                    )}
-                  >
-                    <agent.icon className={cn("w-3 h-3", selectedAgent === agent.id ? agent.color : "text-muted-foreground")} />
-                    {agent.name}
-                  </button>
-                ))}
+          <Card className="bg-primary/20 border-primary/30 rounded-[32px] overflow-hidden shadow-2xl">
+            <CardHeader className="p-8 pb-4">
+              <div className="flex gap-4">
+                <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center shadow-inner">
+                  {(() => {
+                    const AgentIcon = AGENTS.find(a => a.id === selectedAgent)?.icon || Bot;
+                    return <AgentIcon className={cn("w-8 h-8", AGENTS.find(a => a.id === selectedAgent)?.color)} />;
+                  })()}
+                </div>
+                <div>
+                  <CardTitle className="text-2xl font-black uppercase tracking-tighter mb-1">
+                    Consultar {AGENTS.find(a => a.id === selectedAgent)?.name}
+                  </CardTitle>
+                  <CardDescription className="text-primary font-bold text-[10px] uppercase tracking-widest opacity-70">
+                    {AGENTS.find(a => a.id === selectedAgent)?.description}
+                  </CardDescription>
+                </div>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-primary/20 bg-card/50 backdrop-blur-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                {(() => {
-                  const AgentIcon = AGENTS.find(a => a.id === selectedAgent)?.icon || Bot;
-                  return <AgentIcon className={cn("w-5 h-5", AGENTS.find(a => a.id === selectedAgent)?.color)} />;
-                })()}
-                Consultar {AGENTS.find(a => a.id === selectedAgent)?.name}
-              </CardTitle>
-              <CardDescription>{AGENTS.find(a => a.id === selectedAgent)?.description}</CardDescription>
             </CardHeader>
-            <CardContent>
-              <form onSubmit={(e) => handleAsk(e)} className="flex gap-2">
+            <CardContent className="p-8 pt-4">
+              <form onSubmit={(e) => handleAsk(e)} className="flex gap-3">
                 <Input
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
-                  placeholder={`Perguntar ao ${AGENTS.find(a => a.id === selectedAgent)?.name}...`}
-                  className="flex-1"
+                  placeholder={`Digite sua dúvida estratégica aqui...`}
+                  className="h-16 flex-1 bg-card/80 border-white/10 focus:ring-primary/20 focus:border-primary text-lg font-bold rounded-2xl placeholder:opacity-50"
                   disabled={loading}
                 />
-                <Button type="submit" disabled={loading || !prompt.trim()} aria-label="Enviar pergunta">
-                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                <Button 
+                  type="submit" 
+                  disabled={loading || !prompt.trim()} 
+                  className="w-16 h-16 rounded-2xl bg-primary hover:bg-primary/90 text-white shadow-xl shadow-primary/20 active:scale-95 transition-all"
+                >
+                  {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : <Send className="w-6 h-6" />}
                 </Button>
               </form>
-              
-              {context && (
-                <div className="mt-4 flex items-center gap-4 text-[10px] font-bold tracking-widest uppercase text-muted-foreground/60">
-                  <div className="flex items-center gap-1">
-                    <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                    {context.productCount} PRODUTOS
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                    {context.openOrdersCount} COMANDAS ATIVAS
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-1.5 h-1.5 rounded-full bg-yellow-500" />
-                    HOJE: R$ {context.todayRevenue.toFixed(2)}
-                  </div>
-                </div>
-              )}
             </CardContent>
           </Card>
 
           {response && (
-            <Card className="border-border bg-card/30">
-              <CardHeader className="pb-2">
-                <div className="flex items-center gap-2 text-primary font-bold text-xs tracking-widest uppercase">
-                  {(() => {
-                    const AgentIcon = AGENTS.find(a => a.id === selectedAgent)?.icon || Bot;
-                    return <AgentIcon className={cn("w-4 h-4", AGENTS.find(a => a.id === selectedAgent)?.color)} />;
-                  })()}
-                  Análise do {AGENTS.find(a => a.id === selectedAgent)?.name}
+            <Card className="bg-card/30 border-border/50 rounded-[32px] overflow-hidden animate-in fade-in slide-in-from-top-4 duration-700">
+              <CardHeader className="bg-white/[0.02] border-b border-white/5 p-8 pb-4">
+                <div className="flex items-center gap-3 text-primary font-black text-[10px] tracking-[0.2em] uppercase">
+                  <Activity className="w-4 h-4" />
+                  Nexus Analysis Report
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="prose prose-invert max-w-none text-sm leading-relaxed">
+              <CardContent className="p-8">
+                <div className="prose prose-invert max-w-none prose-p:text-sm prose-p:leading-relaxed prose-p:text-white/80 prose-headings:font-black prose-headings:uppercase prose-headings:tracking-widest">
                   <Markdown>{response}</Markdown>
                 </div>
               </CardContent>
@@ -247,38 +278,38 @@ export function AIAssistant({ user }: { user: any }) {
           )}
         </div>
 
-        <div className="space-y-6">
-          <Card className="border-border bg-card/50">
-            <CardHeader>
-              <CardTitle className="text-sm uppercase tracking-wider">Ações Rápidas</CardTitle>
+        <div className="space-y-8">
+          <Card className="bg-card/30 border-border/50 rounded-3xl overflow-hidden">
+            <CardHeader className="p-6 pb-2">
+              <CardTitle className="text-xs font-black uppercase tracking-widest text-muted-foreground">Sugestões de Análise</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
+            <CardContent className="p-6 space-y-3">
               {quickActions.map((action, i) => (
-                <Button
+                <button
                   key={`quick-action-${i}`}
-                  variant="outline"
-                  className="w-full justify-start text-xs text-left h-auto py-3 px-4 hover:bg-primary/5 hover:text-primary transition-all"
+                  className="w-full text-left p-4 rounded-2xl bg-white/[0.02] hover:bg-white/5 border border-white/5 hover:border-primary/20 transition-all group flex items-start gap-3"
                   onClick={() => {
                     setPrompt(action);
                     handleAsk(undefined, action);
                   }}
                 >
-                  {action}
-                </Button>
+                  <PlusCircle className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors mt-0.5" />
+                  <span className="text-xs font-bold text-muted-foreground group-hover:text-white transition-colors">{action}</span>
+                </button>
               ))}
             </CardContent>
           </Card>
 
-          <Card className="bg-primary/5 border-primary/20">
-            <CardContent className="pt-6">
-              <div className="flex items-start gap-3">
-                <div className="bg-primary/20 p-2 rounded-lg">
-                  <Shield className="w-4 h-4 text-primary" />
+          <Card className="bg-primary/10 border-primary/20 border-dashed rounded-3xl">
+            <CardContent className="p-6">
+              <div className="flex items-start gap-4">
+                <div className="bg-primary/20 p-2.5 rounded-xl border border-primary/30">
+                  <ShieldCheck className="w-5 h-5 text-primary" />
                 </div>
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-wider mb-1">Dica do Especialista</p>
-                  <p className="text-[11px] text-muted-foreground leading-relaxed">
-                    A IA analisa tendências de mercado para bares. Use-a para planejar seu estoque com base em feriados e eventos esportivos.
+                  <p className="text-xs font-black uppercase tracking-widest mb-1">Nexus Security</p>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed font-bold">
+                    Suas consultas são privadas e protegidas. A IA atua como um consultor interno do bar.
                   </p>
                 </div>
               </div>

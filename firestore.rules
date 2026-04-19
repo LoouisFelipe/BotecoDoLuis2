@@ -3,38 +3,48 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ===============================================================
-    // Helper Functions
+    // Global Catch-all for Safety
+    // ===============================================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ===============================================================
+    // Shared Helper Functions
     // ===============================================================
     
-    function authenticated() {
+    function isSignedIn() {
       return request.auth != null;
     }
 
-    function isOwner() {
-      return authenticated() && 
-        (request.auth.token.email == "louisfelipecabral@gmail.com" || 
-         request.auth.uid == "e5SB016rBhWuYEKifTIYSCfE5Bq2");
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
     }
 
-    function getUserData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    function isOwner() {
+      return isSignedIn() && (
+        request.auth.uid == "e5SB016rBhWuYEKifTIYSCfE5Bq2" || 
+        request.auth.token.email == "louisfelipecabral@gmail.com"
+      );
+    }
+
+    function getUserData(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data;
     }
 
     function isAdmin() {
       return isOwner() || (
-        authenticated() && 
-        request.auth.token.email_verified == true && 
+        isVerified() && 
         exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-        getUserData().role == 'admin'
+        getUserData(request.auth.uid).role == 'admin'
       );
     }
 
     function isStaff() {
       return isAdmin() || (
-        authenticated() && 
-        request.auth.token.email_verified == true && 
+        isVerified() && 
         exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-        getUserData().role == 'staff'
+        getUserData(request.auth.uid).role == 'staff'
       );
     }
 
@@ -51,100 +61,119 @@ service cloud.firestore {
     }
 
     // ===============================================================
+    // Validation Blueprints
+    // ===============================================================
+
+    function isValidGameSession(data) {
+      return data.modalityId is string && isValidId(data.modalityId) &&
+             data.amount is number &&
+             data.userId == request.auth.uid &&
+             data.userName is string &&
+             data.date is timestamp;
+    }
+
+    function isValidTransaction(data) {
+      return data.amount is number && data.amount >= 0 &&
+             data.type in ['income', 'expense'] &&
+             data.category is string &&
+             data.date is timestamp;
+    }
+
+    // ===============================================================
     // Collection Rules
     // ===============================================================
 
     match /users/{userId} {
-      allow read: if authenticated() && (request.auth.uid == userId || isAdmin());
-      allow create, update: if authenticated() && (request.auth.uid == userId || isAdmin());
-      // Prevent role escalation from non-admins
-      allow update: if authenticated() && request.auth.uid == userId && !isAdmin() && !incoming().diff(existing()).affectedKeys().hasAny(['role']);
+      allow read: if isVerified() && (request.auth.uid == userId || isAdmin());
+      allow create: if isVerified() && request.auth.uid == userId;
+      allow update: if isVerified() && (
+        isAdmin() || (
+          request.auth.uid == userId && 
+          !incoming().diff(existing()).affectedKeys().hasAny(['role'])
+        )
+      );
     }
 
-    match /categories/{categoryId} {
-      allow read: if isStaff();
-      allow write: if isAdmin();
-    }
-
-    match /products/{productId} {
-      allow read: if isStaff();
-      allow write: if isAdmin();
-    }
-
-    match /customers/{customerId} {
-      allow read: if isStaff();
-      allow write: if isStaff();
-    }
-
-    match /suppliers/{supplierId} {
-      allow read: if isStaff();
-      allow write: if isAdmin();
+    match /game_sessions/{sessionId} {
+      // Allow all verified users to list/get game sessions for transparency in the bar
+      allow read: if isVerified();
+      
+      allow create: if isStaff() && isValidGameSession(incoming()) && (
+        incoming().keys().hasAll(['modalityId', 'modalityName', 'amount', 'date', 'userId', 'userName']) &&
+        incoming().keys().size() >= 6
+      );
+      allow update, delete: if isAdmin() && isValidId(sessionId);
     }
 
     match /game_modalities/{gameId} {
       allow read: if isStaff();
-      allow write: if isAdmin();
+      allow write: if isAdmin() && isValidId(gameId);
     }
 
-    match /game_sessions/{sessionId} {
-      allow list, get: if isStaff();
-      allow create: if isStaff();
-      allow update, delete: if isAdmin();
-    }
-
-    match /orders/{orderId} {
+    match /products/{productId} {
       allow read: if isStaff();
-      allow create, update: if isStaff();
-      allow delete: if isAdmin();
+      allow write: if isAdmin() && isValidId(productId);
+    }
+
+    match /categories/{categoryId} {
+      allow read: if isStaff();
+      allow write: if isAdmin() && isValidId(categoryId);
+    }
+
+    match /customers/{customerId} {
+      allow read: if isStaff();
+      allow write: if isStaff() && isValidId(customerId);
+    }
+
+    match /suppliers/{supplierId} {
+      allow read: if isStaff();
+      allow write: if isAdmin() && isValidId(supplierId);
+    }
+
+    match /transactions/{transactionId} {
+      allow list: if isStaff();
+      allow get: if isStaff() && isValidId(transactionId);
+      allow create: if isStaff() && isValidTransaction(incoming());
+      allow update, delete: if isAdmin() && isValidId(transactionId);
+    }
+
+    match /expenses/{expenseId} {
+      allow list: if isStaff();
+      allow get: if isStaff() && isValidId(expenseId);
+      allow create: if isStaff() && isValidTransaction(incoming());
+      allow update, delete: if isAdmin() && isValidId(expenseId);
+    }
+
+    match /open_orders/{orderId} {
+      allow list: if isStaff();
+      allow get: if isStaff() && isValidId(orderId);
+      allow create, update: if isStaff() && isValidId(orderId);
+      allow delete: if isAdmin() && isValidId(orderId);
     }
 
     match /closed_orders/{orderId} {
       allow read: if isStaff();
-      allow write: if isAdmin();
+      allow write: if isAdmin() && isValidId(orderId);
     }
 
-    match /open_orders/{orderId} {
-      allow read: if isStaff();
-      allow create, update: if isStaff();
-      allow delete: if isAdmin();
-    }
-
-    match /transactions/{transactionId} {
-      allow read: if isStaff();
-      allow create: if isStaff();
-      allow update, delete: if isAdmin();
-    }
-
-    match /expenses/{expenseId} {
-      allow read: if isStaff();
-      allow create: if isStaff();
-      allow update, delete: if isAdmin();
+    match /recurring_expenses/{expenseId} {
+      allow read, write: if isAdmin() && isValidId(expenseId);
     }
 
     match /purchases/{purchaseId} {
       allow read: if isStaff();
-      allow create: if isStaff();
-      allow update, delete: if isAdmin();
-    }
-
-    match /recurring_expenses/{expenseId} {
-      allow read: if isAdmin();
-      allow write: if isAdmin();
-    }
-
-    match /bi_summaries/{summaryId} {
-      allow read: if isStaff();
-      allow write: if isAdmin(); 
+      allow create: if isStaff() && isValidId(purchaseId);
+      allow update, delete: if isAdmin() && isValidId(purchaseId);
     }
 
     match /payment_fees/{feeId} {
       allow read: if isStaff();
-      allow write: if isAdmin();
+      allow write: if isAdmin() && isValidId(feeId);
     }
 
-    // Global Catch-all for Safety
-    match /{document=**} {
-      allow read, write: if isOwner();
+    match /bi_summaries/{summaryId} {
+      allow read: if isStaff();
+      allow write: if isAdmin() && isValidId(summaryId);
     }
   }
 }

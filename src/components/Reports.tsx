@@ -133,58 +133,65 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
     <div className="space-y-8">
       {monthlySummary && (
         <Card 
-          className="border-primary/20 bg-primary/5 rounded-2xl overflow-hidden cursor-pointer hover:bg-primary/10 transition-all active:scale-[0.99]"
+          className="bg-primary/20 border-primary/30 rounded-2xl overflow-hidden cursor-pointer relative group transition-all active:scale-[0.99]"
           onClick={() => setActiveTab('finances')}
         >
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <Activity className="w-4 h-4 text-primary" />
-              <CardTitle className="text-xs font-bold uppercase tracking-widest text-primary">Resumo Consolidado: {monthlySummary.month}</CardTitle>
+          <div className="absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-transparent via-primary to-transparent opacity-50" />
+          <CardHeader className="pb-4 border-b border-primary/10">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center border border-primary/30">
+                <Sparkles className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <CardTitle className="text-sm font-black uppercase tracking-widest text-primary">Nexus Insights — {monthlySummary.month}</CardTitle>
+                <p className="text-[10px] font-bold text-primary/60 uppercase tracking-widest">Resumo Consolidado Mensal</p>
+              </div>
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div>
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Vendas</p>
-                <p className="text-xl font-black">{monthlySummary.salesCount}</p>
+          <CardContent className="pt-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
+              <div className="space-y-1">
+                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Volume de Vendas</p>
+                <p className="text-2xl font-black text-white">{monthlySummary.salesCount} <span className="text-[10px] text-primary">ORDENS</span></p>
               </div>
-              <div>
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Receita</p>
-                <p className="text-xl font-black text-green-500">R$ {monthlySummary.totalRevenue?.toFixed(2)}</p>
+              <div className="space-y-1">
+                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Receita Bruta</p>
+                <p className="text-2xl font-black text-green-500">R$ {monthlySummary.totalRevenue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
               </div>
-              <div>
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Despesas</p>
-                <p className="text-xl font-black text-red-500">R$ {monthlySummary.totalExpenses?.toFixed(2)}</p>
+              <div className="space-y-1">
+                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Custos & Despesas</p>
+                <p className="text-2xl font-black text-red-500">R$ {monthlySummary.totalExpenses?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
               </div>
-              <div>
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Saldo</p>
-                <p className="text-xl font-black text-primary">R$ {(monthlySummary.totalRevenue - monthlySummary.totalExpenses).toFixed(2)}</p>
+              <div className="space-y-1">
+                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Margem Líquida</p>
+                <p className="text-2xl font-black text-primary">R$ {(monthlySummary.totalRevenue - monthlySummary.totalExpenses).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
               </div>
             </div>
           </CardContent>
         </Card>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* 7-Day Performance Banner */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         <StatCard 
-          title="Receita Total (7d)" 
+          title="Receita (7d)" 
           value={stats.income} 
-          icon={<TrendingUp className="text-green-500" />} 
-          color="text-green-500" 
+          icon={<TrendingUp className="w-6 h-6 text-green-500" />} 
+          variant="green"
           onClick={() => setActiveTab('finances')}
         />
         <StatCard 
-          title="Despesa Total (7d)" 
+          title="Despesa (7d)" 
           value={stats.expense} 
-          icon={<TrendingDown className="text-red-500" />} 
-          color="text-red-500" 
+          icon={<TrendingDown className="w-6 h-6 text-red-500" />} 
+          variant="red"
           onClick={() => setActiveTab('finances')}
         />
         <StatCard 
           title="Lucro Líquido (7d)" 
           value={stats.profit} 
-          icon={<DollarSign className="text-primary" />} 
-          color="text-primary" 
+          icon={<DollarSign className="w-6 h-6 text-primary" />} 
+          variant="blue"
           onClick={() => setActiveTab('finances')}
         />
       </div>
@@ -355,27 +362,38 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
   );
 }
 
-function StatCard({ title, value, icon, color, onClick }: { title: string, value: number, icon: React.ReactNode, color: string, onClick?: () => void }) {
+function StatCard({ title, value, icon, variant, onClick }: { title: string, value: number, icon: React.ReactNode, variant: 'green' | 'red' | 'blue', onClick?: () => void }) {
+  const variantStyles = {
+    green: "from-green-500/5 shadow-[0_0_20px_rgba(34,197,94,0.1)] text-green-500",
+    red: "from-red-500/5 shadow-[0_0_20px_rgba(239,68,68,0.1)] text-red-500",
+    blue: "from-primary/5 shadow-[0_0_20px_rgba(var(--primary),0.1)] text-primary"
+  };
+
   return (
     <Card 
       className={cn(
-        "border-border bg-card/50 rounded-2xl overflow-hidden group hover:border-primary/50 transition-all",
+        "bg-card/30 border-border/50 overflow-hidden relative group transition-all",
         onClick && "cursor-pointer active:scale-95"
       )}
       onClick={onClick}
     >
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">{title}</CardTitle>
-        <div className="p-2 rounded-lg bg-white/5 group-hover:bg-primary/10 transition-colors">
+      <div className={cn("absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity", variantStyles[variant].split(' ')[0])} />
+      <CardContent className="p-6 flex items-center gap-5 relative z-10">
+        <div className={cn(
+          "w-12 h-12 rounded-2xl flex items-center justify-center border transition-transform group-hover:scale-110",
+          variant === 'green' ? "bg-green-500/10 border-green-500/20" : 
+          variant === 'red' ? "bg-red-500/10 border-red-500/20" : 
+          "bg-primary/10 border-primary/20",
+          variantStyles[variant].split(' ')[1]
+        )}>
           {icon}
         </div>
-      </CardHeader>
-      <CardContent>
-        <div className={cn("text-3xl font-black tracking-tight", color)}>
-          <span className="text-sm font-bold mr-1">R$</span>
-          {(value || 0).toFixed(2)}
+        <div>
+          <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-1">{title}</p>
+          <h3 className={cn("text-2xl font-black leading-none", variantStyles[variant].split(' ').slice(2).join(' '))}>
+            R$ {value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+          </h3>
         </div>
-        <p className="text-[10px] text-muted-foreground mt-1 font-bold tracking-widest uppercase">Consolidado Semanal</p>
       </CardContent>
     </Card>
   );

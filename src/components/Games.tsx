@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { ConfirmDialog } from './ConfirmDialog';
 import { format } from 'date-fns';
 import { useGameState } from '../hooks/useGameState';
+import { cn } from '../lib/utils';
 
 export function Games({ user }: { user: UserProfile }) {
   const {
@@ -59,12 +60,54 @@ export function Games({ user }: { user: UserProfile }) {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
+      {/* Game Insights - Metrics Banner */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+        <Card className="bg-card/30 border-border/50 overflow-hidden relative group">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <CardContent className="p-6 flex items-center gap-5 relative z-10">
+            <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 shadow-[0_0_20px_rgba(var(--primary),0.1)] group-hover:scale-110 transition-transform">
+              <Gamepad2 className="w-6 h-6 text-primary" />
+            </div>
+            <div>
+              <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-1">Modalidades Ativas</p>
+              <h3 className="text-2xl font-black text-white leading-none">{modalities.filter(m => m.active).length} <span className="text-[10px] text-primary font-black">GAMING</span></h3>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-card/30 border-border/50 overflow-hidden relative group">
+          <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <CardContent className="p-6 flex items-center gap-5 relative z-10">
+            <div className="w-12 h-12 rounded-2xl bg-green-500/10 flex items-center justify-center border border-green-500/20 shadow-[0_0_20px_rgba(34,197,94,0.1)] group-hover:scale-110 transition-transform">
+              <TrendingUp className="w-6 h-6 text-green-500" />
+            </div>
+            <div>
+              <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-1">Entradas de Hoje</p>
+              <h3 className="text-2xl font-black text-white leading-none">R$ {sessions.filter(s => s.amount > 0).reduce((sum, s) => sum + s.amount, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-card/30 border-orange-500/20 overflow-hidden relative group cursor-pointer">
+          <div className="absolute inset-0 bg-gradient-to-br from-orange-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <CardContent className="p-6 flex items-center gap-5 relative z-10">
+            <div className="w-12 h-12 rounded-2xl bg-orange-500/10 flex items-center justify-center border border-orange-500/20 shadow-[0_0_20px_rgba(249,115,22,0.1)] group-hover:scale-110 transition-transform">
+              <Trophy className="w-6 h-6 text-orange-500" />
+            </div>
+            <div>
+              <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-1">Movimentos Realizados</p>
+              <h3 className="text-2xl font-black text-white leading-none">{sessions.length} <span className="text-[10px] text-orange-500 font-black">SESSÕES</span></h3>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       <div className="flex flex-col md:flex-row justify-between items-center gap-6">
         <div className="relative flex-1 w-full max-w-2xl group">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 md:w-5 md:h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
           <Input 
             placeholder="PESQUISAR MODALIDADE..." 
-            className="pl-12 h-14 bg-[#0d1117] border-white/5 rounded-2xl text-sm font-bold tracking-widest focus:ring-primary/20 focus:border-primary transition-all uppercase"
+            className="pl-10 md:pl-12 h-12 md:h-14 bg-card/50 border-border rounded-xl text-xs md:text-sm font-black tracking-widest focus:ring-primary/20 focus:border-primary transition-all uppercase"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -352,8 +395,4 @@ export function Games({ user }: { user: UserProfile }) {
       />
     </div>
   );
-}
-
-function cn(...inputs: any[]) {
-  return inputs.filter(Boolean).join(' ');
 }

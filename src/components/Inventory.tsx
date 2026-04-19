@@ -241,62 +241,65 @@ export function Inventory({ user, setActiveTab }: { user: UserProfile, setActive
 
   return (
     <div className="space-y-8">
-      {/* Inventory Insights */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Inventory Insights - Metrics Banner */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         <Card 
           className={cn(
-            "bg-card border-border cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98]",
-            stockFilter === 'critical' && "ring-2 ring-red-500/50 bg-red-500/5"
+            "bg-card/30 border-border/50 overflow-hidden relative group cursor-pointer transition-all",
+            stockFilter === 'critical' && "ring-2 ring-red-500/50 bg-red-500/10"
           )}
           onClick={() => setStockFilter(stockFilter === 'critical' ? 'all' : 'critical')}
         >
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center text-red-500">
-              <AlertCircle className="w-5 h-5" />
+          <div className="absolute inset-0 bg-gradient-to-br from-red-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <CardContent className="p-6 flex items-center gap-5 relative z-10">
+            <div className="w-12 h-12 rounded-2xl bg-red-500/10 flex items-center justify-center border border-red-500/20 shadow-[0_0_20px_rgba(239,68,68,0.1)] group-hover:scale-110 transition-transform">
+              <AlertCircle className={cn("w-6 h-6", stockFilter === 'critical' ? "text-red-400" : "text-red-500")} />
             </div>
             <div>
-              <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Estoque Crítico</p>
-              <p className="text-sm font-black uppercase tracking-tighter">
-                {products.filter(p => (p.stock || 0) <= (p.minStock || 5)).length} Itens em Alerta
-              </p>
+              <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-1">Estoque Crítico</p>
+              <h3 className="text-2xl font-black text-white leading-none">
+                {products.filter(p => (p.stock || 0) <= (p.minStock || 5)).length} <span className="text-[10px] text-red-500 font-black">ALERTAS</span>
+              </h3>
             </div>
           </CardContent>
         </Card>
 
         <Card 
           className={cn(
-            "bg-card border-border cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98]",
-            stockFilter === 'all' && !search && "ring-2 ring-blue-500/50 bg-blue-500/5"
+            "bg-card/30 border-border/50 overflow-hidden relative group cursor-pointer transition-all",
+            stockFilter === 'all' && !search && "ring-2 ring-blue-500/50 bg-blue-500/10"
           )}
           onClick={() => {
             setStockFilter('all');
             setSearch('');
           }}
         >
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500">
-              <Package className="w-5 h-5" />
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <CardContent className="p-6 flex items-center gap-5 relative z-10">
+            <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center border border-blue-500/20 shadow-[0_0_20px_rgba(59,130,246,0.1)]">
+              <Package className="w-6 h-6 text-blue-500" />
             </div>
             <div>
-              <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Total de Produtos</p>
-              <p className="text-sm font-black uppercase tracking-tighter">{products.length} Cadastrados</p>
+              <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-1">Total Inventário</p>
+              <h3 className="text-2xl font-black text-white leading-none">{products.length} <span className="text-[10px] text-blue-500 font-black">PRODUTOS</span></h3>
             </div>
           </CardContent>
         </Card>
 
         <Card 
-          className="bg-card border-border cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98]"
+          className="bg-card/30 border-border/50 overflow-hidden relative group cursor-pointer"
           onClick={() => setActiveTab('finances')}
         >
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center text-green-500">
-              <TrendingUp className="w-5 h-5" />
+          <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <CardContent className="p-6 flex items-center gap-5 relative z-10">
+            <div className="w-12 h-12 rounded-2xl bg-green-500/10 flex items-center justify-center border border-green-500/20 shadow-[0_0_20_rgba(34,197,94,0.1)]">
+              <TrendingUp className="w-6 h-6 text-green-500" />
             </div>
             <div>
-              <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Valor em Estoque</p>
-              <p className="text-sm font-black uppercase tracking-tighter">
-                R$ {products.reduce((sum, p) => sum + ((p.cost || 0) * (p.stock || 0)), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </p>
+              <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-1">Patrimônio Líquido (Estoque)</p>
+              <h3 className="text-2xl font-black text-white leading-none">
+                R$ {products.reduce((sum, p) => sum + ((p.cost || 0) * (p.stock || 0)), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </h3>
             </div>
           </CardContent>
         </Card>
@@ -307,7 +310,7 @@ export function Inventory({ user, setActiveTab }: { user: UserProfile, setActive
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 md:w-5 md:h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
           <Input 
             placeholder="PESQUISAR PRODUTO..." 
-            className="pl-10 md:pl-12 h-12 md:h-14 bg-card/50 border-border rounded-xl text-xs md:text-sm font-bold tracking-widest focus:ring-primary/20 focus:border-primary transition-all"
+            className="pl-10 md:pl-12 h-12 md:h-14 bg-card/50 border-border rounded-xl text-xs md:text-sm font-bold tracking-widest focus:ring-primary/20 focus:border-primary transition-all uppercase"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
