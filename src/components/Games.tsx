@@ -32,6 +32,7 @@ export function Games({ user }: { user: UserProfile }) {
   // Result Form states
   const [selectedModality, setSelectedModality] = useState<GameModality | null>(null);
   const [resultAmount, setResultAmount] = useState('');
+  const [gameEntryType, setGameEntryType] = useState<'debit' | 'credit'>('debit');
 
   useEffect(() => {
     const unsubModalities = onSnapshot(collection(db, 'game_modalities'), (snapshot) => {
@@ -78,11 +79,13 @@ export function Games({ user }: { user: UserProfile }) {
     if (!selectedModality || !resultAmount) return;
     
     try {
-      const amount = parseFloat(resultAmount);
+      const sign = gameEntryType === 'credit' ? -1 : 1;
+      const amount = parseFloat(resultAmount) * sign;
       await addDoc(collection(db, 'game_sessions'), {
         modalityId: selectedModality.id,
         modalityName: selectedModality.name,
         amount,
+        type: gameEntryType,
         date: serverTimestamp(),
         userId: user.uid,
         userName: user.displayName || 'Staff'
@@ -240,6 +243,28 @@ export function Games({ user }: { user: UserProfile }) {
                 <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">{selectedModality?.name}</p>
               </DialogHeader>
               <div className="space-y-6 py-6">
+                <div className="flex bg-[#111827] p-1.5 rounded-2xl border border-border">
+                  <Button 
+                    variant="ghost" 
+                    onClick={() => setGameEntryType('debit')}
+                    className={cn(
+                      "flex-1 h-12 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                      gameEntryType === 'debit' ? "bg-primary text-white" : "text-muted-foreground hover:text-white"
+                    )}
+                  >
+                    Entrada (Venda)
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    onClick={() => setGameEntryType('credit')}
+                    className={cn(
+                      "flex-1 h-12 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                      gameEntryType === 'credit' ? "bg-red-500 text-white" : "text-muted-foreground hover:text-white"
+                    )}
+                  >
+                    Saída (Prêmio)
+                  </Button>
+                </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Valor do Resultado (R$)</label>
                   <Input 
@@ -352,7 +377,12 @@ export function Games({ user }: { user: UserProfile }) {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-black text-green-500">+ R$ {(session.amount || 0).toFixed(2)}</p>
+                    <p className={cn(
+                      "text-sm font-black",
+                      session.amount >= 0 ? "text-green-500" : "text-red-500"
+                    )}>
+                      {session.amount >= 0 ? '+' : '-'} R$ {Math.abs(session.amount || 0).toFixed(2)}
+                    </p>
                   </div>
                 </div>
               ))}

@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
-import { Plus, Search, ShoppingCart, CheckCircle2, ChevronRight, LayoutGrid, List, Zap, Activity, Clock, TrendingUp, TrendingDown, Trash2, ShieldCheck, UserPlus, UserCheck, Menu, X, Receipt, Package, Calendar, Minus, Gamepad2, ArrowLeft, PlusCircle, Users, FlaskConical } from 'lucide-react';
+import { Plus, Search, ShoppingCart, CheckCircle2, ChevronRight, LayoutGrid, List, Zap, Activity, Clock, TrendingUp, TrendingDown, Trash2, ShieldCheck, UserPlus, UserCheck, Menu, X, Receipt, Package, Calendar, Minus, Gamepad2, ArrowLeft, PlusCircle, Users, FlaskConical, Filter } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle, DialogTrigger, DialogFooter } from './ui/dialog';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -425,7 +425,8 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [itemToRemoveIndex, setItemToRemoveIndex] = useState<number | null>(null);
   const [itemSearch, setItemSearch] = useState('');
-  const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
+  const [selectedMenuCategory, setSelectedMenuCategory] = useState<string | null>(null);
+  const [selectedMenuSubcategory, setSelectedMenuSubcategory] = useState<string | null>(null);
   const [linkCustomerId, setLinkCustomerId] = useState('');
   const [linkLetterFilter, setLinkLetterFilter] = useState('TODOS');
   const [linkBalanceFilter, setLinkBalanceFilter] = useState<'all' | 'credit' | 'debt'>('all');
@@ -444,6 +445,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
   const [avulsoPrice, setAvulsoPrice] = useState('');
   const [avulsoCost, setAvulsoCost] = useState('');
   const [selectedAvulsoProduct, setSelectedAvulsoProduct] = useState<Product | null>(null);
+  const [entryType, setEntryType] = useState<'debit' | 'credit'>('debit');
 
   // Checkout states
   const [checkoutAmount, setCheckoutAmount] = useState(order.totalAmount);
@@ -548,21 +550,26 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
 
     const existingItemIndex = newItems.findIndex(i => i.productId === finalId && i.price === price);
 
+    const sign = entryType === 'credit' ? -1 : 1;
+    const finalPrice = price * sign;
+
     if (existingItemIndex > -1) {
       newItems[existingItemIndex] = {
         ...newItems[existingItemIndex],
         quantity: newItems[existingItemIndex].quantity + 1,
-        subtotal: (newItems[existingItemIndex].quantity + 1) * price,
-        costPrice: cost
+        subtotal: (newItems[existingItemIndex].quantity + 1) * finalPrice,
+        costPrice: cost,
+        type: entryType
       };
     } else {
       newItems.push({
         productId: finalId,
         productName: product ? product.name : `[AVULSO] ${name}`,
         quantity: 1,
-        price: price,
-        subtotal: price,
-        costPrice: cost
+        price: finalPrice,
+        subtotal: finalPrice,
+        costPrice: cost,
+        type: entryType
       });
     }
 
@@ -619,7 +626,8 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
   };
 
   const handleAddGame = async (game: GameModality, customPrice?: number) => {
-    const finalPrice = customPrice !== undefined ? customPrice : game.price;
+    const sign = entryType === 'credit' ? -1 : 1;
+    const finalPrice = (customPrice !== undefined ? customPrice : game.price) * sign;
     const gameId = `game_${game.id}_${Date.now()}`; // Unique ID for each game entry
     
     let newItems = [...order.items];
@@ -628,7 +636,8 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
       productName: `[JOGO] ${game.name}`,
       quantity: 1,
       price: finalPrice,
-      subtotal: finalPrice
+      subtotal: finalPrice,
+      type: entryType
     });
 
     const newTotal = newItems.reduce((sum, item) => sum + item.subtotal, 0);
@@ -683,6 +692,10 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
     try {
       const finalAmount = checkoutAmount;
       const targetCustomerId = checkoutCustomerId || order.customerId;
+      
+      // If finalAmount is negative, it means the bar owes the customer (credit)
+      // We'll treat the absolute value as something to be paid/credited
+      const totalPaid = checkoutPayments.reduce((sum, p) => sum + p.amount, 0);
       const surplus = totalPaid - finalAmount;
 
       await updateDoc(doc(db, 'open_orders', order.id), {
@@ -706,7 +719,9 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
             .filter(p => p.method === 'SALDO')
             .reduce((sum, p) => sum + p.amount, 0);
 
-          // Balance Impact: Surplus increases balance, FIADO and SALDO decrease it
+          // Surplus correctly captures the "bar owes customer" logic when finalAmount is negative
+          // If amount is -10 and user paid 0, surplus is 10 (Credit to customer)
+          // Also handle negative finalAmount directly in balance if it was fully unpaid or paid with credit methods
           const balanceImpact = surplus - fiadoAmount - saldoUsedAmount;
 
           await updateDoc(customerRef, {
@@ -1070,7 +1085,11 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                   {/* Menu Sub-tabs */}
                   <div className="flex gap-2 mb-4">
                     <button 
-                      onClick={() => setMenuSubTab('products')}
+                      onClick={() => {
+                        setMenuSubTab('products');
+                        setSelectedMenuCategory(null);
+                        setSelectedMenuSubcategory(null);
+                      }}
                       className={cn(
                         "flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
                         menuSubTab === 'products' ? "bg-[#161b22] text-[#0070f3] border border-[#0070f3]/20" : "text-muted-foreground hover:text-white hover:bg-white/5 border border-transparent"
@@ -1079,7 +1098,11 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                       Cardápio Geral
                     </button>
                     <button 
-                      onClick={() => setMenuSubTab('games')}
+                      onClick={() => {
+                        setMenuSubTab('games');
+                        setSelectedMenuCategory(null);
+                        setSelectedMenuSubcategory(null);
+                      }}
                       className={cn(
                         "flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
                         menuSubTab === 'games' ? "bg-[#161b22] text-[#0070f3] border border-[#0070f3]/20" : "text-muted-foreground hover:text-white hover:bg-white/5 border border-transparent"
@@ -1090,122 +1113,197 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                   </div>
 
                   {menuSubTab === 'products' ? (
-                    <>
-                      {/* Quick Add Section (Intelligent Feature) */}
-                      {!itemSearch && (
-                        <div className="mb-8">
-                          <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-4 flex items-center gap-2">
-                            <Zap className="w-3 h-3 text-yellow-500" /> Itens Mais Pedidos
-                          </p>
-                          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
-                            {products.slice(0, 4).map(product => (
-                              <button
-                                key={`quick-${product.id}`}
-                                onClick={() => {
-                                  if (product.isOpenValue) {
-                                    setSelectedProduct(product);
-                                    setIsProductValueModalOpen(true);
-                                  } else {
-                                    handleAddItem(product);
-                                  }
-                                }}
-                                className="p-4 bg-[#0d1117] hover:bg-[#161b22] border border-white/5 rounded-2xl text-left transition-all group relative overflow-hidden active:scale-95"
-                              >
-                                <div className="absolute top-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <Plus className="w-4 h-4 text-[#0070f3]" />
-                                </div>
-                                <p className="font-bold text-[11px] uppercase tracking-wider mb-1 truncate">{product.name}</p>
-                                <p className="text-xs font-black text-[#0070f3]">
-                                  {product.isOpenValue ? 'VALOR ABERTO' : `R$ ${product.price.toFixed(2)}`}
-                                </p>
-                              </button>
-                            ))}
+                    <div className="space-y-4">
+                      {/* Search results view */}
+                      {itemSearch ? (
+                        <div className="space-y-2">
+                          <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-2">Resultados da busca</p>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {products
+                              .filter(p => 
+                                p.name.toLowerCase().includes(itemSearch.toLowerCase()) || 
+                                categories.find(c => c.id === p.categoryId)?.name.toLowerCase().includes(itemSearch.toLowerCase()) ||
+                                p.subcategory?.toLowerCase().includes(itemSearch.toLowerCase())
+                              )
+                              .map(product => (
+                                <button
+                                  key={`search-${product.id}`}
+                                  onClick={() => {
+                                    if (product.isOpenValue) {
+                                      setSelectedProduct(product);
+                                      setIsProductValueModalOpen(true);
+                                    } else {
+                                      handleAddItem(product);
+                                    }
+                                  }}
+                                  className="w-full p-4 flex items-center justify-between bg-[#0d1117] border border-white/5 rounded-xl hover:bg-white/10 transition-all text-left group"
+                                >
+                                  <div className="min-w-0">
+                                    <p className="font-bold text-xs uppercase tracking-wider group-hover:text-[#0070f3] transition-colors truncate">{product.name}</p>
+                                    <p className="text-[9px] text-muted-foreground font-black tracking-widest">
+                                      {categories.find(c => c.id === product.categoryId)?.name} {product.subcategory && `> ${product.subcategory}`}
+                                    </p>
+                                    <p className="text-[10px] text-[#0070f3] font-black tracking-widest mt-1">
+                                      {product.isOpenValue ? 'VALOR ABERTO' : `R$ ${product.price.toFixed(2)}`}
+                                    </p>
+                                  </div>
+                                  <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center group-hover:bg-[#0070f3] group-hover:text-white transition-all">
+                                    <Plus className="w-4 h-4" />
+                                  </div>
+                                </button>
+                              ))
+                            }
+                            {products.filter(p => p.name.toLowerCase().includes(itemSearch.toLowerCase())).length === 0 && (
+                              <div className="col-span-full py-10 text-center opacity-40">
+                                <Search className="w-10 h-10 mx-auto mb-2" />
+                                <p className="text-[10px] font-black tracking-widest uppercase">Nenhum produto encontrado</p>
+                              </div>
+                            )}
                           </div>
                         </div>
-                      )}
-
-                      <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-2">Categorias</p>
-                      <div className="space-y-3">
-                        {sortedCategories.map(category => (
-                          <div key={category.id} className="bg-[#0d1117] border border-white/5 rounded-2xl overflow-hidden shadow-sm">
-                            <button 
-                              onClick={() => {
-                                setExpandedCategories(prev => 
-                                  prev.includes(category.id) ? prev.filter(id => id !== category.id) : [...prev, category.id]
-                                );
-                              }}
-                              className="w-full p-5 flex items-center justify-between hover:bg-white/5 transition-colors"
-                            >
-                              <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-muted-foreground group-hover:text-white transition-colors">
-                                  <Package className="w-5 h-5" />
-                                </div>
-                                <div className="text-left">
-                                  <span className="font-black text-sm uppercase tracking-widest block">{category.name}</span>
-                                  <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">
-                                    {products.filter(p => (p.categoryId || 'Outros') === category.id).length} Produtos Disponíveis
-                                  </span>
-                                </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {/* Hierarchical Navigation Header */}
+                          {(selectedMenuCategory || selectedMenuSubcategory) && (
+                            <div className="flex items-center gap-3 bg-[#111827] p-3 rounded-2xl border border-white/5 mb-4 sticky top-0 z-10 shadow-xl">
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => {
+                                  if (selectedMenuSubcategory) {
+                                    setSelectedMenuSubcategory(null);
+                                  } else {
+                                    setSelectedMenuCategory(null);
+                                  }
+                                }}
+                                className="w-10 h-10 p-0 rounded-xl hover:bg-white/10 text-white"
+                              >
+                                <ArrowLeft className="w-5 h-5" />
+                              </Button>
+                              <div className="flex flex-col min-w-0">
+                                <p className="text-[9px] font-black tracking-widest uppercase text-[#0070f3] truncate">
+                                  {categories.find(c => c.id === selectedMenuCategory)?.name || 'Outros'}
+                                </p>
+                                {selectedMenuSubcategory && (
+                                  <p className="text-sm font-black uppercase tracking-tighter text-white truncate leading-none mt-0.5">
+                                    {selectedMenuSubcategory}
+                                  </p>
+                                )}
                               </div>
-                              <ChevronRight className={cn("w-5 h-5 text-muted-foreground transition-transform", expandedCategories.includes(category.id) && "rotate-90")} />
-                            </button>
-                            
-                            <AnimatePresence>
-                              {expandedCategories.includes(category.id) && (
-                                <motion.div 
-                                  initial={{ height: 0, opacity: 0 }}
-                                  animate={{ height: 'auto', opacity: 1 }}
-                                  exit={{ height: 0, opacity: 0 }}
-                                  className="overflow-hidden border-t border-white/5 bg-black/20"
+                            </div>
+                          )}
+
+                          {/* Level 1: Categories */}
+                          {!selectedMenuCategory && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-3">
+                              {sortedCategories.map(category => (
+                                <button 
+                                  key={`cat-${category.id}`}
+                                  onClick={() => setSelectedMenuCategory(category.id)}
+                                  className="w-full p-4 flex items-center justify-between bg-[#0d1117] border border-white/5 rounded-2xl hover:bg-[#161b22] hover:border-[#0070f3]/30 transition-all group active:scale-95"
                                 >
-                                  <div className="p-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                    {products
-                                      .filter(p => (p.categoryId || 'Outros') === category.id)
-                                      .filter(p => p.name.toLowerCase().includes(itemSearch.toLowerCase()))
-                                      .map(product => (
-                                        <button
-                                          key={product.id}
-                                          onClick={() => {
-                                            if (product.isOpenValue) {
-                                              setSelectedProduct(product);
-                                              setIsProductValueModalOpen(true);
-                                            } else {
-                                              handleAddItem(product);
-                                            }
-                                          }}
-                                          className="w-full p-4 flex items-center justify-between rounded-xl hover:bg-white/10 transition-all text-left group border border-transparent hover:border-white/5"
-                                        >
-                                          <div className="min-w-0">
-                                            <p className="font-bold text-xs uppercase tracking-wider group-hover:text-[#0070f3] transition-colors truncate">{product.name}</p>
-                                            <div className="flex flex-col gap-0.5">
-                                              <p className="text-[10px] text-muted-foreground font-black tracking-widest">
-                                                {product.isOpenValue ? 'VALOR ABERTO' : `R$ ${product.price.toFixed(2)}`}
-                                              </p>
-                                              {product.isDoseControl && (
-                                                <p className="text-[9px] text-[#0070f3]/70 font-black uppercase tracking-widest flex items-center gap-1">
-                                                  <FlaskConical className="w-2.5 h-2.5" />
-                                                  {product.linkedProductId ? (
-                                                    <>Garrafa: {products.find(p => p.id === product.linkedProductId)?.currentBottleVolume || 0}ml rest.</>
-                                                  ) : (
-                                                    <>{product.currentBottleVolume || 0}ml rest. na garrafa</>
-                                                  )}
-                                                </p>
-                                              )}
-                                            </div>
-                                          </div>
-                                          <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center group-hover:bg-[#0070f3] group-hover:text-white transition-all">
-                                            <Plus className="w-4 h-4" />
-                                          </div>
-                                        </button>
-                                      ))}
+                                  <div className="flex items-center gap-4">
+                                    <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-muted-foreground group-hover:bg-[#0070f3]/10 group-hover:text-[#0070f3] transition-all">
+                                      <Package className="w-5 h-5" />
+                                    </div>
+                                    <div className="text-left">
+                                      <span className="font-black text-[11px] uppercase tracking-widest block text-white group-hover:text-[#0070f3] transition-colors">{category.name}</span>
+                                      <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">
+                                        {products.filter(p => (p.categoryId || 'Outros') === category.id).length} Produtos
+                                      </span>
+                                    </div>
                                   </div>
-                                </motion.div>
-                              )}
-                            </AnimatePresence>
-                          </div>
-                        ))}
-                      </div>
-                    </>
+                                  <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-white transition-all transform group-hover:translate-x-1" />
+                                </button>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Level 2: Subcategories */}
+                          {selectedMenuCategory && !selectedMenuSubcategory && (
+                            <motion.div 
+                              initial={{ x: 20, opacity: 0 }}
+                              animate={{ x: 0, opacity: 1 }}
+                              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-3"
+                            >
+                              {Array.from(new Set(
+                                products
+                                  .filter(p => (p.categoryId || 'Outros') === selectedMenuCategory)
+                                  .map(p => p.subcategory || 'Diversos')
+                              )).sort().map(subcategory => (
+                                <button 
+                                  key={`subcat-${subcategory}`}
+                                  onClick={() => setSelectedMenuSubcategory(subcategory)}
+                                  className="w-full p-4 flex items-center justify-between bg-[#0d1117] border border-white/5 rounded-2xl hover:bg-[#161b22] hover:border-[#0070f3]/30 transition-all group active:scale-95 text-left"
+                                >
+                                  <div className="flex items-center gap-4">
+                                    <div className="w-10 h-10 rounded-xl bg-[#0070f3]/5 flex items-center justify-center text-[#0070f3]">
+                                      <Filter className="w-5 h-5" />
+                                    </div>
+                                    <div className="text-left">
+                                      <span className="font-black text-[11px] uppercase tracking-widest block text-white group-hover:text-[#0070f3] transition-colors">{subcategory}</span>
+                                      <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">
+                                        {products.filter(p => (p.categoryId || 'Outros') === selectedMenuCategory && (p.subcategory || 'Diversos') === subcategory).length} Itens
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-white transition-all transform group-hover:translate-x-1" />
+                                </button>
+                              ))}
+                            </motion.div>
+                          )}
+
+                          {/* Level 3: Products */}
+                          {selectedMenuCategory && selectedMenuSubcategory && (
+                            <motion.div 
+                              initial={{ x: 20, opacity: 0 }}
+                              animate={{ x: 0, opacity: 1 }}
+                              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-2"
+                            >
+                              {products
+                                .filter(p => (p.categoryId || 'Outros') === selectedMenuCategory && (p.subcategory || 'Diversos') === selectedMenuSubcategory)
+                                .map(product => (
+                                  <button
+                                    key={`prod-${product.id}`}
+                                    onClick={() => {
+                                      if (product.isOpenValue) {
+                                        setSelectedProduct(product);
+                                        setIsProductValueModalOpen(true);
+                                      } else {
+                                        handleAddItem(product);
+                                      }
+                                    }}
+                                    className="w-full p-4 flex items-center justify-between bg-[#0d1117] border border-white/5 rounded-2xl hover:bg-white/10 transition-all text-left group active:scale-95"
+                                  >
+                                    <div className="min-w-0 pr-2">
+                                      <p className="font-black text-[11px] uppercase tracking-wider group-hover:text-[#0070f3] transition-colors truncate">{product.name}</p>
+                                      <div className="flex flex-col gap-0.5 mt-1">
+                                        <p className="text-[10px] text-[#0070f3] font-black tracking-widest">
+                                          {product.isOpenValue ? 'VALOR ABERTO' : `R$ ${product.price.toFixed(2)}`}
+                                        </p>
+                                        {product.isDoseControl && (
+                                          <p className="text-[9px] text-white/50 font-black uppercase tracking-widest flex items-center gap-1">
+                                            <FlaskConical className="w-2.5 h-2.5" />
+                                            {product.linkedProductId ? (
+                                              <>{products.find(p => p.id === product.linkedProductId)?.currentBottleVolume || 0}ml</>
+                                            ) : (
+                                              <>{product.currentBottleVolume || 0}ml</>
+                                            )}
+                                          </p>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="w-9 h-9 flex-shrink-0 rounded-xl bg-white/5 flex items-center justify-center group-hover:bg-[#0070f3] group-hover:text-white transition-all">
+                                      <Plus className="w-5 h-5" />
+                                    </div>
+                                  </button>
+                                ))
+                              }
+                            </motion.div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   ) : (
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1218,8 +1316,11 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                               onClick={() => {
                                 if (game.isOpenValue) {
                                   setSelectedGame(game);
+                                  setGameValue('');
+                                  setEntryType('debit');
                                   setIsGameValueModalOpen(true);
                                 } else {
+                                  setEntryType('debit');
                                   handleAddGame(game);
                                 }
                               }}
@@ -1296,9 +1397,15 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                         className="bg-[#161b22] border border-white/5 rounded-2xl p-4 flex items-center justify-between gap-4 shadow-sm"
                       >
                         <div className="min-w-0 flex-1">
-                          <p className="font-black text-sm uppercase tracking-tight truncate leading-none mb-1">{item.productName}</p>
+                          <p className={cn(
+                            "font-black text-sm uppercase tracking-tight truncate leading-none mb-1",
+                            item.type === 'credit' ? "text-green-500" : ""
+                          )}>{item.productName}</p>
                           <div className="flex flex-col gap-0.5">
-                            <p className="text-[10px] text-muted-foreground font-bold tracking-widest uppercase">R$ {item.price.toFixed(2)} / UN</p>
+                            <p className={cn(
+                              "text-[10px] font-bold tracking-widest uppercase",
+                              item.type === 'credit' ? "text-green-500/70" : "text-muted-foreground"
+                            )}>R$ {item.price.toFixed(2)} / UN</p>
                             {(() => {
                               const product = products.find(p => p.id === item.productId.split('_')[0]);
                               if (product?.isDoseControl) {
@@ -1799,6 +1906,29 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
             </div>
           </div>
           <div className="p-8 space-y-6">
+            <div className="flex bg-[#0d1117] p-1.5 rounded-2xl border border-white/5">
+              <Button 
+                variant="ghost" 
+                onClick={() => setEntryType('debit')}
+                className={cn(
+                  "flex-1 h-12 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                  entryType === 'debit' ? "bg-[#0070f3] text-white" : "text-muted-foreground hover:text-white"
+                )}
+              >
+                Débito (Gasto)
+              </Button>
+              <Button 
+                variant="ghost" 
+                onClick={() => setEntryType('credit')}
+                className={cn(
+                  "flex-1 h-12 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                  entryType === 'credit' ? "bg-green-500 text-white" : "text-muted-foreground hover:text-white"
+                )}
+              >
+                Crédito (Prêmio)
+              </Button>
+            </div>
+
             <div className="space-y-2">
               <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Valor do Lançamento (R$)</label>
               <div className="relative">
@@ -1915,7 +2045,10 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
       </Dialog>
 
       {/* Avulso Modal */}
-      <Dialog open={isAvulsoModalOpen} onOpenChange={setIsAvulsoModalOpen}>
+      <Dialog open={isAvulsoModalOpen} onOpenChange={(open) => {
+        setIsAvulsoModalOpen(open);
+        if (open) setEntryType('debit');
+      }}>
         <DialogContent className="bg-[#05070a] border-none max-w-md text-white p-0 overflow-hidden shadow-2xl rounded-3xl">
           <div className="p-8 border-b border-white/5 relative bg-[#05070a]">
             <div className="flex items-center gap-4">
@@ -1929,6 +2062,28 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
             </div>
           </div>
           <div className="p-8 space-y-6">
+            <div className="flex bg-[#0d1117] p-1.5 rounded-2xl border border-white/5">
+              <Button 
+                variant="ghost" 
+                onClick={() => setEntryType('debit')}
+                className={cn(
+                  "flex-1 h-12 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                  entryType === 'debit' ? "bg-[#0070f3] text-white" : "text-muted-foreground hover:text-white"
+                )}
+              >
+                Débito (Gasto)
+              </Button>
+              <Button 
+                variant="ghost" 
+                onClick={() => setEntryType('credit')}
+                className={cn(
+                  "flex-1 h-12 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                  entryType === 'credit' ? "bg-green-500 text-white" : "text-muted-foreground hover:text-white"
+                )}
+              >
+                Crédito (Prêmio)
+              </Button>
+            </div>
             <div className="space-y-2">
               <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Buscar Produto ou Digitar Nome</label>
               <div className="relative">

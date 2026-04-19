@@ -1,30 +1,42 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Global Master Bypass for Owner
+    match /{document=**} {
+      allow read, write: if request.auth != null && 
+        (request.auth.token.email == "louisfelipecabral@gmail.com" || 
+         request.auth.uid == "e5SB016rBhWuYEKifTIYSCfE5Bq2");
+    }
     
     // ===============================================================
     // Helper Functions
     // ===============================================================
     
     function isAuthenticated() {
-      return request.auth != null && request.auth.token.email_verified == true;
+      return request.auth != null && 
+        (request.auth.token.email_verified == true || 
+         request.auth.token.email == "louisfelipecabral@gmail.com" ||
+         request.auth.uid == "e5SB016rBhWuYEKifTIYSCfE5Bq2");
     }
 
     function isAdmin() {
-      return isAuthenticated() && 
+      return request.auth != null && 
         (request.auth.token.email == "louisfelipecabral@gmail.com" ||
-         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         request.auth.uid == "e5SB016rBhWuYEKifTIYSCfE5Bq2" ||
+         (isAuthenticated() && 
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'));
     }
 
     function isStaff() {
-      return isAuthenticated() && 
-        (request.auth.token.email.matches(".*@gmail.com") && (
-          request.auth.token.email == "louisfelipecabral@gmail.com" ||
-          isAdmin() || 
-          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'staff')
-        ));
+      return request.auth != null && 
+        (request.auth.token.email == "louisfelipecabral@gmail.com" ||
+         request.auth.uid == "e5SB016rBhWuYEKifTIYSCfE5Bq2" ||
+         isAdmin() ||
+         (isAuthenticated() && 
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'staff'));
     }
 
     function hasRequiredFields(fields) {
@@ -65,10 +77,21 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    match /game_sessions/{sessionId} {
+      allow read: if isStaff();
+      allow create: if isStaff();
+      allow update, delete: if isAdmin();
+    }
+
     match /orders/{orderId} {
       allow read: if isStaff();
       allow create, update: if isStaff();
       allow delete: if isAdmin();
+    }
+
+    match /closed_orders/{orderId} {
+      allow read: if isStaff();
+      allow write: if isAdmin();
     }
 
     match /open_orders/{orderId} {

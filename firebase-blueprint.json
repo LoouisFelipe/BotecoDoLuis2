@@ -204,6 +204,7 @@
     "/purchases/{purchaseId}": { "schema": "Purchase", "description": "Inventory purchases" },
     "/payment_fees/{feeId}": { "schema": "PaymentFee", "description": "Payment method fees" },
     "/bi_summaries/{summaryId}": { "schema": "BISummary", "description": "Monthly BI summaries" },
+    "/game_sessions/{sessionId}": { "schema": "GameSession", "description": "Game results log" },
     "/users/{userId}": { "schema": "User", "description": "User profiles and roles" }
   }
 }

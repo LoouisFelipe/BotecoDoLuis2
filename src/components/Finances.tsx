@@ -463,9 +463,9 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
                   <TableCell className="max-w-[200px] truncate text-sm font-medium">{t.description}</TableCell>
                   <TableCell className={cn(
                     "text-right font-mono font-bold text-lg",
-                    t.type === 'income' ? 'text-green-500' : 'text-red-500'
+                    ((t.type === 'income' ? t.amount : -t.amount) || 0) >= 0 ? 'text-green-500' : 'text-red-500'
                   )}>
-                    {t.type === 'income' ? '+' : '-'} R$ {(t.amount || 0).toFixed(2)}
+                    {((t.type === 'income' ? t.amount : -t.amount) || 0) >= 0 ? '+' : '-'} R$ {Math.abs(t.amount || 0).toFixed(2)}
                   </TableCell>
                 </TableRow>
               ))}
@@ -502,9 +502,9 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
               <div className="flex justify-end">
                 <p className={cn(
                   "font-mono font-bold text-base",
-                  t.type === 'income' ? 'text-green-500' : 'text-red-500'
+                  ((t.type === 'income' ? t.amount : -t.amount) || 0) >= 0 ? 'text-green-500' : 'text-red-500'
                 )}>
-                  {t.type === 'income' ? '+' : '-'} R$ {(t.amount || 0).toFixed(2)}
+                  {((t.type === 'income' ? t.amount : -t.amount) || 0) >= 0 ? '+' : '-'} R$ {Math.abs(t.amount || 0).toFixed(2)}
                 </p>
               </div>
             </div>
@@ -634,9 +634,9 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Valor Total</p>
                 <p className={cn(
                   "font-mono font-bold text-xl",
-                  selectedTransaction?.type === 'income' ? "text-green-500" : "text-red-500"
+                  (selectedTransaction ? (selectedTransaction.type === 'income' ? selectedTransaction.amount : -selectedTransaction.amount) : 0) >= 0 ? "text-green-500" : "text-red-500"
                 )}>
-                  {selectedTransaction?.type === 'income' ? '+' : '-'} R$ {(selectedTransaction?.amount || 0).toFixed(2)}
+                  {(selectedTransaction ? (selectedTransaction.type === 'income' ? selectedTransaction.amount : -selectedTransaction.amount) : 0) >= 0 ? '+' : '-'} R$ {Math.abs(selectedTransaction?.amount || 0).toFixed(2)}
                 </p>
               </div>
             </div>

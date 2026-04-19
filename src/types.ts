@@ -95,6 +95,7 @@ export interface OrderItem {
   price: number;
   subtotal: number;
   costPrice?: number;
+  type?: 'debit' | 'credit';
 }
 
 export interface Order {

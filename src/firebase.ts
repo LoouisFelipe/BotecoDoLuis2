@@ -4,24 +4,15 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import { getAnalytics } from 'firebase/analytics';
 
-// Configuração do Firebase com suporte a overrides de ambiente e fallbacks seguros
-const config = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
-};
+// Configuração do Firebase utilizando o arquivo gerado pelo provisionamento
+import firebaseConfig from '../firebase-applet-config.json';
 
-console.log("Firebase Config Initializing with Project:", config.projectId);
+console.log("Firebase Config Initializing with Project:", firebaseConfig.projectId);
 
-const app = initializeApp(config);
+const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-const dbId = import.meta.env.VITE_FIREBASE_DATABASE_ID || import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || "botecodoluis";
-export const db = getFirestore(app, dbId);
-console.log("Firestore Initialized with Database ID:", dbId);
+export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+console.log("Firestore Initialized with Database ID:", firebaseConfig.firestoreDatabaseId);
 export const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
 
 // Connection test
