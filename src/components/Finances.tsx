@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, query, onSnapshot, addDoc, serverTimestamp, orderBy, limit, getDocs, where, doc, getDoc } from 'firebase/firestore';
+import { collection, query, addDoc, serverTimestamp, orderBy, limit, getDocs, where, doc, getDoc } from 'firebase/firestore';
 import { Transaction, UserProfile, Customer, Order } from '../types';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';

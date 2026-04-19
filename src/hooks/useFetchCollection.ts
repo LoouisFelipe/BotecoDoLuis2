@@ -1,12 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
   collection, 
   onSnapshot, 
   query, 
   QueryConstraint, 
   FirestoreError,
-  DocumentData,
-  QueryDocumentSnapshot
+  DocumentData
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { handleFirestoreError, OperationType } from '../lib/firebase-utils';
@@ -25,8 +24,16 @@ export function useFetchCollection<T = DocumentData>(
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<FirestoreError | null>(null);
 
-  const { enabled = true } = options;
-  const constraintsKey = JSON.stringify(options.constraints || []);
+  const { enabled = true, constraints = [], onError } = options;
+  
+  // Usamos ref para o callback de erro para evitar que mudanças na função triggerem o useEffect
+  const onErrorRef = useRef(onError);
+  useEffect(() => {
+    onErrorRef.current = onError;
+  }, [onError]);
+
+  // Estabilizamos as constraints usando stringify
+  const constraintsKey = JSON.stringify(constraints.map(c => c.type || 'unknown'));
 
   useEffect(() => {
     if (!enabled) {
@@ -39,7 +46,7 @@ export function useFetchCollection<T = DocumentData>(
     try {
       const q = query(
         collection(db, collectionName), 
-        ...(options.constraints || [])
+        ...constraints
       );
 
       const unsubscribe = onSnapshot(
@@ -57,8 +64,8 @@ export function useFetchCollection<T = DocumentData>(
           console.error(`Error fetching collection ${collectionName}:`, err);
           setError(err);
           setLoading(false);
-          if (options.onError) {
-            options.onError(err);
+          if (onErrorRef.current) {
+            onErrorRef.current(err);
           } else {
             handleFirestoreError(err, OperationType.LIST, collectionName);
           }
@@ -70,7 +77,8 @@ export function useFetchCollection<T = DocumentData>(
       console.error(`Query construction error for ${collectionName}:`, err);
       setLoading(false);
     }
-  }, [collectionName, enabled, constraintsKey, options.onError]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collectionName, enabled, constraintsKey]);
 
   return { data, loading, error };
 }

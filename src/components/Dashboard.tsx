@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { db } from '../firebase';
-import { collection, onSnapshot, query, where, addDoc, serverTimestamp, updateDoc, doc, orderBy, deleteDoc, setDoc } from 'firebase/firestore';
+import { collection, query, where, addDoc, serverTimestamp, updateDoc, doc, orderBy, deleteDoc, setDoc } from 'firebase/firestore';
 import { Order, Product, UserProfile, Customer, Category, GameModality } from '../types';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
