@@ -25,7 +25,9 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
           
           if (userDoc.exists()) {
-            setUser({ uid: firebaseUser.uid, ...userDoc.data() } as UserProfile);
+            const userData = userDoc.data();
+            console.log("User Profile Loaded:", { uid: firebaseUser.uid, email: firebaseUser.email, role: userData.role });
+            setUser({ uid: firebaseUser.uid, ...userData } as UserProfile);
           } else {
             // Create new user profile
             const newUser: UserProfile = {
@@ -35,6 +37,7 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
               role: firebaseUser.email === 'louisfelipecabral@gmail.com' ? 'admin' : 'staff',
               createdAt: serverTimestamp(),
             };
+            console.log("Creating New User Profile:", newUser);
             await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
             setUser(newUser);
           }

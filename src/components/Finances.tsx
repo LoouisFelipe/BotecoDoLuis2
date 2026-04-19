@@ -37,17 +37,26 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
     if (selectedTransaction?.orderId) {
       const fetchOrder = async () => {
         try {
+          console.log("Fetching related order details for:", selectedTransaction.orderId);
           const orderDoc = await getDoc(doc(db, 'closed_orders', selectedTransaction.orderId!));
           if (orderDoc.exists()) {
+            console.log("Found order in closed_orders");
             setRelatedOrder({ ...orderDoc.data(), id: orderDoc.id } as Order);
           } else {
+            console.log("Order not found in closed_orders, checking open_orders...");
             const openOrderDoc = await getDoc(doc(db, 'open_orders', selectedTransaction.orderId!));
             if (openOrderDoc.exists()) {
+              console.log("Found order in open_orders");
               setRelatedOrder({ ...openOrderDoc.data(), id: openOrderDoc.id } as Order);
+            } else {
+              console.warn("Order not found in either collection");
             }
           }
         } catch (error) {
-          console.error("Error fetching related order:", error);
+          console.error("Error fetching related order details:", error);
+          if (error instanceof Error) {
+             console.error("Error Message:", error.message);
+          }
         }
       };
       fetchOrder();

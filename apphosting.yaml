@@ -3,7 +3,7 @@
 
 env:
   - variable: GEMINI_API_KEY
-    value: 
+    secret: GEMINI_API_KEY
     availability:
       - BUILD
       - RUNTIME
@@ -18,7 +18,7 @@ env:
       - BUILD
       - RUNTIME
   - variable: VITE_FIREBASE_API_KEY
-    value: 
+    value: AIzaSyBWMVE765V8nqz7gKwyBE2-SQ5_hNAPkDM
     availability:
       - BUILD
       - RUNTIME
