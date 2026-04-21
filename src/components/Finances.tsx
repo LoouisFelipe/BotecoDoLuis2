@@ -600,7 +600,7 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
                 <p className="font-bold text-sm uppercase">{selectedTransaction?.paymentMethod || 'N/A'}</p>
               </div>
               <div className="space-y-1">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Valor Total</p>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Valor Bruto</p>
                 <p className={cn(
                   "font-mono font-bold text-xl",
                   (selectedTransaction ? (selectedTransaction.type === 'income' ? selectedTransaction.amount : -selectedTransaction.amount) : 0) >= 0 ? "text-green-500" : "text-red-500"
@@ -610,12 +610,62 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
               </div>
             </div>
 
-            <div className="space-y-2">
+            {selectedTransaction?.feeAmount !== undefined && selectedTransaction.feeAmount > 0 && (
+              <div className="grid grid-cols-2 gap-8 border-t border-border/50 pt-6">
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest text-red-500/80">Taxa do Cartão / Pix</p>
+                  <p className="font-mono font-bold text-base text-red-500/80">
+                    - R$ {selectedTransaction.feeAmount.toFixed(2)}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest text-green-500">Valor Líquido (Recebido)</p>
+                  <p className="font-mono font-black text-xl text-green-500">
+                    R$ {(selectedTransaction.netAmount || (selectedTransaction.amount - selectedTransaction.feeAmount)).toFixed(2)}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-2 pt-2">
               <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Descrição / Observações</p>
               <div className="p-4 bg-white/5 rounded-xl border border-border/50 text-sm leading-relaxed">
                 {selectedTransaction?.description || 'Nenhuma descrição informada.'}
               </div>
             </div>
+
+            {selectedTransaction?.customerId && (() => {
+              const customer = customers.find(c => c.id === selectedTransaction.customerId);
+              if (!customer) return null;
+              return (
+                <div className="space-y-4">
+                  <div className="h-px bg-border/50" />
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Resumo do Cliente</p>
+                  <div className="p-4 bg-primary/5 border border-primary/20 rounded-xl relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-4 opacity-10">
+                      <Users className="w-16 h-16" />
+                    </div>
+                    <h4 className="font-bold uppercase text-lg mb-1">{customer.name}</h4>
+                    {customer.phone && <p className="text-sm text-muted-foreground mb-3">{customer.phone}</p>}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Saldo Conta ('Fiado')</p>
+                        <p className={cn(
+                          "font-mono font-bold text-sm",
+                          (customer.balance || 0) > 0 ? "text-green-500" : (customer.balance || 0) < 0 ? "text-red-500" : "text-white"
+                        )}>
+                          R$ {(customer.balance || 0).toFixed(2)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Gasto Total</p>
+                        <p className="font-mono font-bold text-sm text-primary">R$ {(customer.totalSpent || 0).toFixed(2)}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {selectedTransaction?.orderId && (
               <div className="space-y-4">

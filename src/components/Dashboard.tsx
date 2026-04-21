@@ -17,6 +17,7 @@ import { ConfirmDialog } from './ConfirmDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 import { useFetchCollection } from '../hooks/useFetchCollection';
+import { usePaymentFees } from '../hooks/usePaymentFees';
 
 export function Dashboard({ user, setActiveTab }: { user: UserProfile, setActiveTab: (tab: string) => void }) {
   const orderConstraints = React.useMemo(() => [where('status', '==', 'open'), orderBy('createdAt', 'desc')], []);
@@ -364,7 +365,7 @@ export function Dashboard({ user, setActiveTab }: { user: UserProfile, setActive
               exit={{ opacity: 0, scale: 0.95 }}
               transition={{ duration: 0.2 }}
             >
-              <OrderCard order={order} products={products} customers={customers} categories={categories} gameModalities={gameModalities} viewMode={viewMode} />
+              <OrderCard key={order.id} order={order} products={products} customers={customers} categories={categories} gameModalities={gameModalities} viewMode={viewMode} user={user} />
             </motion.div>
           ))}
         </AnimatePresence>
@@ -379,7 +380,8 @@ export function Dashboard({ user, setActiveTab }: { user: UserProfile, setActive
   );
 }
 
-const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Customer[]; categories: Category[]; gameModalities: GameModality[]; viewMode: 'grid' | 'list' }> = ({ order, products, customers, categories, gameModalities, viewMode }) => {
+const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Customer[]; categories: Category[]; gameModalities: GameModality[]; viewMode: 'grid' | 'list'; user: UserProfile }> = ({ order, products, customers, categories, gameModalities, viewMode, user }) => {
+  const { calculateNet } = usePaymentFees();
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
@@ -762,19 +764,42 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
         }
       }
 
+      // Create game sessions for games played in this order
+      for (const item of order.items) {
+        if (item.productId.startsWith('game_')) {
+          const splitId = item.productId.split('_');
+          const modalityId = splitId[1];
+          const modalityName = item.productName.replace('[JOGO] ', '');
+          
+          await addDoc(collection(db, 'game_sessions'), {
+            modalityId,
+            modalityName,
+            amount: item.subtotal,
+            date: new Date(checkoutDate + 'T12:00:00'),
+            userId: user.uid,
+            userName: user.displayName || user.email,
+            orderId: order.id
+          });
+        }
+      }
+
       // Create transactions for each payment
       for (const payment of checkoutPayments) {
         // Proportional cost for this payment
         const paymentCost = finalAmount > 0 ? (payment.amount / finalAmount) * totalCost : 0;
+        const { netAmount, feeAmount } = calculateNet(payment.amount, payment.method);
 
         await addDoc(collection(db, 'transactions'), {
           type: 'income',
           category: 'Vendas',
           amount: payment.amount,
+          netAmount,
+          feeAmount,
           cost: paymentCost,
           description: `Comanda fechada: ${order.customerName} (${payment.method})${checkoutDiscount > 0 ? ` (Desc: R$ ${checkoutDiscount})` : ''}${checkoutAdjustment !== 0 ? ` (Ajuste: R$ ${checkoutAdjustment})` : ''}`,
           date: new Date(checkoutDate + 'T12:00:00'),
           orderId: order.id,
+          customerId: targetCustomerId === 'none' ? '' : targetCustomerId,
           paymentMethod: payment.method,
           isFiado: payment.method === 'FIADO' // Mark for filtering in reports
         });

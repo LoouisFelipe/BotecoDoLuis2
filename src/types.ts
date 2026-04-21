@@ -122,10 +122,20 @@ export interface Transaction {
   category: string;
   amount: number;
   cost?: number;
+  feeAmount?: number;
+  netAmount?: number;
   description?: string;
   date: any;
   orderId?: string;
+  customerId?: string;
   paymentMethod?: string;
+}
+
+export interface PaymentFeeConfig {
+  id?: string;
+  credit_pct: number;
+  debit_pct: number;
+  pix_pct?: number;
 }
 
 export interface UserProfile {

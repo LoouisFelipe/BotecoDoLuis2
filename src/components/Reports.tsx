@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, Timestamp, doc, getDoc } from 'firebase/firestore';
-import { Transaction, UserProfile } from '../types';
+import { Transaction, UserProfile, PaymentFeeConfig } from '../types';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, AreaChart, Area } from 'recharts';
 import { startOfDay, endOfDay, subDays, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Loader2, TrendingUp, TrendingDown, DollarSign, BarChart3, Calendar, Activity, Sparkles } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
+import { Loader2, TrendingUp, TrendingDown, DollarSign, BarChart3, Calendar, Activity, Sparkles, ArrowUpRight, ArrowDownRight, Minus, PackageMinus } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { geminiService } from '../services/geminiService';
 import Markdown from 'react-markdown';
@@ -14,7 +15,7 @@ import Markdown from 'react-markdown';
 export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTab: (tab: string) => void }) {
   const [loading, setLoading] = useState(true);
   const [dailyData, setDailyData] = useState<any[]>([]);
-  const [stats, setStats] = useState({ income: 0, expense: 0, profit: 0 });
+  const [stats, setStats] = useState({ income: 0, expense: 0, profit: 0, grossProfit: 0, grossMarginPct: 0 });
   const [monthlySummary, setMonthlySummary] = useState<any | null>(null);
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -57,6 +58,17 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
         console.error("Error fetching monthly summary:", error);
       }
 
+      // Fetch Rates explicitly for strict accuracy
+      let rates: PaymentFeeConfig = { credit_pct: 0, debit_pct: 0, pix_pct: 0 };
+      try {
+        const docSnap = await getDoc(doc(db, 'payment_fees', 'config_rates'));
+        if (docSnap.exists()) {
+          rates = docSnap.data() as PaymentFeeConfig;
+        }
+      } catch (err) {
+        console.error('Error fetching rates', err);
+      }
+
       const fetchDays = Array.from({ length: 7 }, (_, i) => {
         const date = subDays(new Date(), i);
         const start = startOfDay(date);
@@ -78,20 +90,41 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
           const dayTransactions = transSnapshot.docs.map(doc => doc.data() as Transaction);
           const dayExpenses = expSnapshot.docs.map(doc => doc.data() as Transaction);
           
-          const income = dayTransactions.filter(t => t.type === 'income' && !(t as any).isFiado).reduce((s, t) => s + (t.amount || 0), 0);
+          let rawIncome = 0;
+          let paymentFees = 0;
+          
+          dayTransactions.filter(t => t.type === 'income' && !(t as any).isFiado).forEach(t => {
+             rawIncome += t.amount;
+             
+             // Dynamic fee calculation
+             let pct = 0;
+             const method = t.paymentMethod?.toUpperCase();
+             if (method === 'CRÉDITO' || method === 'CREDITO') pct = rates.credit_pct || 0;
+             else if (method === 'DÉBITO' || method === 'DEBITO') pct = rates.debit_pct || 0;
+             else if (method === 'PIX') pct = rates.pix_pct || 0;
+
+             // Only deduct if not natively present (backwards compatibility)
+             paymentFees += t.feeAmount !== undefined ? t.feeAmount : ((t.amount * pct) / 100);
+          });
+          
+          const income = rawIncome; // Keep raw income for Gross Revenue
           const cost = dayTransactions.filter(t => t.type === 'income').reduce((s, t) => s + (t.cost || 0), 0);
+          
           const expenseFromTrans = dayTransactions.filter(t => t.type === 'expense').reduce((s, t) => s + (t.amount || 0), 0);
           const expenseFromExp = dayExpenses.reduce((s, t) => s + (t.amount || 0), 0);
 
-          const totalDayExpense = expenseFromTrans + expenseFromExp;
+          const totalDayExpense = expenseFromTrans + expenseFromExp + paymentFees;
 
           return {
             date,
             name: format(date, 'EEE', { locale: ptBR }).toUpperCase(),
             fullDate: format(date, 'dd/MM'),
-            income,
+            income, // Gross Income
             expense: totalDayExpense,
+            paymentFees,
+            numFeesCalc: dayTransactions.filter(t => t.type === 'income' && !(t as any).isFiado).length, // Just for debugging logic limits
             cost,
+            grossProfit: income - cost,
             profit: income - cost - totalDayExpense
           };
         });
@@ -103,14 +136,31 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
         
         let totalIncome = 0;
         let totalExpense = 0;
+        let totalCost = 0;
         
         sortedResults.forEach(r => {
           totalIncome += r.income;
           totalExpense += r.expense;
+          totalCost += r.cost;
         });
 
-        setDailyData(sortedResults);
-        setStats({ income: totalIncome, expense: totalExpense, profit: totalIncome - totalExpense });
+        const totalGrossProfit = totalIncome - totalCost;
+        const generalGrossMargin = totalIncome > 0 ? (totalGrossProfit / totalIncome) * 100 : 0;
+
+        const enhancedResults = sortedResults.map(r => ({
+          ...r,
+          grossMarginPct: r.income > 0 ? (r.grossProfit / r.income) * 100 : 0,
+          generalGrossMargin
+        }));
+
+        setDailyData(enhancedResults);
+        setStats({ 
+          income: totalIncome, 
+          expense: totalExpense, 
+          profit: totalIncome - totalExpense - totalCost,
+          grossProfit: totalGrossProfit,
+          grossMarginPct: generalGrossMargin
+        });
       } catch (error) {
         console.error("Error fetching daily data:", error);
       }
@@ -172,7 +222,7 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
       )}
 
       {/* 7-Day Performance Banner */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         <StatCard 
           title="Receita (7d)" 
           value={stats.income} 
@@ -181,7 +231,7 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
           onClick={() => setActiveTab('finances')}
         />
         <StatCard 
-          title="Despesa (7d)" 
+          title="Despesa Geral (7d)" 
           value={stats.expense} 
           icon={<TrendingDown className="w-6 h-6 text-red-500" />} 
           variant="red"
@@ -193,6 +243,13 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
           icon={<DollarSign className="w-6 h-6 text-primary" />} 
           variant="blue"
           onClick={() => setActiveTab('finances')}
+        />
+        <StatCard 
+          title="Margem Bruta (7d)" 
+          value={stats.grossProfit} 
+          icon={<Sparkles className="w-6 h-6 text-orange-500" />} 
+          variant="orange"
+          subtext={`(${stats.grossMarginPct.toFixed(1)}%)`}
         />
       </div>
 
@@ -358,15 +415,98 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
           </CardContent>
         </Card>
       </div>
+
+      <Card className="border-border bg-card/50 rounded-2xl overflow-hidden mt-8">
+        <CardHeader className="border-b border-border pb-4 bg-white/5">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-orange-500/10 text-orange-500">
+              <PackageMinus className="w-5 h-5" />
+            </div>
+            <div>
+              <CardTitle className="text-sm font-bold uppercase tracking-wider">Margem Bruta (Diária)</CardTitle>
+              <p className="text-[10px] text-muted-foreground tracking-widest uppercase font-semibold">
+                Receita Operacional vs Custo de Produtos
+              </p>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-0 px-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-border hover:bg-transparent">
+                  <TableHead className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Dia</TableHead>
+                  <TableHead className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground text-right">Receita</TableHead>
+                  <TableHead className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground text-right">Custo Prod.</TableHead>
+                  <TableHead className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground text-right">Lucro Bruto</TableHead>
+                  <TableHead className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground text-right">Margem %</TableHead>
+                  <TableHead className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground text-center">vs Média Geral</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {dailyData.map((day, idx) => {
+                  const diff = day.grossMarginPct - stats.grossMarginPct;
+                  const isPositive = diff > 0;
+                  const isNeutral = Math.abs(diff) < 0.1;
+                  
+                  return (
+                    <TableRow key={idx} className="border-border hover:bg-white/5 transition-colors">
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="font-bold text-sm uppercase">{day.name}</span>
+                          <span className="text-[10px] text-muted-foreground font-mono">{day.fullDate}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-green-500 font-bold">
+                        R$ {day.income.toFixed(2)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-red-500 opacity-80">
+                        R$ {day.cost.toFixed(2)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono font-bold text-orange-500">
+                        R$ {day.grossProfit.toFixed(2)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <span className="inline-flex items-center justify-center px-2 py-1 rounded bg-orange-500/10 text-orange-500 font-black text-xs">
+                          {day.grossMarginPct.toFixed(1)}%
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {isNeutral ? (
+                          <div className="flex items-center justify-center gap-1 text-muted-foreground">
+                            <Minus className="w-3 h-3" />
+                            <span className="text-[10px] font-bold font-mono">0.0%</span>
+                          </div>
+                        ) : isPositive ? (
+                          <div className="flex items-center justify-center gap-1 text-green-500">
+                            <ArrowUpRight className="w-3 h-3" />
+                            <span className="text-[10px] font-bold font-mono">+{diff.toFixed(1)}%</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-center gap-1 text-red-500">
+                            <ArrowDownRight className="w-3 h-3" />
+                            <span className="text-[10px] font-bold font-mono">{diff.toFixed(1)}%</span>
+                          </div>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
 
-function StatCard({ title, value, icon, variant, onClick }: { title: string, value: number, icon: React.ReactNode, variant: 'green' | 'red' | 'blue', onClick?: () => void }) {
+function StatCard({ title, value, icon, variant, onClick, subtext }: { title: string, value: number, icon: React.ReactNode, variant: 'green' | 'red' | 'blue' | 'orange', onClick?: () => void, subtext?: string }) {
   const variantStyles = {
     green: "from-green-500/5 shadow-[0_0_20px_rgba(34,197,94,0.1)] text-green-500",
     red: "from-red-500/5 shadow-[0_0_20px_rgba(239,68,68,0.1)] text-red-500",
-    blue: "from-primary/5 shadow-[0_0_20px_rgba(var(--primary),0.1)] text-primary"
+    blue: "from-primary/5 shadow-[0_0_20px_rgba(var(--primary),0.1)] text-primary",
+    orange: "from-orange-500/5 shadow-[0_0_20px_rgba(249,115,22,0.1)] text-orange-500"
   };
 
   return (
@@ -383,6 +523,7 @@ function StatCard({ title, value, icon, variant, onClick }: { title: string, val
           "w-12 h-12 rounded-2xl flex items-center justify-center border transition-transform group-hover:scale-110",
           variant === 'green' ? "bg-green-500/10 border-green-500/20" : 
           variant === 'red' ? "bg-red-500/10 border-red-500/20" : 
+          variant === 'orange' ? "bg-orange-500/10 border-orange-500/20" :
           "bg-primary/10 border-primary/20",
           variantStyles[variant].split(' ')[1]
         )}>
@@ -390,9 +531,16 @@ function StatCard({ title, value, icon, variant, onClick }: { title: string, val
         </div>
         <div>
           <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-1">{title}</p>
-          <h3 className={cn("text-2xl font-black leading-none", variantStyles[variant].split(' ').slice(2).join(' '))}>
-            R$ {value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-          </h3>
+          <div className="flex items-baseline gap-2">
+            <h3 className={cn("text-2xl font-black leading-none", variantStyles[variant].split(' ').slice(2).join(' '))}>
+              R$ {value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            </h3>
+            {subtext && (
+              <span className={cn("text-xs font-bold", variantStyles[variant].split(' ').slice(2).join(' '))}>
+                {subtext}
+              </span>
+            )}
+          </div>
         </div>
       </CardContent>
     </Card>

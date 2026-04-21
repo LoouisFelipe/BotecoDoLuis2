@@ -19,8 +19,10 @@ import { format } from 'date-fns';
 import { Order } from '../types';
 
 import { useFetchCollection } from '../hooks/useFetchCollection';
+import { usePaymentFees } from '../hooks/usePaymentFees';
 
 export function Customers({ user }: { user: UserProfile }) {
+  const { calculateNet } = usePaymentFees();
   const customerConstraints = React.useMemo(() => [orderBy('name', 'asc')], []);
 
   const { data: customers } = useFetchCollection<Customer>('customers', {
@@ -140,10 +142,13 @@ export function Customers({ user }: { user: UserProfile }) {
       });
 
       // Create transaction
+      const { netAmount, feeAmount } = calculateNet(amount, payMethod);
       await addDoc(collection(db, 'transactions'), {
         type: 'income',
         category: 'Recebimento Fiado',
         amount: amount,
+        netAmount,
+        feeAmount,
         description: `Pagamento de dívida: ${selectedCustomerForPay.name}`,
         date: serverTimestamp(),
         paymentMethod: payMethod,

@@ -32,7 +32,7 @@ export function ProductFormModal({
   categories: Category[];
   onSaveSuccess?: (product: Product & { id: string }) => void;
 }) {
-  const [productModalTab, setProductModalTab] = useState<'identificacao' | 'venda_estoque'>('identificacao');
+  const [productModalTab, setProductModalTab] = useState<'identificacao' | 'venda_estoque' | 'controle_dose'>('identificacao');
   const [isSavingProduct, setIsSavingProduct] = useState(false);
 
   // Form states
@@ -228,7 +228,8 @@ export function ProductFormModal({
         <div className="flex border-b border-white/5 bg-black/20">
           {[
             { id: 'identificacao', label: '1. Identificação', icon: Package },
-            { id: 'venda_estoque', label: '2. Venda & Estoque', icon: DollarSign }
+            { id: 'venda_estoque', label: '2. Venda & Estoque', icon: DollarSign },
+            { id: 'controle_dose', label: '3. Controle de ML/Dose', icon: Droplets }
           ].map((tab) => (
             <button 
               key={tab.id}
@@ -405,154 +406,49 @@ export function ProductFormModal({
                   </div>
                 </div>
 
-                {/* Seção Dinâmica Baseada no isDoseControl e linkedProductId */}
-                {(isDoseControl && !linkedProductId) ? (
-                  /* MODO GARRAFA BASE (Velho Barreiro, Smirnoff, etc) */
-                  <div className="space-y-8 animate-in fade-in duration-300">
-                    <div className="bg-primary/5 border border-primary/20 p-6 rounded-2xl space-y-6">
-                      <div className="flex items-center gap-3">
-                        <FlaskConical className="w-5 h-5 text-primary" />
-                        <div>
-                          <h4 className="text-[10px] font-black uppercase tracking-widest text-white">Configuração de Inventário da Garrafa</h4>
-                          <p className="text-[9px] text-muted-foreground uppercase font-medium">Controle por ML e Unidade</p>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Garrafas Fechadas (Estoque)</label>
-                          <Input 
-                            type="number"
-                            className="h-12 bg-black/40 border-white/10 rounded-xl font-bold"
-                            value={productStock}
-                            onChange={(e) => setProductStock(e.target.value)}
-                            placeholder="Ex: 3"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-primary ml-1">Capacidade da Garrafa (ML)</label>
-                          <div className="relative">
-                            <Input 
-                              type="number"
-                              className="h-12 bg-black/40 border-white/10 focus:border-primary rounded-xl font-bold pl-4"
-                              value={volumePerUnit}
-                              onChange={(e) => setVolumePerUnit(e.target.value)}
-                              placeholder="Ex: 910"
-                            />
-                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[9px] font-black text-muted-foreground">ML</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between px-1">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">ML Restante na Garrafa Aberta</label>
-                          <Badge className="bg-primary/20 text-primary border-primary/20 text-[8px] font-black tracking-widest">EM USO NO BALCÃO</Badge>
-                        </div>
-                        <div className="relative">
-                          <Droplets className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary" />
-                          <Input 
-                            type="number"
-                            className="h-14 bg-black/40 border-white/10 focus:border-primary text-xl font-black pl-12 rounded-xl text-primary"
-                            value={currentBottleVolume}
-                            onChange={(e) => setCurrentBottleVolume(e.target.value)}
-                            placeholder="Ex: 450"
-                          />
-                        </div>
-                        <p className="text-[9px] text-muted-foreground/60 uppercase font-medium px-1 italic">
-                          O sistema baixará as doses deste volume. Ao chegar a 0, abrirá automaticamente uma das {productStock || '0'} fechadas.
-                        </p>
-                      </div>
-
-                      {/* Configuração de Venda da Garrafa Inteira */}
-                      <div className="pt-4 border-t border-white/5">
-                        <div className="flex items-center justify-between mb-4">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Preço de Venda (Garrafa Inteira)</label>
-                          <p className="text-[8px] text-muted-foreground uppercase font-bold italic">Deixe 0 se não vender a garrafa fechada</p>
-                        </div>
-                        <div className="relative">
-                          <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-green-500 text-lg">R$</span>
-                          <Input 
-                            type="number"
-                            step="0.01"
-                            className="h-14 bg-green-500/5 border-green-500/10 focus:border-green-500/30 text-xl font-black pl-12 rounded-xl text-green-500"
-                            value={productPrice}
-                            onChange={(e) => setProductPrice(e.target.value)}
-                            placeholder="0.00"
-                          />
-                        </div>
-                      </div>
+                <div className="bg-white/[0.02] border border-white/5 p-6 rounded-2xl space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                      <DollarSign className="w-4 h-4 text-green-500" /> Configuração de Venda
+                    </h4>
+                    <div className="flex items-center gap-2">
+                      <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Valor Aberto?</label>
+                      <button 
+                        type="button"
+                        onClick={() => setIsOpenValue(!isOpenValue)}
+                        className={cn(
+                          "w-8 h-4 rounded-full transition-all relative",
+                          isOpenValue ? "bg-green-500" : "bg-white/10"
+                        )}
+                      >
+                        <div className={cn("absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all", isOpenValue ? "left-4.5" : "left-0.5")} />
+                      </button>
                     </div>
-
-                    {/* Doses Vinculadas (Apenas Edição) */}
-                    {editingProduct && products.some(p => p.linkedProductId === editingProduct.id) && (
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between px-1">
-                          <h4 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                             Formatos de Dose Configurados
-                          </h4>
-                          <Badge className="bg-primary/10 text-primary">{products.filter(p => p.linkedProductId === editingProduct.id).length} FORMATOS</Badge>
-                        </div>
-                        <div className="grid grid-cols-1 gap-2">
-                          {products
-                            .filter(p => p.linkedProductId === editingProduct.id)
-                            .map(dose => (
-                              <div key={dose.id} className="bg-white/[0.02] border border-white/5 p-4 rounded-xl flex items-center justify-between group hover:bg-white/[0.04] transition-all">
-                                <div className="flex items-center gap-3">
-                                  <Wine className="w-4 h-4 text-primary" />
-                                  <div>
-                                    <p className="text-xs font-black uppercase tracking-tight">{dose.name}</p>
-                                    <p className="text-[9px] font-bold text-muted-foreground uppercase">{dose.doseSize}ml — R$ {dose.price.toFixed(2)}</p>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                        </div>
-                      </div>
-                    )}
-                    
-                    {!editingProduct && (
-                      <div className="p-5 bg-primary/5 border border-dashed border-primary/20 rounded-2xl">
-                        <p className="text-[10px] font-black text-primary uppercase tracking-widest mb-1 flex items-center gap-2">
-                          <Plus className="w-3 h-3" /> Dica Pro
-                        </p>
-                        <p className="text-[10px] text-muted-foreground uppercase leading-relaxed font-bold">
-                          Após salvar esta garrafa (ex: Velho Barreiro), você poderá cadastrar os diferentes formatos de doses (Dose Simples, Dose Dupla) vinculados a ela.
-                        </p>
-                      </div>
-                    )}
                   </div>
-                ) : !isDoseControl ? (
-                  /* MODO PRODUTO PADRÃO (Latas, Porções, etc) */
-                  <div className="space-y-8 animate-in fade-in duration-300">
-                    <div className="bg-white/[0.02] border border-white/5 p-6 rounded-2xl space-y-6">
-                      <div className="flex items-center justify-between">
-                        <h4 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                          <DollarSign className="w-4 h-4 text-green-500" /> Configuração de Venda
-                        </h4>
-                        <div className="flex items-center gap-2">
-                          <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Valor Aberto?</label>
-                          <button 
-                            type="button"
-                            onClick={() => setIsOpenValue(!isOpenValue)}
-                            className={cn(
-                              "w-8 h-4 rounded-full transition-all relative",
-                              isOpenValue ? "bg-green-500" : "bg-white/10"
-                            )}
-                          >
-                            <div className={cn("absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all", isOpenValue ? "left-4.5" : "left-0.5")} />
-                          </button>
-                        </div>
-                      </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Formato de Venda</label>
-                          <Select value={productUnit} onValueChange={setProductUnit}>
-                            <SelectTrigger className="h-14 bg-black/40 border-white/10 rounded-xl">
-                              <SelectValue placeholder="Como o produto é vendido?" />
-                            </SelectTrigger>
-                            <SelectContent className="bg-[#0b1224] border-white/10">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Formato de Venda</label>
+                      <Select value={productUnit} onValueChange={setProductUnit}>
+                        <SelectTrigger className="h-14 bg-black/40 border-white/10 rounded-xl">
+                          <SelectValue placeholder="Como o produto é vendido?" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#0b1224] border-white/10">
+                          {isDoseControl && linkedProductId ? (
+                            <>
+                              <SelectItem value="Degustação (20ml)">Degustação (20ml)</SelectItem>
+                              <SelectItem value="Shot Standard (30ml)">Shot Standard (30ml)</SelectItem>
+                              <SelectItem value="Dose Curta (40ml)">Dose Curta (40ml)</SelectItem>
+                              <SelectItem value="Dose Simples (50ml)">Dose Simples (50ml)</SelectItem>
+                              <SelectItem value="Dose Generosa (60ml)">Dose Generosa (60ml)</SelectItem>
+                              <SelectItem value="Shot Duplo (70ml)">Shot Duplo (70ml)</SelectItem>
+                              <SelectItem value="Dose Dupla (100ml)">Dose Dupla (100ml)</SelectItem>
+                              <SelectItem value="Copo Americano (190ml)">Copo Americano (190ml)</SelectItem>
+                              <SelectItem value="Long Drink (250ml)">Long Drink (250ml)</SelectItem>
+                              <SelectItem value="Dose (Personalizada)">Outro Formato</SelectItem>
+                            </>
+                          ) : (
+                            <>
                               <SelectGroup>
                                 <SelectLabel className="text-[10px] font-black uppercase tracking-widest text-muted-foreground px-2 py-1.5">Geral</SelectLabel>
                                 <SelectItem value="Por Unidade">Por Unidade / Lata</SelectItem>
@@ -564,182 +460,253 @@ export function ProductFormModal({
                                 <SelectItem value="Por Porção (Pratos)">Por Porção</SelectItem>
                                 <SelectItem value="Serviço / Valor Aberto">Serviço Especial</SelectItem>
                               </SelectGroup>
-                            </SelectContent>
-                          </Select>
+                            </>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center px-1 mb-1">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-green-500">
+                          {isDoseControl && !linkedProductId ? "Preço de Venda (Garrafa Inteira)" : (isDoseControl && linkedProductId ? "Preço de Venda da Dose" : "Preço de Venda (R$)")}
+                        </label>
+                        {isDoseControl && !linkedProductId && <span className="text-[8px] font-medium text-muted-foreground uppercase opacity-80">Deixe 0 se não vender</span>}
+                      </div>
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-green-500 text-lg">R$</span>
+                        <Input 
+                          type="number"
+                          step="0.01"
+                          className="h-14 bg-green-500/5 border-green-500/20 focus:border-green-500/50 text-xl font-black pl-12 rounded-xl text-green-500"
+                          value={productPrice}
+                          onChange={(e) => setProductPrice(e.target.value)}
+                          placeholder="0.00"
+                          disabled={isOpenValue}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {!isDoseControl && !linkedProductId && (
+                    <div className="pt-2 border-t border-white/5 mt-4">
+                       <div className="space-y-2">
+                          <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Estoque Total (Unidades / Peso)</label>
+                          <Input 
+                            type="number"
+                            className="h-12 bg-black/40 border-white/10 rounded-xl font-bold"
+                            value={productStock}
+                            onChange={(e) => setProductStock(e.target.value)}
+                            placeholder="0"
+                          />
                         </div>
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-green-500 ml-1">Preço de Venda (R$)</label>
-                          <div className="relative">
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-green-500 text-lg">R$</span>
-                            <Input 
-                              type="number"
-                              step="0.01"
-                              className="h-14 bg-green-500/5 border-green-500/20 focus:border-green-500/50 text-xl font-black pl-12 rounded-xl text-green-500"
-                              value={productPrice}
-                              onChange={(e) => setProductPrice(e.target.value)}
-                              placeholder="0.00"
-                              disabled={isOpenValue}
-                            />
+                    </div>
+                  )}
+                  
+                  {isDoseControl && !linkedProductId && (
+                    <div className="pt-2 border-t border-white/5 mt-4 flex items-center justify-between p-4 bg-primary/5 rounded-xl border border-primary/20">
+                       <p className="text-[10px] text-primary uppercase font-black tracking-widest">Controle por ML Detectado</p>
+                       <Button 
+                         variant="ghost" 
+                         className="h-8 text-[9px] uppercase tracking-widest hover:bg-primary/20 text-white"
+                         onClick={() => setProductModalTab('controle_dose')}
+                       >
+                         Configurar Garrafa +
+                       </Button>
+                    </div>
+                  )}
+
+                  {isDoseControl && linkedProductId && (
+                    <div className="pt-2 border-t border-white/5 mt-4 flex items-center justify-between p-4 bg-primary/5 rounded-xl border border-primary/20">
+                       <p className="text-[10px] text-primary uppercase font-black tracking-widest">Dose Vinculada Detectada</p>
+                       <Button 
+                         variant="ghost" 
+                         className="h-8 text-[9px] uppercase tracking-widest hover:bg-primary/20 text-white"
+                         onClick={() => setProductModalTab('controle_dose')}
+                       >
+                         Configurar ML / Garrafa +
+                       </Button>
+                    </div>
+                  )}
+
+                </div>
+              </div>
+            )}
+
+            {/* 3. CONTROLE DE DOSE TAB */}
+            {productModalTab === 'controle_dose' && (
+              <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                {!isDoseControl ? (
+                   <div className="p-8 text-center flex flex-col items-center justify-center border border-dashed border-white/10 rounded-2xl bg-white/[0.01]">
+                      <Droplets className="w-12 h-12 text-muted-foreground/30 mb-4" />
+                      <h4 className="text-sm font-black uppercase tracking-widest text-muted-foreground">Não Aplicável</h4>
+                      <p className="text-[10px] text-muted-foreground/60 uppercase font-bold mt-2 max-w-[250px] mx-auto">
+                        O item selecionado está como "Item Simples". Controle volumétrico não é necessário. Selecione "Garrafa Base" ou "Dose Vinculada" na aba de Vendas.
+                      </p>
+                   </div>
+                ) : (isDoseControl && !linkedProductId) ? (
+                   <div className="space-y-8">
+                     <div className="bg-primary/5 border border-primary/20 p-6 rounded-2xl space-y-6">
+                        <div className="flex items-center gap-3">
+                          <FlaskConical className="w-5 h-5 text-primary" />
+                          <div>
+                            <h4 className="text-[10px] font-black uppercase tracking-widest text-white">Configuração de Inventário da Garrafa</h4>
+                            <p className="text-[9px] text-muted-foreground uppercase font-medium">Controle por ML e Unidades Fechadas</p>
                           </div>
                         </div>
-                      </div>
-                      
-                      {!isDoseControl && !linkedProductId && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Garrafas Fechadas no Estoque</label>
+                            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Garrafas Fechadas (Estoque Real)</label>
                             <Input 
                               type="number"
                               className="h-12 bg-black/40 border-white/10 rounded-xl font-bold"
                               value={productStock}
                               onChange={(e) => setProductStock(e.target.value)}
-                              placeholder="0"
+                              placeholder="Ex: 3"
                             />
                           </div>
-                          {productUnit === 'Garrafa / Inteiro' && (
-                            <div className="space-y-2">
-                              <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Volume da Garrafa (ML)</label>
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-primary ml-1">Capacidade da Garrafa (ML)</label>
+                            <div className="relative">
                               <Input 
                                 type="number"
-                                className="h-12 bg-black/40 border-white/10 rounded-xl font-bold"
+                                className="h-12 bg-black/40 border-white/10 focus:border-primary rounded-xl font-bold pl-4"
                                 value={volumePerUnit}
                                 onChange={(e) => setVolumePerUnit(e.target.value)}
                                 placeholder="Ex: 910"
                               />
+                              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[9px] font-black text-muted-foreground">ML</span>
                             </div>
-                          )}
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between px-1">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">ML Restante na Garrafa Aberta</label>
+                            <Badge className="bg-primary/20 text-primary border-primary/20 text-[8px] font-black tracking-widest">EM COMPARTILHAMENTO</Badge>
+                          </div>
+                          <div className="relative">
+                            <Droplets className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary" />
+                            <Input 
+                              type="number"
+                              className="h-14 bg-black/40 border-white/10 focus:border-primary text-xl font-black pl-12 rounded-xl text-primary"
+                              value={currentBottleVolume}
+                              onChange={(e) => setCurrentBottleVolume(e.target.value)}
+                              placeholder="Ex: 450"
+                            />
+                          </div>
+                          <p className="text-[9px] text-muted-foreground/60 uppercase font-medium px-1 italic">
+                            O sistema baixará as doses deste volume. Ao chegar a 0, abrirá automaticamente uma das {productStock || '0'} fechadas.
+                          </p>
+                        </div>
+                     </div>
+
+                     {/* Doses Vinculadas Existentes */}
+                     {editingProduct && products.some(p => p.linkedProductId === editingProduct.id) && (
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between px-1">
+                            <h4 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                               Doses / Formatos Configurados
+                            </h4>
+                            <Badge className="bg-primary/10 text-primary">{products.filter(p => p.linkedProductId === editingProduct.id).length} FORMATOS</Badge>
+                          </div>
+                          <div className="grid grid-cols-1 gap-2">
+                            {products
+                              .filter(p => p.linkedProductId === editingProduct.id)
+                              .map(dose => (
+                                <div key={dose.id} className="bg-white/[0.02] border border-white/5 p-4 rounded-xl flex items-center justify-between group hover:bg-white/[0.04] transition-all">
+                                  <div className="flex items-center gap-3">
+                                    <Wine className="w-4 h-4 text-primary" />
+                                    <div>
+                                      <p className="text-xs font-black uppercase tracking-tight">{dose.name}</p>
+                                      <p className="text-[9px] font-bold text-muted-foreground uppercase">{dose.doseSize}ml — R$ {dose.price.toFixed(2)}</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                          </div>
                         </div>
                       )}
-                    </div>
 
-                    {/* Conteúdo de ML para Garrafas Base - Refinado */}
-                    {/* (This section already handled by the 3-way toggle above) */}
-                  </div>
-                ) : (
-                  /* MODO DOSE FRACIONADA (Linked) */
-                  <div className="space-y-8 animate-in fade-in duration-300">
-                    <div className="space-y-8">
-                        {/* Passo 1: Garrafa de Origem */}
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-2">
-                            <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-black text-primary">1</div>
-                            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Vincular a uma Garrafa</label>
-                          </div>
-                          <Select value={linkedProductId} onValueChange={setLinkedProductId}>
-                            <SelectTrigger className="h-14 bg-black/40 border-white/10 rounded-xl">
-                              <SelectValue placeholder="Selecione a garrafa de estoque">
-                                {products.find(p => p.id === linkedProductId)?.name}
-                              </SelectValue>
-                            </SelectTrigger>
-                            <SelectContent className="bg-[#0b1224] border-white/10 max-h-[300px]">
-                              {products
-                                .filter(p => !p.linkedProductId && (p.unit === 'Garrafa / Inteiro' || (p.volumePerUnit && p.volumePerUnit > 0)))
-                                .map(p => (
-                                  <SelectItem key={p.id} value={p.id} className="font-bold uppercase tracking-widest text-[10px] py-3">
-                                    {p.name} ({p.currentBottleVolume || p.volumePerUnit}ml disponíveis)
-                                  </SelectItem>
-                                ))}
-                            </SelectContent>
-                          </Select>
+                      {!editingProduct && (
+                        <div className="p-5 bg-primary/5 border border-dashed border-primary/20 rounded-2xl">
+                          <p className="text-[10px] font-black text-primary uppercase tracking-widest mb-1 flex items-center gap-2">
+                            <Plus className="w-3 h-3" /> Dica de Estoque
+                          </p>
+                          <p className="text-[10px] text-muted-foreground uppercase leading-relaxed font-bold">
+                            Após salvar esta garrafa aqui, cadastre novos produtos como "Dose Vinculada" e aponte para cá. O abate de ML será automático na venda da dose.
+                          </p>
                         </div>
-
-                        {/* Passo 2: Formato de Venda e Tamanho */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <div className="space-y-3">
+                      )}
+                   </div>
+                ) : (
+                   <div className="space-y-8">
+                     <div className="bg-primary/5 border border-primary/20 p-6 rounded-2xl space-y-6">
+                        <div className="space-y-3">
                             <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-black text-primary">2</div>
-                              <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Formato da Dose</label>
+                              <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-black text-primary">1</div>
+                              <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Vincular a qual Garrafa Base?</label>
                             </div>
-                            <Select value={productUnit} onValueChange={setProductUnit}>
+                            <Select value={linkedProductId} onValueChange={setLinkedProductId}>
                               <SelectTrigger className="h-14 bg-black/40 border-white/10 rounded-xl">
-                                <SelectValue placeholder="Padrão do Boteco" />
+                                <SelectValue placeholder="Selecione a garrafa de estoque">
+                                  {products.find(p => p.id === linkedProductId)?.name || "Selecione uma Capa do Estoque"}
+                                </SelectValue>
                               </SelectTrigger>
-                              <SelectContent className="bg-[#0b1224] border-white/10">
-                                <SelectItem value="Degustação (20ml)">Degustação (20ml)</SelectItem>
-                                <SelectItem value="Shot Standard (30ml)">Shot Standard (30ml)</SelectItem>
-                                <SelectItem value="Dose Curta (40ml)">Dose Curta (40ml)</SelectItem>
-                                <SelectItem value="Dose Simples (50ml)">Dose Simples (50ml)</SelectItem>
-                                <SelectItem value="Dose Generosa (60ml)">Dose Generosa (60ml)</SelectItem>
-                                <SelectItem value="Shot Duplo (70ml)">Shot Duplo (70ml)</SelectItem>
-                                <SelectItem value="Dose Dupla (100ml)">Dose Dupla (100ml)</SelectItem>
-                                <SelectItem value="Copo Americano (190ml)">Copo Americano (190ml)</SelectItem>
-                                <SelectItem value="Long Drink (250ml)">Long Drink (250ml)</SelectItem>
-                                <SelectItem value="Dose (Personalizada)">Outro Formato</SelectItem>
+                              <SelectContent className="bg-[#0b1224] border-white/10 max-h-[300px]">
+                                {products
+                                  .filter(p => !p.linkedProductId && (p.unit === 'Garrafa / Inteiro' || (p.volumePerUnit && p.volumePerUnit > 0)))
+                                  .map(p => (
+                                    <SelectItem key={p.id} value={p.id} className="font-bold uppercase tracking-widest text-[10px] py-3">
+                                      {p.name} ({p.currentBottleVolume || p.volumePerUnit}ml disponíveis)
+                                    </SelectItem>
+                                  ))}
                               </SelectContent>
                             </Select>
-                          </div>
-                          
-                          <div className="space-y-3">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-8">Baixa no ML exato</label>
+                        </div>
+
+                        <div className="space-y-3 pt-4 border-t border-primary/10">
+                            <div className="flex items-center gap-2 mb-2">
+                              <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-black text-primary">2</div>
+                              <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Baixa no ML exato na Garrafa Principal</label>
+                            </div>
                             <div className="relative">
                               <Wine className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary" />
                               <Input 
                                 type="number"
                                 min="0"
-                                className="h-14 bg-black/40 border-white/10 focus:border-primary text-sm font-black pl-11 rounded-xl"
+                                className="h-14 bg-black/40 border-primary/20 focus:border-primary text-xl font-black pl-12 rounded-xl text-primary"
                                 value={doseSize}
                                 onChange={(e) => setDoseSize(e.target.value)}
                                 placeholder="Ex: 50"
                               />
+                              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[9px] font-black text-muted-foreground uppercase tracking-widest">
+                                MILILITROS
+                              </span>
                             </div>
-                          </div>
                         </div>
+                     </div>
 
-                        {/* Passo 3: Preço de Venda */}
-                        <div className="space-y-3 p-6 bg-white/[0.02] rounded-2xl border border-white/5">
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded-full bg-green-500/20 flex items-center justify-center text-[10px] font-black text-green-500">3</div>
-                              <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Preço de Venda da Dose</label>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Valor Aberto?</label>
-                              <button 
-                                onClick={() => setIsOpenValue(!isOpenValue)}
-                                className={cn(
-                                  "w-8 h-4 rounded-full transition-all relative",
-                                  isOpenValue ? "bg-green-500" : "bg-white/10"
-                                )}
-                              >
-                                <div className={cn("absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all", isOpenValue ? "left-4.5" : "left-0.5")} />
-                              </button>
-                            </div>
-                          </div>
-                          <div className="relative">
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-green-500 text-lg">R$</span>
-                            <Input 
-                              type="number"
-                              step="0.01"
-                              className="h-16 bg-black/40 border-green-500/20 focus:border-green-500/50 text-2xl font-black pl-14 rounded-xl text-green-500 shadow-inner"
-                              value={productPrice}
-                              onChange={(e) => setProductPrice(e.target.value)}
-                              placeholder="0.00"
-                              disabled={isOpenValue}
-                            />
-                          </div>
+                     <div className="p-5 bg-white/[0.02] border border-white/5 rounded-2xl flex items-start gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center flex-shrink-0">
+                          <Info className="w-5 h-5 text-white/50" />
                         </div>
-
-                        {/* Resumo Dinâmico */}
-                        <div className="p-5 bg-primary/5 border border-primary/10 rounded-2xl flex items-start gap-4">
-                          <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0">
-                            <Info className="w-5 h-5 text-primary" />
-                          </div>
-                          <div>
-                            <p className="text-[10px] font-black text-primary uppercase tracking-widest mb-1">Impacto no Estoque e Caixa</p>
-                            <p className="text-xs text-muted-foreground leading-relaxed">
-                              Ao bipar uma <span className="text-white font-bold">{productName || 'Dose'}</span>, o sistema irá somar 
-                              <span className="text-green-400 font-bold mx-1">
-                                {isOpenValue ? 'Preço Aberto' : `R$ ${parseFloat(productPrice || '0').toFixed(2)}`}
-                              </span> 
-                              ao caixa e abater <span className="text-white font-bold">{doseSize || '0'}ml</span> direto da garrafa 
-                              <span className="text-primary font-bold ml-1">
-                                {products.find(p => p.id === linkedProductId)?.name || '...'}
-                              </span>.
-                            </p>
-                          </div>
+                        <div>
+                          <p className="text-[10px] font-black text-white uppercase tracking-widest mb-1">Engrenagem Funcionando</p>
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            Ao vender <span className="text-white font-bold">1x {productName || 'Dose'}</span>, nós iremos lançar 
+                            <span className="text-green-400 font-bold mx-1">
+                              {isOpenValue ? 'Preço Aberto' : `R$ ${parseFloat(productPrice || '0').toFixed(2)}`}
+                            </span> 
+                            no caixa e subtrair exatamente <span className="text-white font-bold">{doseSize || '0'}ml</span> direto da 
+                            <span className="text-primary font-bold ml-1">
+                              {products.find(p => p.id === linkedProductId)?.name || 'Garrafa Pai'}
+                            </span>.
+                          </p>
                         </div>
-                    </div>
-                  </div>
+                      </div>
+                   </div>
                 )}
               </div>
             )}

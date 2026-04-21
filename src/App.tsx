@@ -14,7 +14,6 @@ import { Games } from './components/Games';
 import { Customers } from './components/Customers';
 import { Suppliers } from './components/Suppliers';
 import { Users as UsersComponent } from './components/Users';
-import { AIAssistant } from './components/AIAssistant';
 import { Settings as SettingsComponent } from './components/Settings';
 import { BottomNav } from './components/BottomNav';
 import { LayoutDashboard, Package, Receipt, BarChart3, LogOut, Shield, Users, Truck, Settings, Gamepad2, User, Sparkles, Activity, Globe, Database, Menu, X as CloseIcon, Plus } from 'lucide-react';
@@ -47,7 +46,6 @@ export default function App() {
     { id: 'finances', label: 'FINANCEIRO', icon: Receipt, path: '/finances' },
     { id: 'inventory', label: 'PRODUTOS', icon: Package, path: '/inventory' },
     { id: 'reports', label: 'RELATÓRIOS', icon: BarChart3, path: '/reports' },
-    { id: 'ai', label: 'ASSISTENTE IA', icon: Sparkles, path: '/ai' },
   ];
 
   const secondaryItems = [
@@ -217,7 +215,6 @@ export default function App() {
                   <Route path="/inventory" element={<Inventory user={user} setActiveTab={setActiveTab} />} />
                   <Route path="/finances" element={<Finances user={user} setActiveTab={setActiveTab} />} />
                   <Route path="/reports" element={<Reports user={user} setActiveTab={setActiveTab} />} />
-                  <Route path="/ai" element={<AIAssistant user={user} />} />
                   <Route path="/games" element={<Games user={user} />} />
                   <Route path="/clients" element={<Customers user={user} />} />
                   <Route path="/suppliers" element={<Suppliers user={user} />} />
