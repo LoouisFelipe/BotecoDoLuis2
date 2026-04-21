@@ -16,6 +16,7 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -60,6 +61,8 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
   }, []);
 
   const handleLogin = async () => {
+    if (isLoggingIn) return;
+    setIsLoggingIn(true);
     const provider = new GoogleAuthProvider();
     setError(null);
     try {
@@ -71,15 +74,19 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
       let message = 'Ocorreu um erro ao tentar fazer login.';
       
       if (authError.code === 'auth/unauthorized-domain') {
-        message = 'Este domínio não está autorizado no Firebase Console. Por favor, adicione "botecodoluis2--botecodoluis2.us-central1.hosted.app" aos domínios autorizados.';
+        message = 'Este domínio não está autorizado no Firebase Console.';
       } else if (authError.code === 'auth/popup-blocked') {
         message = 'O popup de login foi bloqueado pelo navegador.';
-      } else if (authError.code === 'auth/popup-closed-by-user') {
+      } else if (authError.code === 'auth/popup-closed-by-user' || authError.code === 'auth/cancelled-popup-request') {
         message = 'O login foi cancelado.';
       }
       
-      setError(message);
+      if (authError.code !== 'auth/popup-closed-by-user' && authError.code !== 'auth/cancelled-popup-request') {
+        setError(message);
+      }
       toast.error(message);
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
@@ -111,8 +118,20 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
                 <p>{error}</p>
               </div>
             )}
-            <Button onClick={handleLogin} className="w-full py-6 text-lg font-medium" size="lg">
-              Sign in with Google
+            <Button 
+              onClick={handleLogin} 
+              className="w-full py-6 text-lg font-medium" 
+              size="lg"
+              disabled={isLoggingIn}
+            >
+              {isLoggingIn ? (
+                <>
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                  Conectando...
+                </>
+              ) : (
+                'Sign in with Google'
+              )}
             </Button>
           </CardContent>
         </Card>

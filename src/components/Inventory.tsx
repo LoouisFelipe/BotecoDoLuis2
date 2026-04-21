@@ -232,9 +232,18 @@ export function Inventory({ user, setActiveTab }: { user: UserProfile, setActive
     }
   };
 
+  const isProductCritical = (p: Product) => {
+    if (p.isDoseControl && p.linkedProductId) {
+      const bottle = products.find(b => b.id === p.linkedProductId);
+      const possibleDoses = bottle ? Math.floor(((bottle.stock || 0) * (bottle.volumePerUnit || 0) + (bottle.currentBottleVolume !== undefined ? bottle.currentBottleVolume : (bottle.volumePerUnit || 0))) / (p.doseSize || 1)) : 0;
+      return possibleDoses <= (p.minStock || 5);
+    }
+    return (p.stock || 0) <= (p.minStock || 5);
+  };
+
   const filteredProducts = products.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase());
-    const matchesStock = stockFilter === 'critical' ? (p.stock || 0) <= (p.minStock || 5) : true;
+    const matchesStock = stockFilter === 'critical' ? isProductCritical(p) : true;
     const matchesCategory = categoryFilter === 'all' ? true : p.categoryId === categoryFilter;
     return matchesSearch && matchesStock && matchesCategory;
   });
@@ -258,7 +267,7 @@ export function Inventory({ user, setActiveTab }: { user: UserProfile, setActive
             <div>
               <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-1">Estoque Crítico</p>
               <h3 className="text-2xl font-black text-white leading-none">
-                {products.filter(p => (p.stock || 0) <= (p.minStock || 5)).length} <span className="text-[10px] text-red-500 font-black">ALERTAS</span>
+                {products.filter(p => isProductCritical(p)).length} <span className="text-[10px] text-red-500 font-black">ALERTAS</span>
               </h3>
             </div>
           </CardContent>
@@ -525,6 +534,9 @@ export function Inventory({ user, setActiveTab }: { user: UserProfile, setActive
                                 <div className="p-2 space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
                                   {subProducts.map((product, prodIdx) => {
                                     const margin = product.cost > 0 ? ((product.price - product.cost) / product.cost) * 100 : 0;
+                                    const linkedBottle = product.isDoseControl && product.linkedProductId ? products.find(p => p.id === product.linkedProductId) : null;
+                                    const possibleDoses = linkedBottle ? Math.floor(((linkedBottle.stock || 0) * (linkedBottle.volumePerUnit || 0) + (linkedBottle.currentBottleVolume !== undefined ? linkedBottle.currentBottleVolume : (linkedBottle.volumePerUnit || 0))) / (product.doseSize || 1)) : 0;
+                                    const isCritical = product.isDoseControl && product.linkedProductId ? possibleDoses <= (product.minStock || 5) : (product.stock || 0) <= (product.minStock || 5);
                                     return (
                                       <div key={`${product.id}-${prodIdx}`} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-card/40 border border-border/30 rounded-xl hover:border-primary/30 transition-all group/item gap-4">
                                         <div className="flex items-center gap-4">
@@ -563,9 +575,11 @@ export function Inventory({ user, setActiveTab }: { user: UserProfile, setActive
                                             <div className="flex flex-col items-end gap-1">
                                               <Badge variant="outline" className={cn(
                                                 "text-[9px] md:text-[10px] font-bold uppercase tracking-widest border-none px-2 py-0.5",
-                                                (product.stock || 0) <= 5 ? "bg-red-500/10 text-red-500" : "bg-green-500/10 text-green-500"
+                                                isCritical ? "bg-red-500/10 text-red-500" : "bg-green-500/10 text-green-500"
                                               )}>
-                                                {(product.stock || 0)} UN.
+                                                {product.isDoseControl && product.linkedProductId 
+                                                  ? `${possibleDoses} DOSES` 
+                                                  : `${(product.stock || 0)} UN.`}
                                               </Badge>
                                               {product.isDoseControl && !product.linkedProductId && (
                                                 <p className="text-[8px] font-mono font-bold text-primary/60">
@@ -653,6 +667,9 @@ export function Inventory({ user, setActiveTab }: { user: UserProfile, setActive
                       .sort((a, b) => a.name.localeCompare(b.name))
                       .map((product, idx) => {
                       const margin = product.cost > 0 ? ((product.price - product.cost) / product.cost) * 100 : 0;
+                      const linkedBottle = product.isDoseControl && product.linkedProductId ? products.find(p => p.id === product.linkedProductId) : null;
+                      const possibleDoses = linkedBottle ? Math.floor(((linkedBottle.stock || 0) * (linkedBottle.volumePerUnit || 0) + (linkedBottle.currentBottleVolume !== undefined ? linkedBottle.currentBottleVolume : (linkedBottle.volumePerUnit || 0))) / (product.doseSize || 1)) : 0;
+                      const isCritical = product.isDoseControl && product.linkedProductId ? possibleDoses <= (product.minStock || 5) : (product.stock || 0) <= (product.minStock || 5);
                       return (
                         <div key={`${product.id}-${idx}`} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-card/40 border border-border/30 rounded-xl hover:border-primary/30 transition-all group/item gap-4">
                           <div className="flex items-center gap-4">
@@ -691,9 +708,11 @@ export function Inventory({ user, setActiveTab }: { user: UserProfile, setActive
                               <div className="flex flex-col items-end gap-1">
                                 <Badge variant="outline" className={cn(
                                   "text-[9px] md:text-[10px] font-bold uppercase tracking-widest border-none px-2 py-0.5",
-                                  (product.stock || 0) <= 5 ? "bg-red-500/10 text-red-500" : "bg-green-500/10 text-green-500"
+                                  isCritical ? "bg-red-500/10 text-red-500" : "bg-green-500/10 text-green-500"
                                 )}>
-                                  {(product.stock || 0)} UN.
+                                  {product.isDoseControl && product.linkedProductId 
+                                    ? `${possibleDoses} DOSES` 
+                                    : `${(product.stock || 0)} UN.`}
                                 </Badge>
                                 {product.isDoseControl && !product.linkedProductId && (
                                   <p className="text-[8px] font-mono font-bold text-primary/60">

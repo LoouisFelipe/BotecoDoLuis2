@@ -698,69 +698,102 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
         }
       }
 
-      // Calculate total cost and subtract stock
+      // Calculate total cost and aggregate stock reductions
       let totalCost = 0;
+      const inventoryUpdates: Record<string, {
+        stockReduction: number;
+        mlReduction: number;
+        originalStock: number;
+        originalVol: number;
+        volPerUnit: number;
+        isDoseControl: boolean;
+      }> = {};
+
       for (const item of order.items) {
         totalCost += (item.costPrice || 0) * item.quantity;
 
-        // Subtract stock for registered products
         if (!item.productId.startsWith('manual_') && !item.productId.startsWith('game_')) {
           const baseProductId = item.productId.split('_')[0];
           const product = products.find(p => p.id === baseProductId);
           
           if (product) {
-            const productRef = doc(db, 'products', baseProductId);
-            
             if (product.isDoseControl && product.linkedProductId) {
-              // It's a DOSE. Subtract from the LINKED BOTTLE.
+              // It's a DOSE
               const bottleId = product.linkedProductId;
               const bottle = products.find(p => p.id === bottleId);
               
               if (bottle) {
-                const bottleRef = doc(db, 'products', bottleId);
-                const totalMlSold = (product.doseSize || 0) * item.quantity;
-                const volPerUnit = bottle.volumePerUnit || 0;
-                
-                let newCurrentVolume = (bottle.currentBottleVolume !== undefined ? bottle.currentBottleVolume : volPerUnit) - totalMlSold;
-                let newStock = bottle.stock || 0;
-
-                // If volume goes negative, open a new bottle
-                if (volPerUnit > 0) {
-                  while (newCurrentVolume < 0 && newStock > 0) {
-                    newStock -= 1;
-                    newCurrentVolume += volPerUnit;
-                  }
+                if (!inventoryUpdates[bottleId]) {
+                  inventoryUpdates[bottleId] = {
+                    stockReduction: 0,
+                    mlReduction: 0,
+                    originalStock: bottle.stock || 0,
+                    originalVol: bottle.currentBottleVolume !== undefined ? bottle.currentBottleVolume : (bottle.volumePerUnit || 0),
+                    volPerUnit: bottle.volumePerUnit || 0,
+                    isDoseControl: true
+                  };
                 }
-
-                // If volume is still negative (out of stock), cap it at 0
-                if (newCurrentVolume < 0) {
-                  newCurrentVolume = 0;
-                  newStock = 0;
-                }
-
-                await updateDoc(bottleRef, {
-                  stock: Math.max(0, newStock),
-                  currentBottleVolume: Math.max(0, newCurrentVolume)
-                });
+                inventoryUpdates[bottleId].mlReduction += (product.doseSize || 0) * item.quantity;
               }
             } else if (product.isDoseControl && !product.linkedProductId) {
-              // It's a BOTTLE sold as a whole.
-              const newStock = Math.max(0, (product.stock || 0) - item.quantity);
-              const updateData: any = { stock: newStock };
-              
-              // If stock reaches 0, also clear current volume
-              if (newStock === 0) {
-                updateData.currentBottleVolume = 0;
+              // It's a BASE BOTTLE
+              if (!inventoryUpdates[product.id]) {
+                inventoryUpdates[product.id] = {
+                  stockReduction: 0,
+                  mlReduction: 0,
+                  originalStock: product.stock || 0,
+                  originalVol: product.currentBottleVolume !== undefined ? product.currentBottleVolume : (product.volumePerUnit || 0),
+                  volPerUnit: product.volumePerUnit || 0,
+                  isDoseControl: true
+                };
               }
-              
-              await updateDoc(productRef, updateData);
+              inventoryUpdates[product.id].stockReduction += item.quantity;
             } else {
-              // Normal product
-              await updateDoc(productRef, {
-                stock: Math.max(0, (product.stock || 0) - item.quantity)
-              });
+              // NORMAL PRODUCT
+              if (!inventoryUpdates[product.id]) {
+                inventoryUpdates[product.id] = {
+                  stockReduction: 0,
+                  mlReduction: 0,
+                  originalStock: product.stock || 0,
+                  originalVol: 0,
+                  volPerUnit: 0,
+                  isDoseControl: false
+                };
+              }
+              inventoryUpdates[product.id].stockReduction += item.quantity;
             }
           }
+        }
+      }
+
+      // Apply aggregated inventory updates
+      for (const [productId, update] of Object.entries(inventoryUpdates)) {
+        const productRef = doc(db, 'products', productId);
+        
+        if (update.isDoseControl) {
+          let newCurrentVolume = update.originalVol - update.mlReduction;
+          let newStock = update.originalStock - update.stockReduction;
+
+          if (update.volPerUnit > 0) {
+            while (newCurrentVolume < 0 && newStock > 0) {
+              newStock -= 1;
+              newCurrentVolume += update.volPerUnit;
+            }
+          }
+
+          if (newCurrentVolume < 0) {
+            newCurrentVolume = 0;
+            newStock = 0;
+          }
+
+          await updateDoc(productRef, {
+            stock: Math.max(0, newStock),
+            currentBottleVolume: Math.max(0, newCurrentVolume)
+          });
+        } else {
+          await updateDoc(productRef, {
+            stock: Math.max(0, update.originalStock - update.stockReduction)
+          });
         }
       }
 
@@ -866,100 +899,155 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
   return (
     <>
       <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-          <DialogTrigger nativeButton={false} render={viewMode === 'list' ? (
-            <div className="group relative bg-[#0d1117] hover:bg-[#161b22] border border-white/5 rounded-2xl p-5 md:p-6 transition-all cursor-pointer flex items-center justify-between gap-4 shadow-sm">
-              <div className="flex items-center gap-4">
-                <div className="relative flex-shrink-0">
-                  <div className="w-2.5 h-2.5 rounded-full bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]" />
-                </div>
-                <div className="min-w-0">
-                  <h3 className="font-black text-lg md:text-xl uppercase tracking-tight truncate leading-none mb-1">{order.customerName}</h3>
-                  <p className="text-[10px] md:text-xs text-muted-foreground font-bold tracking-widest uppercase">
-                    {order.items.reduce((sum, i) => sum + i.quantity, 0)} ITENS
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-4">
-                <div className="text-right">
-                  <p className="text-lg md:text-2xl font-black tracking-tighter">
-                    <span className="text-[10px] md:text-xs font-bold text-muted-foreground mr-1">R$</span>
-                    {(order.totalAmount || 0).toFixed(2)}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    disabled={isProcessing}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsDeleteConfirmOpen(true);
-                    }}
-                    className="h-10 w-10 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-all rounded-xl"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                  <ChevronRight className="w-5 h-5 text-muted-foreground/30 group-hover:text-primary transition-colors" />
-                </div>
-              </div>
-            </div>
-          ) : (
-            <Card className="overflow-hidden border-white/5 bg-[#0d1117] hover:bg-[#161b22] transition-all cursor-pointer group shadow-lg">
-              <CardHeader className="border-b border-white/5 pb-4 p-6">
-                <div className="flex justify-between items-start">
-                  <div className="flex items-center gap-3">
-                    <div className="w-2.5 h-2.5 rounded-full bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]" />
-                    <CardTitle className="text-lg font-black uppercase tracking-tight truncate max-w-[150px]">{order.customerName}</CardTitle>
-                    {order.type === 'customer' && (
-                      <Badge variant="outline" className="text-[8px] font-black tracking-widest uppercase border-[#0070f3]/20 bg-[#0070f3]/5 text-[#0070f3]">
-                        Fiel
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <p className="text-[10px] text-muted-foreground font-black">
-                      {order.createdAt?.toDate ? format(order.createdAt.toDate(), 'HH:mm') : 'AGORA'}
-                    </p>
+          <DialogTrigger nativeButton={false} render={
+            <div className={cn(
+              "group relative overflow-hidden transition-all duration-300 cursor-pointer border border-white/5",
+              "hover:border-white/10 hover:shadow-2xl hover:shadow-[#0070f3]/5 bg-[#0d1117] hover:bg-[#161b22]",
+              viewMode === 'list' 
+                ? "flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 md:p-5 rounded-2xl w-full"
+                : "flex flex-col rounded-3xl"
+            )}
+            onClick={() => setIsDetailOpen(true)}
+            >
+              {viewMode === 'grid' && (
+                <div className="p-6 border-b border-white/5 bg-white/[0.01]">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex items-center gap-3 w-full">
+                      <div className="relative flex-shrink-0">
+                        <div className="w-2.5 h-2.5 rounded-full bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)] animate-pulse" />
+                      </div>
+                      <div className="min-w-0 pr-2">
+                        <h3 className="font-black text-lg uppercase tracking-tight truncate max-w-full leading-tight text-white group-hover:text-[#0070f3] transition-colors">{order.customerName}</h3>
+                        <p className="text-[10px] text-muted-foreground font-black tracking-widest uppercase mt-0.5">
+                          {order.createdAt?.toDate ? format(order.createdAt.toDate(), 'HH:mm') : 'AGORA'}
+                        </p>
+                      </div>
+                    </div>
                     <Button 
                       variant="ghost" 
                       size="icon" 
-                      disabled={isProcessing}
                       onClick={(e) => {
                         e.stopPropagation();
                         setIsDeleteConfirmOpen(true);
                       }}
-                      className="h-6 w-6 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-all"
+                      className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-all rounded-xl -mr-2 -mt-2 flex-shrink-0"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
+                  
+                  {order.type === 'customer' ? (
+                    <Badge className="bg-[#0070f3]/10 text-[#0070f3] border-[#0070f3]/20 text-[9px] font-black tracking-widest uppercase">
+                      Cliente Fiel
+                    </Badge>
+                  ) : (
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsLinkCustomerOpen(true);
+                      }}
+                      className="inline-flex items-center gap-1.5 text-[9px] font-black tracking-widest uppercase text-muted-foreground hover:text-[#0070f3] bg-white/5 hover:bg-[#0070f3]/10 border border-white/5 hover:border-[#0070f3]/20 px-2.5 py-1 rounded-md transition-all"
+                    >
+                      <UserPlus className="w-3 h-3" />
+                      Vincular Fiel
+                    </button>
+                  )}
                 </div>
-              </CardHeader>
-              <CardContent className="p-6 space-y-6">
-                <div className="flex justify-between items-end">
-                  <div>
-                    <p className="text-[10px] text-muted-foreground font-black tracking-widest uppercase mb-1">Total</p>
-                    <p className="text-3xl font-black tracking-tighter">
-                      <span className="text-xs font-bold text-muted-foreground mr-1">R$</span>
-                      {(order.totalAmount || 0).toFixed(2)}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[10px] text-muted-foreground font-black tracking-widest uppercase mb-1">Itens</p>
-                    <p className="text-xl font-black">{order.items.reduce((sum, i) => sum + i.quantity, 0)}</p>
+              )}
+
+              {viewMode === 'grid' && (
+                <div className="p-6 flex flex-col gap-6">
+                  <div className="flex items-end justify-between">
+                    <div>
+                      <p className="text-[10px] text-muted-foreground font-black tracking-widest uppercase mb-1 flex items-center gap-1.5">
+                        <ShoppingCart className="w-3 h-3" />
+                        Consumo
+                      </p>
+                      <p className="text-4xl font-black tracking-tighter text-white">
+                        <span className="text-sm font-bold text-muted-foreground mr-1">R$</span>
+                        {(order.totalAmount || 0).toFixed(2)}
+                      </p>
+                    </div>
+                    <div className="text-right pb-1">
+                      <p className="text-[9px] text-muted-foreground font-black tracking-widest uppercase mb-0.5">Volume</p>
+                      <p className="text-xs font-black text-white/80 bg-white/5 px-2 py-1 rounded-md">
+                        {order.items.reduce((sum, i) => sum + i.quantity, 0)} ITENS
+                      </p>
+                    </div>
                   </div>
                 </div>
-                
-                <Button 
-                  className="w-full h-14 bg-[#0070f3] hover:bg-[#0070f3]/90 text-white rounded-xl font-black uppercase tracking-widest shadow-lg shadow-[#0070f3]/20"
-                  onClick={() => setIsDetailOpen(true)}
-                >
-                  Ver Detalhes
-                </Button>
-              </CardContent>
-            </Card>
-          )} />
+              )}
+
+              {/* LIST MODE RENDER */}
+              {viewMode === 'list' && (
+                <>
+                  <div className="flex items-center gap-4 w-full sm:w-auto overflow-hidden">
+                    <div className="relative flex-shrink-0 ml-1">
+                      <div className="w-3 h-3 rounded-full bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)] animate-pulse" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-3">
+                        <h3 className="font-black text-lg md:text-xl uppercase tracking-tight truncate leading-none text-white group-hover:text-[#0070f3] transition-colors">{order.customerName}</h3>
+                        {order.type === 'customer' && (
+                          <Badge className="bg-[#0070f3]/10 text-[#0070f3] border-[#0070f3]/20 text-[8px] font-black tracking-widest uppercase px-1.5 py-0 h-4 mt-0.5">
+                            Fiel
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 mt-2 sm:mt-1.5">
+                        <p className="text-[10px] text-muted-foreground font-black tracking-widest uppercase flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {order.createdAt?.toDate ? format(order.createdAt.toDate(), 'HH:mm') : 'AGORA'}
+                        </p>
+                        <div className="w-1 h-1 rounded-full bg-white/20" />
+                        <p className="text-[10px] text-muted-foreground font-black tracking-widest uppercase">
+                          {order.items.reduce((sum, i) => sum + i.quantity, 0)} ITENS
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between sm:justify-end gap-6 w-full sm:w-auto border-t sm:border-t-0 border-white/5 pt-4 sm:pt-0 mt-2 sm:mt-0">
+                    {order.type !== 'customer' && (
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsLinkCustomerOpen(true);
+                        }}
+                        className="hidden md:inline-flex items-center gap-1.5 text-[9px] font-black tracking-widest uppercase text-muted-foreground hover:text-[#0070f3] bg-white/5 hover:bg-[#0070f3]/10 border border-white/5 px-3 py-2 rounded-lg transition-all"
+                      >
+                        <UserPlus className="w-3 h-3" />
+                        Vincular
+                      </button>
+                    )}
+                    
+                    <div className="text-left sm:text-right">
+                      <p className="text-[10px] text-muted-foreground font-black tracking-widest uppercase sm:hidden mb-1">TOTAL</p>
+                      <p className="text-2xl font-black tracking-tighter text-white">
+                        <span className="text-[10px] font-bold text-muted-foreground mr-1">R$</span>
+                        {(order.totalAmount || 0).toFixed(2)}
+                      </p>
+                    </div>
+                    
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsDeleteConfirmOpen(true);
+                        }}
+                        className="h-10 w-10 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-all rounded-xl"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                      <ChevronRight className="w-5 h-5 text-muted-foreground/30 group-hover:text-[#0070f3] transition-colors hidden sm:block" />
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          } />
         <DialogContent className="max-w-[95vw] md:max-w-7xl bg-[#05070a] border-none text-white p-0 overflow-hidden h-[95vh] md:h-[90vh] flex flex-col shadow-2xl rounded-3xl">
           {/* Header - Optimized for all screens */}
           <div className="p-4 md:p-8 border-b border-white/5 flex flex-col sm:flex-row sm:items-center justify-between bg-[#05070a] z-20 gap-4 flex-shrink-0 relative">
@@ -1134,6 +1222,20 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                                     <p className="text-[10px] text-[#0070f3] font-black tracking-widest mt-1">
                                       {product.isOpenValue ? 'VALOR ABERTO' : `R$ ${product.price.toFixed(2)}`}
                                     </p>
+                                    {product.isDoseControl && (
+                                      <p className="text-[9px] font-black uppercase tracking-widest flex items-center gap-1 opacity-70 mt-0.5">
+                                        <FlaskConical className="w-2 h-2" />
+                                        {product.linkedProductId ? (
+                                          (() => {
+                                            const linkedBottle = products.find(p => p.id === product.linkedProductId);
+                                            const possibleDoses = linkedBottle ? Math.floor(((linkedBottle.stock || 0) * (linkedBottle.volumePerUnit || 0) + (linkedBottle.currentBottleVolume !== undefined ? linkedBottle.currentBottleVolume : (linkedBottle.volumePerUnit || 0))) / (product.doseSize || 1)) : 0;
+                                            return <>{possibleDoses} DOSES</>;
+                                          })()
+                                        ) : (
+                                          <>{product.currentBottleVolume || 0}ml REST.</>
+                                        )}
+                                      </p>
+                                    )}
                                   </div>
                                   <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center group-hover:bg-[#0070f3] group-hover:text-white transition-all">
                                     <Plus className="w-4 h-4" />
@@ -1284,12 +1386,16 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                                             {product.isOpenValue ? 'VALOR ABERTO' : `R$ ${product.price.toFixed(2)}`}
                                           </p>
                                           {product.isDoseControl && (
-                                            <p className="text-[9px] text-white/50 font-black uppercase tracking-widest flex items-center gap-1">
+                                            <p className="text-[9px] font-black uppercase tracking-widest flex items-center gap-1 opacity-70">
                                               <FlaskConical className="w-2.5 h-2.5" />
                                               {product.linkedProductId ? (
-                                                <>{products.find(p => p.id === product.linkedProductId)?.currentBottleVolume || 0}ml</>
+                                                (() => {
+                                                  const linkedBottle = products.find(p => p.id === product.linkedProductId);
+                                                  const possibleDoses = linkedBottle ? Math.floor(((linkedBottle.stock || 0) * (linkedBottle.volumePerUnit || 0) + (linkedBottle.currentBottleVolume !== undefined ? linkedBottle.currentBottleVolume : (linkedBottle.volumePerUnit || 0))) / (product.doseSize || 1)) : 0;
+                                                  return <>{possibleDoses} DOSES</>;
+                                                })()
                                               ) : (
-                                                <>{product.currentBottleVolume || 0}ml</>
+                                                <>{product.currentBottleVolume || 0}ml REST.</>
                                               )}
                                             </p>
                                           )}
