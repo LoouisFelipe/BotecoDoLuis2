@@ -16,7 +16,7 @@ import { Suppliers } from './components/Suppliers';
 import { Users as UsersComponent } from './components/Users';
 import { Settings as SettingsComponent } from './components/Settings';
 import { BottomNav } from './components/BottomNav';
-import { LayoutDashboard, Package, Receipt, BarChart3, LogOut, Shield, Users, Truck, Settings, Gamepad2, User, Sparkles, Activity, Globe, Database, Menu, X as CloseIcon, Plus } from 'lucide-react';
+import { LayoutDashboard, Package, Receipt, BarChart3, LogOut, Shield, Users, Truck, Settings, Gamepad2, User, Activity, Globe, Database, Menu, X as CloseIcon, Plus } from 'lucide-react';
 import { auth } from './firebase';
 import { Button } from './components/ui/button';
 import { useState, useMemo } from 'react';

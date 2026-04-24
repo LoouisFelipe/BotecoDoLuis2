@@ -15,6 +15,7 @@ import { handleFirestoreError, OperationType } from '../lib/firebase-utils';
 import { cn, getShiftDate } from '../lib/utils';
 import { ConfirmDialog } from './ConfirmDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { calculateAvailableDoses } from '../lib/stock-utils';
 
 import { useFetchCollection } from '../hooks/useFetchCollection';
 import { usePaymentFees } from '../hooks/usePaymentFees';
@@ -452,18 +453,11 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
     
     // Dose control warning
     if (product.isDoseControl) {
-      const bottle = product.linkedProductId 
-        ? products.find(p => p.id === product.linkedProductId)
-        : product;
-      
-      if (bottle) {
-        const currentVol = bottle.currentBottleVolume !== undefined ? bottle.currentBottleVolume : (bottle.volumePerUnit || 0);
-        const stock = bottle.stock || 0;
-        if (currentVol <= 0 && stock <= 0) {
-          toast.error(`Atenção: A garrafa de ${bottle.name} está vazia e sem estoque!`);
-        } else if (currentVol < (product.doseSize || 0) && stock <= 0) {
-          toast.warning(`Atenção: Volume insuficiente na última garrafa de ${bottle.name}`);
-        }
+      const doses = calculateAvailableDoses(product, products);
+      if (doses <= 0) {
+        toast.error(`Atenção: Estoque de ${product.name} esgotado!`);
+      } else if (doses <= (product.minStock || 5)) {
+        toast.warning(`Atenção: Estoque baixo de ${product.name} (${doses} doses restantes)`);
       }
     }
 
