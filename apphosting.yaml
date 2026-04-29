@@ -13,7 +13,7 @@ env:
       - BUILD
       - RUNTIME
   - variable: VITE_FIREBASE_APP_ID
-    value: 1:959264021711:web:d96d3d6efd985680092bba
+    value: 1:959264021711:web:e9b409f0bbdb26df092bba
     availability:
       - BUILD
       - RUNTIME
@@ -38,7 +38,7 @@ env:
       - BUILD
       - RUNTIME
   - variable: VITE_FIREBASE_MEASUREMENT_ID
-    value: G-3LEXX8S4X8
+    value: ""
     availability:
       - BUILD
       - RUNTIME

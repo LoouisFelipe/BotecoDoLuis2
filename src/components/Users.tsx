@@ -48,7 +48,7 @@ export function Users({ user: currentUser }: { user: UserProfile }) {
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row items-center justify-between gap-6 pb-4">
         <div>
-          <h1 className="text-3xl font-black tracking-tighter uppercase mb-1">Nexus Team</h1>
+          <h1 className="text-3xl font-black tracking-tighter uppercase mb-1">Equipe do Boteco</h1>
           <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Gestão de Acessos & Permissões</p>
         </div>
         <div className="flex items-center gap-3">

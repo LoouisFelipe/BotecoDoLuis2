@@ -52,12 +52,20 @@ export interface Purchase {
   date: any;
 }
 
+export interface ExpenseCategory {
+  id: string;
+  name: string;
+  subcategories: string[];
+  createdAt?: any;
+}
+
 export interface RecurringExpense {
   id: string;
   description: string;
   amount: number;
   dueDate: number; // Day of month
-  category: string;
+  categoryId: string;
+  subCategory?: string;
   active: boolean;
 }
 
@@ -80,6 +88,7 @@ export interface Product {
   unit?: string;
   active?: boolean;
   isOpenValue?: boolean;
+  ingredients?: { productId: string; quantity: number }[];
   // Dose control fields
   isDoseControl?: boolean;
   volumePerUnit?: number; // ml per bottle
@@ -119,7 +128,9 @@ export interface Order {
 export interface Transaction {
   id: string;
   type: 'income' | 'expense';
-  category: string;
+  categoryId?: string;
+  subCategory?: string;
+  category?: string; // Legacy support
   amount: number;
   cost?: number;
   feeAmount?: number;
@@ -136,6 +147,21 @@ export interface PaymentFeeConfig {
   credit_pct: number;
   debit_pct: number;
   pix_pct?: number;
+}
+
+export interface InstallmentExpense {
+  id: string;
+  description: string;
+  totalAmount: number;
+  remainingAmount: number;
+  installmentsCount: number;
+  remainingInstallments: number;
+  installmentValue: number;
+  nextDueDate: any;
+  categoryId: string;
+  subCategory?: string;
+  createdAt: any;
+  active: boolean;
 }
 
 export interface UserProfile {

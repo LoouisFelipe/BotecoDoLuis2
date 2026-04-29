@@ -157,7 +157,18 @@ service cloud.firestore {
     }
 
     match /recurring_expenses/{expenseId} {
-      allow read, write: if isAdmin() && isValidId(expenseId);
+      allow read: if isStaff() || isOwner();
+      allow write: if isAdmin() && isValidId(expenseId);
+    }
+
+    match /expense_categories/{categoryId} {
+      allow read: if isStaff() || isOwner();
+      allow write: if isAdmin() && isValidId(categoryId);
+    }
+
+    match /installment_expenses/{expenseId} {
+      allow read: if isStaff() || isOwner();
+      allow write: if isAdmin() && isValidId(expenseId);
     }
 
     match /purchases/{purchaseId} {

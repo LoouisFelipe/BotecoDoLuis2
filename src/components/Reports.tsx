@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, Timestamp, doc, getDoc } from 'firebase/firestore';
-import { Transaction, UserProfile, PaymentFeeConfig } from '../types';
+import { Transaction, UserProfile, PaymentFeeConfig, Product } from '../types';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Badge } from './ui/badge';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, AreaChart, Area } from 'recharts';
 import { startOfDay, endOfDay, subDays, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -15,7 +16,16 @@ import Markdown from 'react-markdown';
 export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTab: (tab: string) => void }) {
   const [loading, setLoading] = useState(true);
   const [dailyData, setDailyData] = useState<any[]>([]);
-  const [stats, setStats] = useState({ income: 0, expense: 0, profit: 0, grossProfit: 0, grossMarginPct: 0 });
+  const [topProducts, setTopProducts] = useState<any[]>([]);
+  const [stats, setStats] = useState({ 
+    income: 0, 
+    expense: 0, 
+    profit: 0, 
+    grossProfit: 0, 
+    grossMarginPct: 0,
+    projectedProfit30d: 0 
+  });
+  const [abcData, setAbcData] = useState<any[]>([]);
   const [monthlySummary, setMonthlySummary] = useState<any | null>(null);
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -88,7 +98,7 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
 
         return Promise.all([getDocs(qTrans), getDocs(qExp)]).then(([transSnapshot, expSnapshot]) => {
           const dayTransactions = transSnapshot.docs.map(doc => doc.data() as Transaction);
-          const dayExpenses = expSnapshot.docs.map(doc => doc.data() as Transaction);
+          const dayExpenses = expSnapshot.docs.map(doc => ({ ...doc.data() as Transaction, id: doc.id }));
           
           let rawIncome = 0;
           let paymentFees = 0;
@@ -130,7 +140,49 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
         });
       });
 
+      // Fetch Top Products for Margin Analysis
+      const fetchTopProducts = async () => {
+        try {
+          const prodSnapshot = await getDocs(collection(db, 'products'));
+          const products = prodSnapshot.docs.map(doc => ({ ...doc.data() as Product, id: doc.id }));
+          
+          const sorted = products
+            .filter(p => (p.cost || 0) > 0)
+            .map(p => ({
+              ...p,
+              margin: ((p.price - p.cost) / p.cost) * 100,
+              potentialProfit: (p.price - p.cost) * (p.stock || 0)
+            }))
+            .sort((a, b) => b.margin - a.margin)
+            .slice(0, 5);
+            
+          setTopProducts(sorted);
+
+          // Calculate ABC Curve (based on Total Inventory Value as proxy for importance)
+          const sortedByValue = products
+            .filter(p => (p.price * (p.stock || 0)) > 0)
+            .sort((a, b) => (b.price * (b.stock || 0)) - (a.price * (a.stock || 0)));
+          
+          const totalVal = sortedByValue.reduce((sum, p) => sum + (p.price * (p.stock || 0)), 0);
+          let cumulative = 0;
+          const abc = sortedByValue.map(p => {
+            const val = p.price * (p.stock || 0);
+            cumulative += val;
+            const pct = totalVal > 0 ? (cumulative / totalVal) * 100 : 0;
+            let group = 'C';
+            if (pct <= 70) group = 'A';
+            else if (pct <= 90) group = 'B';
+            return { ...p, value: val, accumulatedPct: pct, group };
+          });
+          setAbcData(abc);
+
+        } catch (error) {
+          console.error("Error fetching top products:", error);
+        }
+      };
+
       try {
+        await fetchTopProducts();
         const results = await Promise.all(fetchDays);
         const sortedResults = results.sort((a, b) => a.date.getTime() - b.date.getTime());
         
@@ -159,7 +211,8 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
           expense: totalExpense, 
           profit: totalIncome - totalExpense - totalCost,
           grossProfit: totalGrossProfit,
-          grossMarginPct: generalGrossMargin
+          grossMarginPct: generalGrossMargin,
+          projectedProfit30d: (totalIncome - totalExpense - totalCost) / 7 * 30
         });
       } catch (error) {
         console.error("Error fetching daily data:", error);
@@ -193,7 +246,7 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
                 <Sparkles className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <CardTitle className="text-sm font-black uppercase tracking-widest text-primary">Nexus Insights — {monthlySummary.month}</CardTitle>
+                <CardTitle className="text-sm font-black uppercase tracking-widest text-primary">Insights Estratégicos — {monthlySummary.month}</CardTitle>
                 <p className="text-[10px] font-bold text-primary/60 uppercase tracking-widest">Resumo Consolidado Mensal</p>
               </div>
             </div>
@@ -245,11 +298,11 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
           onClick={() => setActiveTab('finances')}
         />
         <StatCard 
-          title="Margem Bruta (7d)" 
-          value={stats.grossProfit} 
-          icon={<Sparkles className="w-6 h-6 text-orange-500" />} 
-          variant="orange"
-          subtext={`(${stats.grossMarginPct.toFixed(1)}%)`}
+          title="Proj. Mensal (30d)" 
+          value={stats.projectedProfit30d} 
+          icon={<TrendingUp className="w-6 h-6 text-purple-500" />} 
+          variant="purple"
+          subtext="ESTIMADO"
         />
       </div>
 
@@ -308,6 +361,49 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
         <Card className="border-border bg-card/50 rounded-2xl overflow-hidden">
           <CardHeader className="border-b border-border pb-4">
             <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-green-500/10 text-green-500">
+                <TrendingUp className="w-5 h-5" />
+              </div>
+              <div>
+                <CardTitle className="text-sm font-bold uppercase tracking-wider">Top Margem de Lucro</CardTitle>
+                <p className="text-[10px] text-muted-foreground tracking-widest uppercase font-semibold">Produtos mais rentáveis</p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-4 p-0">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-border hover:bg-transparent">
+                  <TableHead className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground pl-6">Produto</TableHead>
+                  <TableHead className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground text-right">Preço</TableHead>
+                  <TableHead className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground text-right pr-6">Margem</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {topProducts.map((p, idx) => (
+                  <TableRow key={p.id} className="border-border hover:bg-white/5 transition-colors">
+                    <TableCell className="pl-6">
+                      <p className="text-xs font-bold uppercase">{p.name}</p>
+                      <p className="text-[10px] text-muted-foreground font-mono">ESTOQUE: {p.stock}</p>
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-xs">
+                      R$ {p.price.toFixed(2)}
+                    </TableCell>
+                    <TableCell className="text-right pr-6">
+                      <span className="inline-flex items-center px-2 py-1 rounded bg-green-500/10 text-green-500 font-black text-xs">
+                        {p.margin.toFixed(0)}%
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border bg-card/50 rounded-2xl overflow-hidden">
+          <CardHeader className="border-b border-border pb-4">
+            <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-primary/10 text-primary">
                 <BarChart3 className="w-5 h-5" />
               </div>
@@ -318,7 +414,7 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
             </div>
           </CardHeader>
           <CardContent className="pt-8">
-            <div className="h-80 w-full">
+            <div className="h-64 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={dailyData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1f2937" />
@@ -353,68 +449,75 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
             </div>
           </CardContent>
         </Card>
-
-        <Card className="border-border bg-card/50 rounded-2xl overflow-hidden">
-          <CardHeader className="border-b border-border pb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-primary/10 text-primary">
-                <Calendar className="w-5 h-5" />
-              </div>
-              <div>
-                <CardTitle className="text-sm font-bold uppercase tracking-wider">Tendência de Lucro</CardTitle>
-                <p className="text-[10px] text-muted-foreground tracking-widest uppercase font-semibold">Evolução do Saldo</p>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-8">
-            <div className="h-80 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={dailyData}>
-                  <defs>
-                    <linearGradient id="colorProfit" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#0080ff" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#0080ff" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1f2937" />
-                  <XAxis 
-                    dataKey="name" 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 'bold' }} 
-                  />
-                  <YAxis 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 'bold' }}
-                    tickFormatter={(value) => `R$${value}`}
-                  />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: '#111827', 
-                      border: '1px solid #1f2937', 
-                      borderRadius: '12px',
-                      fontSize: '12px',
-                      fontWeight: 'bold',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em'
-                    }}
-                  />
-                  <Area 
-                    type="monotone" 
-                    dataKey="profit" 
-                    stroke="#0080ff" 
-                    strokeWidth={3}
-                    fillOpacity={1} 
-                    fill="url(#colorProfit)" 
-                    name="LUCRO"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
       </div>
+
+      <Card className="border-border bg-card/50 rounded-2xl overflow-hidden mt-8">
+        <CardHeader className="border-b border-border pb-4 bg-white/5 flex flex-row items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-500">
+              <TrendingUp className="w-5 h-5" />
+            </div>
+            <div>
+              <CardTitle className="text-sm font-bold uppercase tracking-wider">Curva ABC de Estoque</CardTitle>
+              <p className="text-[10px] text-muted-foreground tracking-widest uppercase font-semibold">
+                Classificação por Valor de Inventário (Importância Estratégica)
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20 text-[8px] font-black uppercase tracking-widest px-2 py-1">Classe A (70%)</Badge>
+            <Badge variant="outline" className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20 text-[8px] font-black uppercase tracking-widest px-2 py-1">Classe B (20%)</Badge>
+            <Badge variant="outline" className="bg-red-500/10 text-red-500 border-red-500/20 text-[8px] font-black uppercase tracking-widest px-2 py-1">Classe C (10%)</Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-0 px-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-border hover:bg-transparent">
+                  <TableHead className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground pl-6">Posição</TableHead>
+                  <TableHead className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Produto</TableHead>
+                  <TableHead className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground text-right">Valor em Estoque</TableHead>
+                  <TableHead className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground text-right">Acumulado %</TableHead>
+                  <TableHead className="text-[10px] font-bold tracking-widest uppercase text-center pr-6">Classe</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {abcData.slice(0, 15).map((item, idx) => (
+                  <TableRow key={item.id} className="border-border hover:bg-white/5 transition-colors">
+                    <TableCell className="pl-6 font-mono text-xs text-muted-foreground">{idx + 1}º</TableCell>
+                    <TableCell>
+                      <p className="text-xs font-bold uppercase">{item.name}</p>
+                      <p className="text-[9px] text-muted-foreground uppercase">{item.stock} {item.unit || 'UN'} em estoque</p>
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-xs font-bold">
+                      R$ {item.value.toFixed(2)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-[10px] text-muted-foreground">
+                      {item.accumulatedPct.toFixed(1)}%
+                    </TableCell>
+                    <TableCell className="text-center pr-6">
+                      <Badge className={cn(
+                        "text-[10px] font-black uppercase tracking-widest px-3 py-1 border-none",
+                        item.group === 'A' ? "bg-green-500/20 text-green-500" :
+                        item.group === 'B' ? "bg-yellow-500/20 text-yellow-500" :
+                        "bg-red-500/20 text-red-500"
+                      )}>
+                        {item.group}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            {abcData.length > 15 && (
+              <div className="p-4 text-center bg-white/5">
+                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Exibindo top 15 de {abcData.length} produtos ativos</p>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="border-border bg-card/50 rounded-2xl overflow-hidden mt-8">
         <CardHeader className="border-b border-border pb-4 bg-white/5">
@@ -501,12 +604,13 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
   );
 }
 
-function StatCard({ title, value, icon, variant, onClick, subtext }: { title: string, value: number, icon: React.ReactNode, variant: 'green' | 'red' | 'blue' | 'orange', onClick?: () => void, subtext?: string }) {
+function StatCard({ title, value, icon, variant, onClick, subtext }: { title: string, value: number, icon: React.ReactNode, variant: 'green' | 'red' | 'blue' | 'orange' | 'purple', onClick?: () => void, subtext?: string }) {
   const variantStyles = {
     green: "from-green-500/5 shadow-[0_0_20px_rgba(34,197,94,0.1)] text-green-500",
     red: "from-red-500/5 shadow-[0_0_20px_rgba(239,68,68,0.1)] text-red-500",
     blue: "from-primary/5 shadow-[0_0_20px_rgba(var(--primary),0.1)] text-primary",
-    orange: "from-orange-500/5 shadow-[0_0_20px_rgba(249,115,22,0.1)] text-orange-500"
+    orange: "from-orange-500/5 shadow-[0_0_20px_rgba(249,115,22,0.1)] text-orange-500",
+    purple: "from-purple-500/5 shadow-[0_0_20px_rgba(168,85,247,0.1)] text-purple-500"
   };
 
   return (
@@ -524,6 +628,7 @@ function StatCard({ title, value, icon, variant, onClick, subtext }: { title: st
           variant === 'green' ? "bg-green-500/10 border-green-500/20" : 
           variant === 'red' ? "bg-red-500/10 border-red-500/20" : 
           variant === 'orange' ? "bg-orange-500/10 border-orange-500/20" :
+          variant === 'purple' ? "bg-purple-500/10 border-purple-500/20" :
           "bg-primary/10 border-primary/20",
           variantStyles[variant].split(' ')[1]
         )}>

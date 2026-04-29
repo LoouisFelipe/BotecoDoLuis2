@@ -114,6 +114,25 @@
       },
       "required": ["customerName", "status", "totalAmount"]
     },
+    "InstallmentExpense": {
+      "title": "InstallmentExpense",
+      "description": "Expenses paid in installments",
+      "type": "object",
+      "properties": {
+        "description": { "type": "string" },
+        "totalAmount": { "type": "number" },
+        "remainingAmount": { "type": "number" },
+        "installmentsCount": { "type": "number" },
+        "remainingInstallments": { "type": "number" },
+        "installmentValue": { "type": "number" },
+        "nextDueDate": { "type": "string", "format": "date-time" },
+        "categoryId": { "type": "string" },
+        "subCategory": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "active": { "type": "boolean" }
+      },
+      "required": ["description", "totalAmount", "installmentsCount", "installmentValue"]
+    },
     "BISummary": {
       "title": "BISummary",
       "description": "Monthly business intelligence summaries",
@@ -138,6 +157,17 @@
       },
       "required": ["method", "percentage"]
     },
+    "ExpenseCategory": {
+      "title": "ExpenseCategory",
+      "description": "Categories for expenses (e.g., Suppliers, Fixed Costs)",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "subcategories": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name"]
+    },
     "Purchase": {
       "title": "Purchase",
       "description": "Inventory purchases from suppliers",
@@ -159,9 +189,10 @@
         "description": { "type": "string" },
         "amount": { "type": "number" },
         "dayOfMonth": { "type": "number" },
-        "category": { "type": "string" }
+        "categoryId": { "type": "string" },
+        "subCategory": { "type": "string" }
       },
-      "required": ["description", "amount", "dayOfMonth"]
+      "required": ["description", "amount", "dayOfMonth", "categoryId"]
     },
     "Transaction": {
       "title": "Transaction",
@@ -169,6 +200,8 @@
       "type": "object",
       "properties": {
         "type": { "type": "string", "enum": ["income", "expense"] },
+        "categoryId": { "type": "string" },
+        "subCategory": { "type": "string" },
         "category": { "type": "string" },
         "amount": { "type": "number" },
         "description": { "type": "string" },
@@ -203,6 +236,8 @@
     "/recurring_expenses/{expenseId}": { "schema": "RecurringExpense", "description": "Fixed monthly expenses" },
     "/purchases/{purchaseId}": { "schema": "Purchase", "description": "Inventory purchases" },
     "/payment_fees/{feeId}": { "schema": "PaymentFee", "description": "Payment method fees" },
+    "/expense_categories/{categoryId}": { "schema": "ExpenseCategory", "description": "Expense categories" },
+    "/installment_expenses/{expenseId}": { "schema": "InstallmentExpense", "description": "Installment payments" },
     "/bi_summaries/{summaryId}": { "schema": "BISummary", "description": "Monthly BI summaries" },
     "/game_sessions/{sessionId}": { "schema": "GameSession", "description": "Game results log" },
     "/users/{userId}": { "schema": "User", "description": "User profiles and roles" }

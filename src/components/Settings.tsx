@@ -47,7 +47,7 @@ export function Settings({ user }: { user: UserProfile }) {
   return (
     <div className="space-y-8 max-w-5xl mx-auto animate-in fade-in duration-500">
       <div className="pb-4">
-        <h1 className="text-3xl font-black tracking-tighter uppercase mb-1">Nexus Configuration</h1>
+        <h1 className="text-3xl font-black tracking-tighter uppercase mb-1">Configuração Master</h1>
         <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest leading-relaxed">Gerencie as diretrizes estratégicas e operacionais do sistema</p>
       </div>
 
@@ -89,7 +89,7 @@ export function Settings({ user }: { user: UserProfile }) {
               <div className="space-y-4">
                 {[
                   { label: 'Version', value: 'v2.4.0-PROD' },
-                  { label: 'Data Hub', value: 'Nexus v360' },
+                  { label: 'Data Hub', value: 'Google Cloud' },
                   { label: 'Engine', value: 'Gemini 3 Flash' },
                 ].map((item) => (
                   <div key={item.label} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">

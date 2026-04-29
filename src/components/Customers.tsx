@@ -259,7 +259,7 @@ export function Customers({ user }: { user: UserProfile }) {
               <Star className="w-6 h-6 text-orange-500" />
             </div>
             <div>
-              <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-1">Fidelidade Nexus</p>
+              <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-1">Programa de Fidelidade</p>
               <h3 className="text-xl font-black text-white leading-none">Top 5% Ativos</h3>
             </div>
           </CardContent>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, query, addDoc, serverTimestamp, orderBy, limit, getDocs, where, doc, getDoc } from 'firebase/firestore';
-import { Transaction, UserProfile, Customer, Order } from '../types';
+import { collection, query, addDoc, serverTimestamp, orderBy, limit, getDocs, where, doc, getDoc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { Transaction, UserProfile, Customer, Order, ExpenseCategory, RecurringExpense, InstallmentExpense } from '../types';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Calendar as CalendarUI } from './ui/calendar';
-import { Plus, TrendingUp, TrendingDown, Receipt, Calendar, ArrowUpRight, ArrowDownRight, Filter, X, Users, ChevronRight } from 'lucide-react';
+import { Plus, TrendingUp, TrendingDown, Receipt, Calendar, ArrowUpRight, ArrowDownRight, Filter, X, Users, ChevronRight, Settings2, Trash2 } from 'lucide-react';
 import { Badge } from './ui/badge';
 import { toast } from 'sonner';
 import { format, isToday, isThisWeek, isThisMonth, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
@@ -30,7 +30,10 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
   const { data: rawExpenses } = useFetchCollection<Transaction>('expenses', {
     constraints: expConstraints
   });
+  const { data: recurringExpenses } = useFetchCollection<RecurringExpense>('recurring_expenses');
+  const { data: installmentExpenses } = useFetchCollection<InstallmentExpense>('installment_expenses');
   const { data: customers } = useFetchCollection<Customer>('customers');
+  const { data: expenseCategories } = useFetchCollection<ExpenseCategory>('expense_categories');
 
   const transactions = React.useMemo(() => {
     const merged = [...rawTransactions, ...rawExpenses.map(e => ({ ...e, type: 'expense' as const }))];
@@ -88,28 +91,139 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
   // Form states
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('');
+  const [subCategory, setSubCategory] = useState('');
   const [description, setDescription] = useState('');
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [isInstallment, setIsInstallment] = useState(false);
+  const [installmentsCount, setInstallmentsCount] = useState('3');
+  const [dueDate, setDueDate] = useState('5');
+
+  // Metas states
+  const [metasView, setMetasView] = useState<'daily' | 'weekly' | 'monthly'>('monthly');
+
+  // Category Management State
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
+  const [newSubName, setNewSubName] = useState('');
 
   const handleAddExpense = async () => {
     if (!amount || !category) return;
     setIsSaving(true);
     try {
-      // Write to 'expenses' collection to match user's Firestore structure
-      await addDoc(collection(db, 'expenses'), {
-        category,
-        amount: parseFloat(amount),
-        description,
-        date: serverTimestamp()
-      });
+      const selectedCat = expenseCategories.find(c => c.id === category);
+      
+      if (isRecurring) {
+        await addDoc(collection(db, 'recurring_expenses'), {
+          description,
+          amount: parseFloat(amount),
+          dueDate: parseInt(dueDate),
+          categoryId: category,
+          subCategory,
+          active: true,
+          createdAt: serverTimestamp()
+        });
+        toast.success('Despesa recorrente agendada');
+      } else if (isInstallment) {
+        const total = parseFloat(amount);
+        const count = parseInt(installmentsCount);
+        const installmentValue = total / count;
+        
+        // Register the "entrada" (down payment) as a transaction if paid now
+        // The user example says they pay R$310 now and 3x R$230 later.
+        // I will simplify and just create an InstallmentExpense.
+        // Actually, the user says "pagamos só R$310,00 de entrada e pagaremos mais 3 parcelas de R$230,00"
+        // This means Total is 310 + 3*230 = 1000.
+        
+        await addDoc(collection(db, 'installment_expenses'), {
+          description,
+          totalAmount: total,
+          remainingAmount: total - (total / count), // Assuming first installment is paid now or handled by transaction
+          installmentsCount: count,
+          remainingInstallments: count - 1,
+          installmentValue: installmentValue,
+          nextDueDate: new Date(new Date().setMonth(new Date().getMonth() + 1)),
+          categoryId: category,
+          subCategory,
+          createdAt: serverTimestamp(),
+          active: true
+        });
+        
+        // Record the immediate payment
+        await addDoc(collection(db, 'expenses'), {
+          categoryId: category,
+          subCategory,
+          category: selectedCat?.name || category,
+          amount: installmentValue,
+          description: `${description} (Entrada/Parcela 1/${count})`,
+          date: serverTimestamp()
+        });
+        
+        toast.success('Compra parcelada registrada');
+      } else {
+        // Write to 'expenses' collection to match user's Firestore structure
+        await addDoc(collection(db, 'expenses'), {
+          categoryId: category,
+          subCategory,
+          category: selectedCat?.name || category, // Legacy support
+          amount: parseFloat(amount),
+          description,
+          date: serverTimestamp()
+        });
+        toast.success('Despesa registrada');
+      }
+      
       setIsExpenseModalOpen(false);
       setAmount('');
       setCategory('');
+      setSubCategory('');
       setDescription('');
-      toast.success('Despesa registrada');
+      setIsRecurring(false);
     } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, 'expenses');
+      handleFirestoreError(error, OperationType.CREATE, isRecurring ? 'recurring_expenses' : 'expenses');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleDeleteRecurring = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'recurring_expenses', id));
+      toast.success('Despesa recorrente removida');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, 'recurring_expenses');
+    }
+  };
+
+  const handleCreateCategory = async () => {
+    if (!newCatName) return;
+    try {
+      await addDoc(collection(db, 'expense_categories'), {
+        name: newCatName,
+        subcategories: [],
+        createdAt: serverTimestamp()
+      });
+      setNewCatName('');
+      toast.success('Categoria criada');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, 'expense_categories');
+    }
+  };
+
+  const handleAddSubcategory = async (catId: string) => {
+    if (!newSubName) return;
+    try {
+      const cat = expenseCategories.find(c => c.id === catId);
+      if (!cat) return;
+      
+      const subcategories = [...(cat.subcategories || []), newSubName];
+      await updateDoc(doc(db, 'expense_categories', catId), {
+        subcategories
+      });
+
+      setNewSubName('');
+      toast.success('Subcategoria adicionada');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, 'expense_categories');
     }
   };
 
@@ -141,6 +255,23 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
     .reduce((sum, t) => sum + (t.amount || 0), 0);
 
   const totalFiado = customers.reduce((sum, c) => sum + Math.abs(Math.min(0, c.balance || 0)), 0);
+
+  // Metas Logic
+  const daysInMonth = (month: number, year: number) => new Date(year, month + 1, 0).getDate();
+  const now = new Date();
+  const currentMonthDays = daysInMonth(now.getMonth(), now.getFullYear());
+  
+  const monthlyObligations = React.useMemo(() => {
+    const recurring = recurringExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+    const installments = installmentExpenses.reduce((sum, e) => sum + (e.installmentValue || 0), 0);
+    
+    // Also include non-recurring expenses of the current month to show progress?
+    // User wants to calculate what we NEED to pay.
+    return recurring + installments;
+  }, [recurringExpenses, installmentExpenses]);
+
+  const dailyGoal = monthlyObligations / currentMonthDays;
+  const weeklyGoal = dailyGoal * 7;
 
   const filteredTransactions = dateFilteredTransactions.filter(t => {
     if (typeFilter === 'all') return true;
@@ -229,13 +360,99 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
         </Card>
       </div>
 
+      {/* Metas / Objectives Section */}
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500 border border-blue-500/20">
+              <TrendingUp className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-black uppercase tracking-tighter text-lg leading-tight">Metas de Receita</h3>
+              <p className="text-[10px] text-muted-foreground tracking-widest uppercase font-bold">Cobertura de custos baseada em obrigações</p>
+            </div>
+          </div>
+          
+          <div className="flex bg-white/5 p-1 rounded-lg border border-border/50">
+            {(['daily', 'weekly', 'monthly'] as const).map((view) => (
+              <button
+                key={view}
+                onClick={() => setMetasView(view)}
+                className={cn(
+                  "px-4 py-1.5 rounded-md text-[10px] font-black uppercase tracking-widest transition-all",
+                  metasView === view ? "bg-primary text-white shadow-lg" : "text-muted-foreground hover:text-white"
+                )}
+              >
+                {view === 'daily' ? 'Diário' : view === 'weekly' ? 'Semanal' : 'Mensal'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Card className="bg-card/40 border-border/50 overflow-hidden relative group">
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent" />
+            <CardContent className="p-6">
+              <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-4">
+                Meta {metasView === 'daily' ? 'Diária' : metasView === 'weekly' ? 'Semanal' : 'Mensal'}
+              </p>
+              <div className="flex items-baseline gap-2">
+                <h3 className="text-3xl font-black text-white tabular-nums">
+                  R$ {(metasView === 'daily' ? dailyGoal : metasView === 'weekly' ? weeklyGoal : monthlyObligations).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </h3>
+              </div>
+              <div className="mt-4 h-2 bg-white/5 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-primary transition-all duration-1000" 
+                  style={{ width: `${Math.min(100, (totalIncome / (metasView === 'daily' ? dailyGoal : metasView === 'weekly' ? weeklyGoal : monthlyObligations)) * 100)}%` }} 
+                />
+              </div>
+              <p className="mt-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                Progresso: {Math.min(100, (totalIncome / (metasView === 'daily' ? dailyGoal : metasView === 'weekly' ? weeklyGoal : monthlyObligations)) * 100).toFixed(1)}% atingido
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-card/40 border-border/50 overflow-hidden rounded-2xl md:col-span-2">
+             <CardContent className="p-6">
+               <div className="flex items-center justify-between mb-4">
+                 <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground">Detalhamento de Custos Fixos & Parcelas</p>
+                 <Badge variant="outline" className="text-[9px] font-black uppercase tracking-widest bg-white/5 border-white/10">
+                   Total Mensal: R$ {monthlyObligations.toFixed(2)}
+                 </Badge>
+               </div>
+               <div className="space-y-3">
+                 {recurringExpenses.map(exp => (
+                   <div key={exp.id} className="flex justify-between items-center text-xs border-b border-border/20 pb-2">
+                     <span className="font-bold text-muted-foreground uppercase tracking-tighter">{exp.description}</span>
+                     <span className="font-mono font-bold text-white">R$ {exp.amount.toFixed(2)}</span>
+                   </div>
+                 ))}
+                 {installmentExpenses.map(exp => (
+                   <div key={exp.id} className="flex justify-between items-center text-xs border-b border-border/20 pb-2">
+                     <div className="flex items-center gap-2">
+                       <span className="font-bold text-muted-foreground uppercase tracking-tighter">{exp.description}</span>
+                       <Badge className="text-[8px] bg-primary/20 text-primary border-none">{exp.remainingInstallments}/{exp.installmentsCount}</Badge>
+                     </div>
+                     <span className="font-mono font-bold text-white">R$ {exp.installmentValue.toFixed(2)}</span>
+                   </div>
+                 ))}
+                 {recurringExpenses.length === 0 && installmentExpenses.length === 0 && (
+                   <p className="text-[10px] text-muted-foreground uppercase font-bold text-center py-4">Nenhuma obrigação recorrente cadastrada</p>
+                 )}
+               </div>
+             </CardContent>
+          </Card>
+        </div>
+      </div>
+
       <div className="flex flex-col md:flex-row justify-between items-center gap-4 md:gap-6">
         <div className="flex items-center gap-4 w-full md:w-auto">
           <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
             <Receipt className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="font-black uppercase tracking-tighter text-lg leading-tight">Histórico Nexus</h3>
+            <h3 className="font-black uppercase tracking-tighter text-lg leading-tight">Histórico de Transações</h3>
             <p className="text-[10px] text-muted-foreground tracking-widest uppercase font-bold">Monitoramento de Fluxo {getFilterLabel()}</p>
           </div>
         </div>
@@ -352,22 +569,65 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Categoria</label>
-                    <Select value={category} onValueChange={setCategory}>
+                    <div className="flex justify-between items-center ml-1">
+                      <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Categoria</label>
+                      <button 
+                        type="button"
+                        onClick={() => setIsCategoryModalOpen(true)}
+                        className="text-[9px] font-bold text-primary hover:underline uppercase tracking-widest"
+                      >
+                        Gerenciar
+                      </button>
+                    </div>
+                    <Select value={category} onValueChange={(val) => {
+                      setCategory(val);
+                      setSubCategory('');
+                    }}>
                       <SelectTrigger className="h-12 bg-background border-border font-bold uppercase tracking-widest text-[10px]">
                         <SelectValue placeholder="Selecionar" />
                       </SelectTrigger>
-                      <SelectContent className="bg-[#0b1224] border-border">
-                        <SelectItem value="Suprimentos" className="uppercase font-bold tracking-widest text-xs">Suprimentos</SelectItem>
-                        <SelectItem value="Aluguel" className="uppercase font-bold tracking-widest text-xs">Aluguel</SelectItem>
-                        <SelectItem value="Utilidades" className="uppercase font-bold tracking-widest text-xs">Utilidades</SelectItem>
-                        <SelectItem value="Salários" className="uppercase font-bold tracking-widest text-xs">Salários</SelectItem>
-                        <SelectItem value="Manutenção" className="uppercase font-bold tracking-widest text-xs">Manutenção</SelectItem>
-                        <SelectItem value="Outros" className="uppercase font-bold tracking-widest text-xs">Outros</SelectItem>
+                      <SelectContent className="bg-[#0b1224] border-border max-h-[250px]">
+                        {expenseCategories.length === 0 ? (
+                          <div className="px-2 py-4 text-center text-muted-foreground text-[10px] font-bold uppercase">
+                            Nenhuma categoria cadastrada
+                          </div>
+                        ) : (
+                          expenseCategories.map(cat => (
+                            <SelectItem key={cat.id} value={cat.id} className="uppercase font-bold tracking-widest text-xs">
+                              {cat.name}
+                            </SelectItem>
+                          ))
+                        )}
+                        {/* Legacy default categories if none exist */}
+                        {expenseCategories.length === 0 && (
+                          <>
+                            <SelectItem value="Suprimentos" className="uppercase font-bold tracking-widest text-xs">Suprimentos</SelectItem>
+                            <SelectItem value="Aluguel" className="uppercase font-bold tracking-widest text-xs">Aluguel</SelectItem>
+                            <SelectItem value="Utilidades" className="uppercase font-bold tracking-widest text-xs">Utilidades</SelectItem>
+                          </>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
+
+                {category && expenseCategories.find(c => c.id === category)?.subcategories?.length! > 0 && (
+                  <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                    <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Subcategoria (Opcional)</label>
+                    <Select value={subCategory} onValueChange={setSubCategory}>
+                      <SelectTrigger className="h-12 bg-background border-border font-bold uppercase tracking-widest text-[10px]">
+                        <SelectValue placeholder="Selecionar Subcategoria" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-[#0b1224] border-border">
+                        {expenseCategories.find(c => c.id === category)?.subcategories.map(sub => (
+                          <SelectItem key={sub} value={sub} className="uppercase font-bold tracking-widest text-xs">
+                            {sub}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Descrição</label>
                   <Input 
@@ -376,6 +636,80 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
                     onChange={(e) => setDescription(e.target.value)}
                     placeholder="Ex: Reposição de Cerveja"
                   />
+                </div>
+
+                <div className="pt-4 border-t border-border/50 space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex items-center justify-between bg-white/5 p-3 rounded-xl border border-border/50">
+                      <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground">Fixa Mensal?</label>
+                      <input 
+                        type="checkbox" 
+                        className="w-5 h-5 rounded border-border bg-background accent-primary"
+                        checked={isRecurring}
+                        onChange={(e) => {
+                          setIsRecurring(e.target.checked);
+                          if (e.target.checked) setIsInstallment(false);
+                        }}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between bg-white/5 p-3 rounded-xl border border-border/50">
+                      <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground">Parcelada?</label>
+                      <input 
+                        type="checkbox" 
+                        className="w-5 h-5 rounded border-border bg-background accent-primary"
+                        checked={isInstallment}
+                        onChange={(e) => {
+                          setIsInstallment(e.target.checked);
+                          if (e.target.checked) setIsRecurring(false);
+                        }}
+                      />
+                    </div>
+                  </div>
+                  
+                  {isRecurring && (
+                    <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
+                      <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Dia do Vencimento</label>
+                      <Select value={dueDate} onValueChange={setDueDate}>
+                        <SelectTrigger className="h-12 bg-background border-border font-bold uppercase tracking-widest text-[10px]">
+                          <SelectValue placeholder="Selecionar Dia" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#0b1224] border-border max-h-[200px]">
+                          {Array.from({ length: 31 }, (_, i) => (
+                            <SelectItem key={i + 1} value={(i + 1).toString()} className="font-mono">
+                              Dia {i + 1}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-widest leading-tight">
+                        Esta despesa será listada automaticamente no relatório mensal.
+                      </p>
+                    </div>
+                  )}
+
+                  {isInstallment && (
+                    <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Número de Parcelas</label>
+                        <Select value={installmentsCount} onValueChange={setInstallmentsCount}>
+                          <SelectTrigger className="h-12 bg-background border-border font-bold uppercase tracking-widest text-[10px]">
+                            <SelectValue placeholder="Selecionar Parcelas" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-[#0b1224] border-border">
+                            {[2,3,4,5,6,10,12,24].map(n => (
+                              <SelectItem key={n} value={n.toString()} className="font-mono">{n} Parcelas</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="p-4 bg-primary/5 border border-primary/20 rounded-xl">
+                        <p className="text-[10px] font-bold text-primary uppercase tracking-widest mb-1 text-center">Simulação</p>
+                        <p className="text-sm font-black text-white text-center">
+                          {installmentsCount}x de R$ {(parseFloat(amount || '0') / parseInt(installmentsCount)).toFixed(2)}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
               <DialogFooter className="p-6 md:p-8 border-t border-border/50 bg-card flex-shrink-0">
@@ -593,7 +927,9 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
               </div>
               <div className="space-y-1">
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Categoria</p>
-                <p className="font-bold text-sm uppercase">{selectedTransaction?.category}</p>
+                <p className="font-bold text-sm uppercase">
+                  {selectedTransaction?.subCategory ? `${selectedTransaction.category} > ${selectedTransaction.subCategory}` : selectedTransaction?.category}
+                </p>
               </div>
               <div className="space-y-1">
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Método de Pagamento</p>
@@ -700,6 +1036,190 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
                 )}
               </div>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+      {/* Recurring & Installment Expenses Management */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-12 pb-12">
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-500">
+                <Calendar className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-black uppercase tracking-tighter text-lg leading-tight">Custos Fixos Mensais</h3>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4">
+            {recurringExpenses.map(expense => {
+              const category = expenseCategories.find(c => c.id === expense.categoryId);
+              return (
+                <Card key={expense.id} className="bg-card/30 border-border/50 relative group overflow-hidden">
+                  <div className="p-4 flex justify-between items-center">
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-black text-orange-500 uppercase tracking-widest">Dia {expense.dueDate}</p>
+                      <h4 className="font-black text-sm uppercase truncate max-w-[150px]">{expense.description}</h4>
+                      <p className="text-[8px] text-muted-foreground uppercase font-bold tracking-widest">{category?.name}</p>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <p className="text-sm font-black text-white font-mono">R$ {expense.amount.toFixed(2)}</p>
+                      <Button variant="ghost" size="icon" onClick={() => handleDeleteRecurring(expense.id)} className="text-muted-foreground hover:text-red-500"><Trash2 className="w-4 h-4" /></Button>
+                    </div>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                <Receipt className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-black uppercase tracking-tighter text-lg leading-tight">Compras Parceladas</h3>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4">
+            {installmentExpenses.map(expense => {
+              const category = expenseCategories.find(c => c.id === expense.categoryId);
+              return (
+                <Card key={expense.id} className="bg-card/30 border-border/50 relative group overflow-hidden">
+                  <div className="p-4 flex justify-between items-center">
+                    <div className="space-y-1">
+                      <Badge variant="outline" className="text-[8px] font-black uppercase tracking-widest border-primary/20 bg-primary/5 text-primary">
+                        {expense.remainingInstallments} restantes
+                      </Badge>
+                      <h4 className="font-black text-sm uppercase truncate max-w-[150px]">{expense.description}</h4>
+                      <p className="text-[8px] text-muted-foreground uppercase font-bold tracking-widest">{category?.name}</p>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <p className="text-sm font-black text-white font-mono">R$ {expense.installmentValue.toFixed(2)}</p>
+                        <p className="text-[9px] text-muted-foreground uppercase font-bold">Total: {expense.totalAmount.toFixed(0)}</p>
+                      </div>
+                      <Button variant="ghost" size="icon" onClick={async () => {
+                        try {
+                          await deleteDoc(doc(db, 'installment_expenses', expense.id));
+                          toast.success('Parcelamento removido');
+                        } catch (error) {
+                          handleFirestoreError(error, OperationType.DELETE, 'installment_expenses');
+                        }
+                      }} className="text-muted-foreground hover:text-red-500"><Trash2 className="w-4 h-4" /></Button>
+                    </div>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Category Management Modal */}
+      <Dialog open={isCategoryModalOpen} onOpenChange={setIsCategoryModalOpen}>
+        <DialogContent className="bg-[#0b1224] border-border max-w-2xl text-white p-0 overflow-hidden flex flex-col max-h-[90vh]">
+          <div className="p-6 md:p-8 border-b border-border/50 relative flex-shrink-0">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20">
+                <Settings2 className="w-7 h-7 text-primary" />
+              </div>
+              <div>
+                <DialogTitle className="text-2xl md:text-3xl font-black uppercase tracking-tighter leading-none mb-1">Categorias de Despesa</DialogTitle>
+                <p className="text-[10px] font-bold tracking-widest uppercase text-primary/60 flex items-center gap-2">
+                  Organização avançada do financeiro
+                </p>
+              </div>
+            </div>
+            <button onClick={() => setIsCategoryModalOpen(false)} className="absolute right-6 top-6 text-muted-foreground hover:text-white transition-colors">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="p-6 md:p-8 space-y-8 overflow-y-auto custom-scrollbar">
+            {/* New Category Form */}
+            <div className="flex gap-4 items-end bg-white/5 p-6 rounded-2xl border border-border/50">
+              <div className="flex-1 space-y-2">
+                <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Nova Categoria</label>
+                <Input 
+                  value={newCatName}
+                  onChange={(e) => setNewCatName(e.target.value)}
+                  placeholder="Ex: Fornecedores"
+                  className="h-12 bg-background"
+                />
+              </div>
+              <Button onClick={handleCreateCategory} className="h-12 px-6 font-bold uppercase tracking-widest text-[10px]">
+                Criar
+              </Button>
+            </div>
+
+            {/* List Categories */}
+            <div className="space-y-6">
+              {expenseCategories.map(cat => (
+                <div key={cat.id} className="p-6 bg-card border border-border rounded-2xl space-y-6">
+                  <div className="flex justify-between items-center">
+                    <h4 className="text-xl font-black uppercase tracking-tight">{cat.name}</h4>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={async () => {
+                        if (confirm('Excluir esta categoria e todas subcategorias?')) {
+                          await deleteDoc(doc(db, 'expense_categories', cat.id));
+                          toast.success('Categoria excluída');
+                        }
+                      }}
+                      className="text-red-500 hover:bg-red-500/10"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </Button>
+                  </div>
+
+                  {/* Subcategories */}
+                  <div className="space-y-4">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Subcategorias</p>
+                    <div className="flex flex-wrap gap-2">
+                      {cat.subcategories?.map(sub => (
+                        <Badge key={sub} variant="secondary" className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest group">
+                          {sub}
+                          <button 
+                            className="ml-2 hover:text-red-500"
+                            onClick={async () => {
+                              const updated = cat.subcategories.filter(s => s !== sub);
+                              const { updateDoc, doc } = await import('firebase/firestore');
+                              await updateDoc(doc(db, 'expense_categories', cat.id), { subcategories: updated });
+                            }}
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+
+                    <div className="flex gap-2 items-center mt-4">
+                      <Input 
+                        placeholder="Nova subcategoria..."
+                        value={newSubName}
+                        onChange={(e) => setNewSubName(e.target.value)}
+                        className="h-10 text-xs bg-background"
+                      />
+                      <Button 
+                        size="sm" 
+                        onClick={() => handleAddSubcategory(cat.id)}
+                        className="h-10 font-bold uppercase tracking-widest text-[10px]"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </DialogContent>
       </Dialog>

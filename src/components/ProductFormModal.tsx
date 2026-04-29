@@ -9,7 +9,7 @@ import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from './ui/select';
 import { Dialog, DialogContent, DialogTitle, DialogFooter } from './ui/dialog';
 import { Combobox } from './ui/combobox';
-import { Info, Plus, Settings, Check, Droplets, FlaskConical, Package, Wine, X, DollarSign, TrendingUp, History } from 'lucide-react';
+import { Info, Plus, Settings, Check, Droplets, FlaskConical, Package, Wine, X, DollarSign, TrendingUp, History, List, Minus } from 'lucide-react';
 import { toast } from 'sonner';
 import { handleFirestoreError, OperationType } from '../lib/firebase-utils';
 import { cn } from '../lib/utils';
@@ -32,7 +32,7 @@ export function ProductFormModal({
   categories: Category[];
   onSaveSuccess?: (product: Product & { id: string }) => void;
 }) {
-  const [productModalTab, setProductModalTab] = useState<'identificacao' | 'venda_estoque' | 'controle_dose'>('identificacao');
+  const [productModalTab, setProductModalTab] = useState<'identificacao' | 'venda_estoque' | 'ficha_tecnica' | 'controle_dose'>('identificacao');
   const [isSavingProduct, setIsSavingProduct] = useState(false);
 
   // Form states
@@ -51,6 +51,7 @@ export function ProductFormModal({
   const [currentBottleVolume, setCurrentBottleVolume] = useState('');
   const [linkedProductId, setLinkedProductId] = useState('');
   const [doseSize, setDoseSize] = useState('');
+  const [ingredients, setIngredients] = useState<{ productId: string; quantity: number }[]>([]);
 
   // Auto-configure dose control based on subcategory
   useEffect(() => {
@@ -104,6 +105,7 @@ export function ProductFormModal({
         setCurrentBottleVolume((editingProduct.currentBottleVolume || '').toString());
         setLinkedProductId(editingProduct.linkedProductId || '');
         setDoseSize((editingProduct.doseSize || '').toString());
+        setIngredients(editingProduct.ingredients || []);
       } else {
         setProductName(initialName || '');
         setProductPrice('');
@@ -167,6 +169,7 @@ export function ProductFormModal({
       isOpenValue,
       isDoseControl,
       volumePerUnit: Math.max(0, parseFloat(volumePerUnit) || 0),
+      ingredients: ingredients.length > 0 ? ingredients : null,
       linkedProductId: isDoseControl ? linkedProductId : '',
       doseSize: isDoseControl ? Math.max(0, parseFloat(doseSize) || 0) : 0,
       currentBottleVolume: isDoseControl && !linkedProductId 
@@ -229,7 +232,8 @@ export function ProductFormModal({
           {[
             { id: 'identificacao', label: '1. Identificação', icon: Package },
             { id: 'venda_estoque', label: '2. Venda & Estoque', icon: DollarSign },
-            { id: 'controle_dose', label: '3. Controle de ML/Dose', icon: Droplets }
+            { id: 'ficha_tecnica', label: '3. Ficha Técnica', icon: List },
+            { id: 'controle_dose', label: '4. Controle de ML/Dose', icon: Droplets }
           ].map((tab) => (
             <button 
               key={tab.id}
@@ -529,6 +533,124 @@ export function ProductFormModal({
                     </div>
                   )}
 
+                </div>
+              </div>
+            )}
+
+            {/* 3. FICHA TÉCNICA TAB */}
+            {productModalTab === 'ficha_tecnica' && (
+              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <div className="p-6 bg-amber-500/5 border border-amber-500/10 rounded-2xl flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center">
+                    <List className="w-6 h-6 text-amber-500" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-black uppercase tracking-widest text-white">Ficha Técnica (Composição)</h4>
+                    <p className="text-[10px] text-muted-foreground uppercase font-black">Defina os ingredientes deste item</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Selecionar Ingrediente (Produto)</label>
+                      <Combobox 
+                        options={products.filter(p => p.id !== editingProduct?.id).map(p => ({ label: p.name, value: p.id }))}
+                        value=""
+                        onSelect={(id) => {
+                          if (id && !ingredients.some(i => i.productId === id)) {
+                            setIngredients([...ingredients, { productId: id, quantity: 1 }]);
+                          }
+                        }}
+                        placeholder="Pesquisar produto no estoque..."
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 border border-white/5 rounded-2xl overflow-hidden">
+                    {ingredients.length === 0 ? (
+                      <div className="p-12 text-center text-muted-foreground">
+                        <Package className="w-12 h-12 mx-auto mb-4 opacity-5" />
+                        <p className="text-[10px] font-bold uppercase tracking-widest">Nenhum ingrediente adicionado</p>
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-white/5">
+                        {ingredients.map((ing, idx) => {
+                          const product = products.find(p => p.id === ing.productId);
+                          return (
+                            <div key={ing.productId} className="p-4 flex items-center justify-between bg-white/[0.02] hover:bg-white/[0.04] transition-all">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center">
+                                  <Package className="w-4 h-4 text-muted-foreground" />
+                                </div>
+                                <div>
+                                  <p className="text-xs font-bold uppercase">{product?.name || 'Desconhecido'}</p>
+                                  <p className="text-[8px] text-muted-foreground uppercase">Unidade: {product?.unit || 'UN'}</p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-4">
+                                <div className="flex items-center bg-black/40 rounded-lg p-1 border border-white/5">
+                                  <button 
+                                    onClick={() => {
+                                      const newIngs = [...ingredients];
+                                      newIngs[idx].quantity = Math.max(0.01, newIngs[idx].quantity - 1);
+                                      setIngredients(newIngs);
+                                    }}
+                                    className="w-6 h-6 flex items-center justify-center hover:bg-white/5 rounded"
+                                  >
+                                    <Minus className="w-3 h-3" />
+                                  </button>
+                                  <Input 
+                                    type="number"
+                                    className="w-14 h-6 bg-transparent border-none text-center font-bold text-xs p-0 focus-visible:ring-0"
+                                    value={ing.quantity}
+                                    onChange={(e) => {
+                                      const newIngs = [...ingredients];
+                                      newIngs[idx].quantity = parseFloat(e.target.value) || 0;
+                                      setIngredients(newIngs);
+                                    }}
+                                  />
+                                  <button 
+                                    onClick={() => {
+                                      const newIngs = [...ingredients];
+                                      newIngs[idx].quantity += 1;
+                                      setIngredients(newIngs);
+                                    }}
+                                    className="w-6 h-6 flex items-center justify-center hover:bg-white/5 rounded"
+                                  >
+                                    <Plus className="w-3 h-3" />
+                                  </button>
+                                </div>
+                                <button 
+                                  onClick={() => setIngredients(ingredients.filter(i => i.productId !== ing.productId))}
+                                  className="p-2 text-red-500/50 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="p-6 bg-blue-500/5 border border-blue-500/10 rounded-2xl">
+                     <div className="flex items-center gap-3 mb-2">
+                       <TrendingUp className="w-4 h-4 text-blue-500" />
+                       <h5 className="text-[10px] font-black uppercase tracking-widest text-[#0070f3]">Impacto no Custo</h5>
+                     </div>
+                     <div className="flex items-center justify-between">
+                       <p className="text-xs text-muted-foreground uppercase font-bold">Custo Total dos Ingredientes:</p>
+                       <p className="text-xl font-black text-white">
+                         R$ {ingredients.reduce((sum, ing) => {
+                           const p = products.find(prod => prod.id === ing.productId);
+                           return sum + ((p?.cost || 0) * ing.quantity);
+                         }, 0).toFixed(2)}
+                       </p>
+                     </div>
+                     <p className="text-[9px] text-muted-foreground uppercase mt-2 italic">* O sistema atualizará o estoque desses itens automaticamente a cada venda deste produto.</p>
+                  </div>
                 </div>
               </div>
             )}

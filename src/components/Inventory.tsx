@@ -243,7 +243,7 @@ export function Inventory({ user, setActiveTab }: { user: UserProfile, setActive
   return (
     <div className="space-y-8">
       {/* Inventory Insights - Metrics Banner */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         <Card 
           className={cn(
             "bg-card/30 border-border/50 overflow-hidden relative group cursor-pointer transition-all",
@@ -266,28 +266,6 @@ export function Inventory({ user, setActiveTab }: { user: UserProfile, setActive
         </Card>
 
         <Card 
-          className={cn(
-            "bg-card/30 border-border/50 overflow-hidden relative group cursor-pointer transition-all",
-            stockFilter === 'all' && !search && "ring-2 ring-blue-500/50 bg-blue-500/10"
-          )}
-          onClick={() => {
-            setStockFilter('all');
-            setSearch('');
-          }}
-        >
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-          <CardContent className="p-6 flex items-center gap-5 relative z-10">
-            <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center border border-blue-500/20 shadow-[0_0_20px_rgba(59,130,246,0.1)]">
-              <Package className="w-6 h-6 text-blue-500" />
-            </div>
-            <div>
-              <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-1">Total Inventário</p>
-              <h3 className="text-2xl font-black text-white leading-none">{products.length} <span className="text-[10px] text-blue-500 font-black">PRODUTOS</span></h3>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card 
           className="bg-card/30 border-border/50 overflow-hidden relative group cursor-pointer"
           onClick={() => setActiveTab('finances')}
         >
@@ -297,9 +275,44 @@ export function Inventory({ user, setActiveTab }: { user: UserProfile, setActive
               <TrendingUp className="w-6 h-6 text-green-500" />
             </div>
             <div>
-              <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-1">Patrimônio Líquido (Estoque)</p>
+              <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-1">Patrimônio Líquido</p>
               <h3 className="text-2xl font-black text-white leading-none">
                 R$ {products.reduce((sum, p) => sum + ((p.cost || 0) * (p.stock || 0)), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </h3>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-card/30 border-border/50 overflow-hidden relative group">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <CardContent className="p-6 flex items-center gap-5 relative z-10">
+            <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20">
+              <TrendingUp className="w-6 h-6 text-primary" />
+            </div>
+            <div>
+              <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-1">Lucro Potencial</p>
+              <h3 className="text-2xl font-black text-primary leading-none">
+                R$ {products.reduce((sum, p) => sum + (((p.price - p.cost) || 0) * (p.stock || 1)), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </h3>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-card/30 border-border/50 overflow-hidden relative group">
+          <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <CardContent className="p-6 flex items-center gap-5 relative z-10">
+            <div className="w-12 h-12 rounded-2xl bg-yellow-500/10 flex items-center justify-center border border-yellow-500/20">
+              <Tag className="w-6 h-6 text-yellow-500" />
+            </div>
+            <div>
+              <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-1">Margem Média</p>
+              <h3 className="text-2xl font-black text-white leading-none">
+                {(() => {
+                  const productsWithCost = products.filter(p => (p.cost || 0) > 0);
+                  if (productsWithCost.length === 0) return '0%';
+                  const avgMargin = productsWithCost.reduce((sum, p) => sum + (((p.price - p.cost) / p.cost) * 100), 0) / productsWithCost.length;
+                  return `${avgMargin.toFixed(0)}%`;
+                })()}
               </h3>
             </div>
           </CardContent>
@@ -583,8 +596,8 @@ export function Inventory({ user, setActiveTab }: { user: UserProfile, setActive
                                           <div className="hidden lg:block text-right">
                                             <p className="text-[8px] font-bold tracking-widest uppercase text-muted-foreground mb-1">Margem</p>
                                             <p className={cn(
-                                              "text-[10px] font-bold uppercase tracking-widest",
-                                              margin >= 30 ? "text-green-500" : "text-yellow-500"
+                                              "text-xs font-black uppercase tracking-tighter",
+                                              margin >= 100 ? "text-green-400" : margin >= 50 ? "text-green-500" : margin >= 30 ? "text-yellow-500" : "text-red-500"
                                             )}>
                                               {margin.toFixed(0)}%
                                             </p>
@@ -686,6 +699,16 @@ export function Inventory({ user, setActiveTab }: { user: UserProfile, setActive
                             <div className="hidden md:block text-right">
                               <p className="text-[8px] font-bold tracking-widest uppercase text-muted-foreground mb-1">Custo Unit.</p>
                               <p className="font-mono font-bold text-xs text-muted-foreground">R$ {(product.cost || 0).toFixed(2)}</p>
+                            </div>
+
+                            <div className="hidden lg:block text-right">
+                              <p className="text-[8px] font-bold tracking-widest uppercase text-muted-foreground mb-1">Margem</p>
+                              <p className={cn(
+                                "text-xs font-black uppercase tracking-tighter",
+                                margin >= 100 ? "text-green-400" : margin >= 50 ? "text-green-500" : margin >= 30 ? "text-yellow-500" : "text-red-500"
+                              )}>
+                                {margin.toFixed(0)}%
+                              </p>
                             </div>
                             
                             <div className="text-left sm:text-right">

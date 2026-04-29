@@ -102,7 +102,7 @@ export function Dashboard({ user, setActiveTab }: { user: UserProfile, setActive
   return (
     <div className="space-y-8">
       {/* Digital Operations Dashboard - Metrics Banner */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         <Card className="bg-card/30 border-border/50 overflow-hidden relative group cursor-pointer" onClick={() => setIsNewOrderOpen(true)}>
           <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
           <CardContent className="p-6 flex items-center gap-5 relative z-10">
@@ -139,7 +139,6 @@ export function Dashboard({ user, setActiveTab }: { user: UserProfile, setActive
             )}
           </CardContent>
         </Card>
-
         <Card className="bg-card/30 border-border/50 overflow-hidden relative group cursor-pointer" onClick={() => setActiveTab('finances')}>
           <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
           <CardContent className="p-6 flex items-center gap-5 relative z-10">
@@ -149,19 +148,6 @@ export function Dashboard({ user, setActiveTab }: { user: UserProfile, setActive
             <div>
               <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-1">Faturamento Bruto</p>
               <h3 className="text-2xl font-black text-white leading-none">R$ {orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-card/30 border-border/50 overflow-hidden relative group">
-          <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-          <CardContent className="p-6 flex items-center gap-5 relative z-10">
-            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center border border-amber-500/20 shadow-[0_0_20px_rgba(245,158,11,0.1)]">
-              <Activity className="w-6 h-6 text-amber-500" />
-            </div>
-            <div>
-              <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-1">Fluxo de Dados</p>
-              <h3 className="text-2xl font-black text-white leading-none">NEXUS <span className="text-[10px] text-amber-500 font-black">ONLINE</span></h3>
             </div>
           </CardContent>
         </Card>
@@ -711,6 +697,26 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
           const product = products.find(p => p.id === baseProductId);
           
           if (product) {
+            // RECIPE (Ficha Técnica) logic - Reduce stock of ingredients
+            if (product.ingredients && product.ingredients.length > 0) {
+              for (const ing of product.ingredients) {
+                const ingProduct = products.find(p => p.id === ing.productId);
+                if (ingProduct) {
+                  if (!inventoryUpdates[ing.productId]) {
+                    inventoryUpdates[ing.productId] = {
+                      stockReduction: 0,
+                      mlReduction: 0,
+                      originalStock: ingProduct.stock || 0,
+                      originalVol: ingProduct.currentBottleVolume !== undefined ? ingProduct.currentBottleVolume : (ingProduct.volumePerUnit || 0),
+                      volPerUnit: ingProduct.volumePerUnit || 0,
+                      isDoseControl: !!ingProduct.isDoseControl
+                    };
+                  }
+                  inventoryUpdates[ing.productId].stockReduction += (ing.quantity * item.quantity);
+                }
+              }
+            }
+
             if (product.isDoseControl && product.linkedProductId) {
               // It's a DOSE
               const bottleId = product.linkedProductId;
