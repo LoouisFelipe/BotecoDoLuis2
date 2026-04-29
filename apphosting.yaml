@@ -37,11 +37,6 @@ env:
     availability:
       - BUILD
       - RUNTIME
-  - variable: VITE_FIREBASE_MEASUREMENT_ID
-    value: ""
-    availability:
-      - BUILD
-      - RUNTIME
   - variable: VITE_FIREBASE_STORAGE_BUCKET
     value: botecodoluis2.firebasestorage.app
     availability:

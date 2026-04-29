@@ -1,4 +1,4 @@
-# Security Specification - Bar do Luis (Nexus/Boteco 360)
+# Security Specification - Bar do Luis (Boteco 360)
 
 ## Data Invariants
 1. **User Role Integrity:** Only the hardcoded owner or verified admins can promote staff or change roles.

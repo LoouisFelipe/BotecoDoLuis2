@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
-import { Plus, Search, ShoppingCart, CheckCircle2, ChevronRight, LayoutGrid, List, Zap, Activity, Clock, TrendingUp, TrendingDown, Trash2, ShieldCheck, UserPlus, UserCheck, Menu, X, Receipt, Package, Calendar, Minus, Gamepad2, ArrowLeft, PlusCircle, Users, FlaskConical, Filter } from 'lucide-react';
+import { Plus, Search, ShoppingCart, CheckCircle2, ChevronRight, LayoutGrid, List, Zap, Activity, Clock, TrendingUp, TrendingDown, Trash2, ShieldCheck, UserPlus, UserCheck, Menu, X, Receipt, Package, Calendar, Minus, Gamepad2, ArrowLeft, PlusCircle, Users, FlaskConical, Filter, DollarSign, CreditCard, Globe } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle, DialogTrigger, DialogFooter } from './ui/dialog';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -102,52 +102,59 @@ export function Dashboard({ user, setActiveTab }: { user: UserProfile, setActive
   return (
     <div className="space-y-8">
       {/* Digital Operations Dashboard - Metrics Banner */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
         <Card className="bg-card/30 border-border/50 overflow-hidden relative group cursor-pointer" onClick={() => setIsNewOrderOpen(true)}>
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-          <CardContent className="p-6 flex items-center gap-5 relative z-10">
-            <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 shadow-[0_0_20px_rgba(59,130,246,0.1)] group-hover:scale-110 transition-transform">
-              <Zap className="w-6 h-6 text-primary" />
+          <div className="absolute inset-0 bg-gradient-to-br from-[#0070f3]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <CardContent className="p-4 md:p-6 flex items-center gap-4 md:gap-5 relative z-10">
+            <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-[#0070f3]/10 flex items-center justify-center border border-[#0070f3]/20 shadow-[0_0_20px_rgba(0,112,243,0.1)] group-hover:scale-110 transition-transform">
+              <PlusCircle className="w-5 h-5 md:w-6 md:h-6 text-[#0070f3]" />
             </div>
             <div>
-              <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-1">Acesso Rápido</p>
-              <h3 className="text-xl font-black text-white leading-none">ABRIR COMANDA</h3>
+              <p className="text-[8px] md:text-[9px] font-black tracking-widest uppercase text-muted-foreground mb-1 leading-none">Ponto de Venda</p>
+              <h3 className="text-xs md:text-lg font-black text-white leading-none">NOVA COMANDA</h3>
             </div>
           </CardContent>
         </Card>
 
         <Card className="bg-card/30 border-border/50 overflow-hidden relative group">
           <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-          <CardContent className="p-6 flex items-center gap-5 relative z-10">
-            <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center border border-blue-500/20 shadow-[0_0_20px_rgba(59,130,246,0.1)]">
-              <Clock className="w-6 h-6 text-blue-500" />
+          <CardContent className="p-4 md:p-6 flex items-center gap-4 md:gap-5 relative z-10">
+            <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
+              <Clock className="w-5 h-5 md:w-6 md:h-6 text-blue-500" />
             </div>
             <div className="flex-1">
-              <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-1">Atendimento Ativo</p>
-              <h3 className="text-2xl font-black text-white leading-none">{orders.length} <span className="text-[10px] text-blue-500 font-black">ATIVAS</span></h3>
+              <p className="text-[8px] md:text-[9px] font-black tracking-widest uppercase text-muted-foreground mb-1 leading-none">Mesas Ativas</p>
+              <h3 className="text-lg md:text-2xl font-black text-white leading-none">{orders.length}</h3>
             </div>
-            {user.uid === 'e5SB016rBhWuYEKifTIYSCfE5Bq2' && (
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={bootstrapAdmin}
-                className="text-primary/40 hover:text-primary transition-colors h-8 w-8"
-                title="Sincronizar Admin"
-              >
-                <ShieldCheck className="w-4 h-4" />
-              </Button>
-            )}
           </CardContent>
         </Card>
+
         <Card className="bg-card/30 border-border/50 overflow-hidden relative group cursor-pointer" onClick={() => setActiveTab('finances')}>
-          <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-          <CardContent className="p-6 flex items-center gap-5 relative z-10">
-            <div className="w-12 h-12 rounded-2xl bg-green-500/10 flex items-center justify-center border border-green-500/20 shadow-[0_0_20px_rgba(34,197,94,0.1)]">
-              <TrendingUp className="w-6 h-6 text-green-500" />
+          <div className="absolute inset-0 bg-gradient-to-br from-[#0070f3]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <CardContent className="p-4 md:p-6 flex items-center gap-4 md:gap-5 relative z-10">
+            <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-[#0070f3]/10 flex items-center justify-center border border-[#0070f3]/20">
+              <TrendingUp className="w-5 h-5 md:w-6 md:h-6 text-[#0070f3]" />
             </div>
-            <div>
-              <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-1">Faturamento Bruto</p>
-              <h3 className="text-2xl font-black text-white leading-none">R$ {orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
+            <div className="min-w-0">
+              <p className="text-[8px] md:text-[9px] font-black tracking-widest uppercase text-muted-foreground mb-1 leading-none">Valor em Aberto</p>
+              <h3 className="text-base md:text-2xl font-black text-[#0070f3] leading-none truncate font-mono">
+                R$ {orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </h3>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-card/30 border-border/50 overflow-hidden relative group">
+          <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <CardContent className="p-4 md:p-6 flex items-center gap-4 md:gap-5 relative z-10">
+            <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-green-500/10 flex items-center justify-center border border-green-500/20">
+              <Zap className="w-5 h-5 md:w-6 md:h-6 text-green-500" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[8px] md:text-[9px] font-black tracking-widest uppercase text-muted-foreground mb-1 leading-none">Ticket Médio</p>
+              <h3 className="text-base md:text-2xl font-black text-green-500 leading-none truncate font-mono">
+                R$ {orders.length > 0 ? (orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0) / orders.length).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '0,00'}
+              </h3>
             </div>
           </CardContent>
         </Card>
@@ -1753,19 +1760,46 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
           </div>
 
           <div className="p-6 md:p-8 space-y-8 overflow-y-auto custom-scrollbar flex-1">
-            {/* Main Total Display */}
-            <div className="bg-[#0d1117] p-8 rounded-3xl border border-white/5 text-center space-y-3 shadow-inner relative overflow-hidden group">
-              <div className="absolute inset-0 bg-gradient-to-br from-[#0070f3]/5 to-transparent opacity-50" />
-              <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground relative z-10">Valor Total a Receber</p>
-              <p className="text-5xl md:text-7xl font-black text-[#0070f3] tracking-tighter leading-none relative z-10 flex items-center justify-center gap-2">
-                <span className="text-xl md:text-2xl font-bold text-[#0070f3]/60">R$</span>
-                {checkoutAmount.toFixed(2)}
-              </p>
-              {checkoutDiscount > 0 && (
-                <p className="text-xs font-bold text-green-500 relative z-10 uppercase tracking-widest">
-                  Desconto Aplicado: R$ {checkoutDiscount.toFixed(2)}
-                </p>
-              )}
+            <div className="space-y-4">
+              {/* Main Total Display */}
+              <div className="bg-[#0d1117] p-6 md:p-8 rounded-3xl border border-white/5 text-center space-y-2 shadow-inner relative overflow-hidden group">
+                <div className="absolute inset-0 bg-gradient-to-br from-[#0070f3]/5 to-transparent opacity-50" />
+                <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground relative z-10 italic">Total do Atendimento</p>
+                <div className="flex flex-col items-center justify-center relative z-10">
+                  <div className="flex items-baseline justify-center gap-2">
+                    <span className="text-xl md:text-2xl font-bold text-[#0070f3]/60 italic">R$</span>
+                    <span className="text-5xl md:text-7xl font-black text-[#0070f3] tracking-tighter leading-none">
+                      {checkoutAmount.toFixed(2)}
+                    </span>
+                  </div>
+                  {checkoutDiscount > 0 && (
+                    <Badge variant="outline" className="mt-2 bg-green-500/10 text-green-500 border-green-500/20 px-3 py-1 font-black uppercase tracking-widest text-[10px]">
+                      - R$ {checkoutDiscount.toFixed(2)} DESCONTO
+                    </Badge>
+                  )}
+                </div>
+              </div>
+
+              {/* Advanced Summary Box */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="bg-white/[0.02] border border-white/5 p-4 rounded-2xl flex flex-col justify-center">
+                  <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest mb-1">Impacto Líquido (Est.)</p>
+                  <p className="text-lg font-black text-white/90">
+                    R$ {checkoutPayments.reduce((sum, p) => sum + calculateNet(p.amount, p.method).netAmount, 0).toFixed(2)}
+                  </p>
+                  <p className="text-[8px] text-muted-foreground uppercase font-bold tracking-tighter">Após taxas de operadora</p>
+                </div>
+                
+                {checkoutPayments.reduce((sum, p) => sum + p.amount, 0) > checkoutAmount && (
+                  <div className="bg-orange-500/5 border border-orange-500/20 p-4 rounded-2xl flex flex-col justify-center animate-in zoom-in duration-300">
+                    <p className="text-[9px] font-black text-orange-500 uppercase tracking-widest mb-1">Troco / Crédito</p>
+                    <p className="text-lg font-black text-orange-500">
+                      R$ {(checkoutPayments.reduce((sum, p) => sum + p.amount, 0) - checkoutAmount).toFixed(2)}
+                    </p>
+                    <p className="text-[8px] text-orange-500/60 uppercase font-bold tracking-tighter">Valor pago excedente</p>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Customer Balance Info */}
@@ -1806,17 +1840,20 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
             )}
 
             {/* Quick Actions */}
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {['DINHEIRO', 'PIX', 'CARTÃO'].map((method) => (
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { label: 'Dinheiro', method: 'DINHEIRO', icon: DollarSign },
+                { label: 'PIX', method: 'PIX', icon: Globe },
+                { label: 'Débito', method: 'CARTÃO DE DÉBITO', icon: CreditCard }
+              ].map((item) => (
                 <Button
-                  key={`quick-pay-${method}`}
+                  key={`quick-pay-${item.label}`}
                   variant="outline"
-                  onClick={() => {
-                    setCheckoutPayments([{ method: method === 'CARTÃO' ? 'CARTÃO DE DÉBITO' : method, amount: checkoutAmount }]);
-                  }}
-                  className="h-14 bg-[#0d1117] border-white/5 hover:border-[#0070f3]/50 hover:bg-[#0070f3]/5 text-[10px] font-black uppercase tracking-widest rounded-2xl transition-all"
+                  onClick={() => setCheckoutPayments([{ method: item.method, amount: checkoutAmount }])}
+                  className="h-14 md:h-16 bg-[#0d1117] border-white/5 hover:border-[#0070f3]/50 hover:bg-[#0070f3]/5 flex flex-col items-center justify-center gap-1 rounded-2xl group transition-all"
                 >
-                  Pagar Tudo ({method})
+                  <item.icon className="w-4 h-4 text-muted-foreground group-hover:text-[#0070f3] transition-colors" />
+                  <span className="text-[8px] md:text-[9px] font-black uppercase tracking-widest">{item.label} Total</span>
                 </Button>
               ))}
             </div>
@@ -1886,63 +1923,78 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                   </Button>
                 </div>
                 
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {checkoutPayments.map((payment, index) => (
                     <motion.div 
                       key={index}
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="flex gap-3 items-end p-4 bg-[#0d1117] rounded-2xl border border-white/5"
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="group relative"
                     >
-                      <div className="flex-1 space-y-2">
-                        <label className="text-[9px] font-black tracking-widest uppercase text-muted-foreground">Método</label>
-                        <Select 
-                          value={payment.method} 
-                          onValueChange={(val) => {
-                            const newPayments = [...checkoutPayments];
-                            newPayments[index].method = val;
-                            setCheckoutPayments(newPayments);
-                          }}
-                        >
-                          <SelectTrigger className="h-12 bg-[#161b22] border-white/5 font-bold text-xs uppercase rounded-xl">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent className="bg-[#05070a] border-white/10 rounded-2xl">
-                            {['DINHEIRO', 'PIX', 'CARTÃO DE CRÉDITO', 'CARTÃO DE DÉBITO', 'VALE REFEIÇÃO', 'FIADO', 'SALDO'].map(method => (
-                              <SelectItem key={method} value={method} className="font-black uppercase tracking-widest text-[10px] py-4 focus:bg-[#0070f3]/10 focus:text-[#0070f3]">
-                                {method}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="w-36 space-y-2">
-                        <label className="text-[9px] font-black tracking-widest uppercase text-muted-foreground">Valor</label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground font-bold">R$</span>
-                          <Input 
-                            type="number" 
-                            step="0.01"
-                            className="h-12 pl-8 bg-[#161b22] border-white/5 font-black text-sm rounded-xl"
-                            value={payment.amount}
-                            onChange={(e) => {
+                      <div className="flex flex-col md:flex-row gap-3 p-4 bg-[#0d1117] rounded-2xl border border-white/5 group-hover:border-white/10 transition-all">
+                        <div className="flex-1 space-y-2">
+                          <label className="text-[9px] font-black tracking-widest uppercase text-muted-foreground flex items-center gap-2">
+                            <CreditCard className="w-3 h-3" /> Método de Pagamento
+                          </label>
+                          <Select 
+                            value={payment.method} 
+                            onValueChange={(val) => {
                               const newPayments = [...checkoutPayments];
-                              newPayments[index].amount = parseFloat(e.target.value) || 0;
+                              newPayments[index].method = val;
                               setCheckoutPayments(newPayments);
                             }}
-                          />
+                          >
+                            <SelectTrigger className="h-12 bg-white/[0.02] border-white/5 font-bold text-xs uppercase rounded-xl">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="bg-[#05070a] border-white/10 rounded-2xl">
+                              {['DINHEIRO', 'PIX', 'CARTÃO DE CRÉDITO', 'CARTÃO DE DÉBITO', 'VALE REFEIÇÃO', 'FIADO', 'SALDO'].map(method => (
+                                <SelectItem key={method} value={method} className="font-black uppercase tracking-widest text-[10px] py-4">
+                                  {method}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="flex gap-2">
+                          <div className="flex-1 md:w-32 space-y-2">
+                            <label className="text-[9px] font-black tracking-widest uppercase text-muted-foreground">Valor (R$)</label>
+                            <div className="relative">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground font-bold italic">R$</span>
+                              <Input 
+                                type="number" 
+                                step="0.01"
+                                className="h-12 pl-8 bg-white/[0.02] border-white/5 font-black text-sm rounded-xl focus:ring-[#0070f3]/20"
+                                value={payment.amount}
+                                onChange={(e) => {
+                                  const newPayments = [...checkoutPayments];
+                                  newPayments[index].amount = parseFloat(e.target.value) || 0;
+                                  setCheckoutPayments(newPayments);
+                                }}
+                              />
+                            </div>
+                          </div>
+                          {checkoutPayments.length > 1 && (
+                            <div className="flex items-end">
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={() => setCheckoutPayments(checkoutPayments.filter((_, i) => i !== index))}
+                                className="h-12 w-12 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-xl"
+                              >
+                                <X className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       </div>
-                      {checkoutPayments.length > 1 && (
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          onClick={() => setCheckoutPayments(checkoutPayments.filter((_, i) => i !== index))}
-                          className="h-12 w-12 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-xl"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      )}
+                      <div className="absolute -right-2 -top-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                         {calculateNet(payment.amount, payment.method).feeAmount > 0 && (
+                           <Badge className="bg-red-500/20 text-red-400 border-none text-[8px] font-bold">
+                             -R$ {calculateNet(payment.amount, payment.method).feeAmount.toFixed(2)} Taxa
+                           </Badge>
+                         )}
+                      </div>
                     </motion.div>
                   ))}
                 </div>

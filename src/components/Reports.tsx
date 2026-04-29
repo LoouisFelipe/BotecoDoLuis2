@@ -240,34 +240,34 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
           onClick={() => setActiveTab('finances')}
         >
           <div className="absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-transparent via-primary to-transparent opacity-50" />
-          <CardHeader className="pb-4 border-b border-primary/10">
+          <CardHeader className="pb-3 md:pb-4 border-b border-primary/10 px-4 md:px-6">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center border border-primary/30">
-                <Sparkles className="w-5 h-5 text-primary" />
+              <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-primary/20 flex items-center justify-center border border-primary/30">
+                <Sparkles className="w-4 h-4 md:w-5 md:h-5 text-primary" />
               </div>
               <div>
-                <CardTitle className="text-sm font-black uppercase tracking-widest text-primary">Insights Estratégicos — {monthlySummary.month}</CardTitle>
-                <p className="text-[10px] font-bold text-primary/60 uppercase tracking-widest">Resumo Consolidado Mensal</p>
+                <CardTitle className="text-xs md:text-sm font-black uppercase tracking-widest text-primary leading-none">Insights Estratégicos — {monthlySummary.month}</CardTitle>
+                <p className="text-[8px] md:text-[10px] font-bold text-primary/60 uppercase tracking-widest mt-1">Resumo Consolidado Mensal</p>
               </div>
             </div>
           </CardHeader>
-          <CardContent className="pt-6">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
-              <div className="space-y-1">
-                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Volume de Vendas</p>
-                <p className="text-2xl font-black text-white">{monthlySummary.salesCount} <span className="text-[10px] text-primary">ORDENS</span></p>
+          <CardContent className="p-4 md:p-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-8">
+              <div className="space-y-0.5">
+                <p className="text-[8px] md:text-[10px] font-black text-muted-foreground uppercase tracking-widest">Volume</p>
+                <p className="text-lg md:text-2xl font-black text-white">{monthlySummary.salesCount} <span className="text-[8px] md:text-[10px] text-primary">ORDENS</span></p>
               </div>
-              <div className="space-y-1">
-                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Receita Bruta</p>
-                <p className="text-2xl font-black text-green-500">R$ {monthlySummary.totalRevenue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+              <div className="space-y-0.5">
+                <p className="text-[8px] md:text-[10px] font-black text-muted-foreground uppercase tracking-widest">Receita</p>
+                <p className="text-lg md:text-2xl font-black text-green-500">R$ {monthlySummary.totalRevenue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
               </div>
-              <div className="space-y-1">
-                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Custos & Despesas</p>
-                <p className="text-2xl font-black text-red-500">R$ {monthlySummary.totalExpenses?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+              <div className="space-y-0.5">
+                <p className="text-[8px] md:text-[10px] font-black text-muted-foreground uppercase tracking-widest">Despesas</p>
+                <p className="text-lg md:text-2xl font-black text-red-500">R$ {monthlySummary.totalExpenses?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
               </div>
-              <div className="space-y-1">
-                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Margem Líquida</p>
-                <p className="text-2xl font-black text-primary">R$ {(monthlySummary.totalRevenue - monthlySummary.totalExpenses).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+              <div className="space-y-0.5">
+                <p className="text-[8px] md:text-[10px] font-black text-muted-foreground uppercase tracking-widest">Margem</p>
+                <p className="text-lg md:text-2xl font-black text-primary">R$ {(monthlySummary.totalRevenue - monthlySummary.totalExpenses).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
               </div>
             </div>
           </CardContent>
@@ -275,7 +275,7 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
       )}
 
       {/* 7-Day Performance Banner */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
         <StatCard 
           title="Receita (7d)" 
           value={stats.income} 
