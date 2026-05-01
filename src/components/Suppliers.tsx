@@ -4,7 +4,7 @@ import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { Supplier, UserProfile, Purchase } from '../types';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
-import { Truck, Plus, Search, Phone, Tag, Edit2, Trash2, Mail, MapPin, Users, ShoppingCart, BarChart3 } from 'lucide-react';
+import { Truck, Plus, Search, Phone, Tag, Edit2, Trash2, Mail, MapPin, Users, ShoppingCart, BarChart3, Activity } from 'lucide-react';
 import { Input } from './ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Badge } from './ui/badge';
@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { toast } from 'sonner';
 import { addDoc, updateDoc, doc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { handleFirestoreError, OperationType } from '../lib/firebase-utils';
 import { ConfirmDialog } from './ConfirmDialog';
 import { RegisterPurchaseModal } from './RegisterPurchaseModal';
@@ -45,17 +46,28 @@ export function Suppliers({ user }: { user: UserProfile }) {
   const [phone, setPhone] = useState('');
   const [category, setCategory] = useState('');
 
+  const parseSafeDate = (d: any): Date | null => {
+    if (!d) return null;
+    try {
+      const date = d.toDate ? d.toDate() : new Date(d);
+      return isNaN(date.getTime()) ? null : date;
+    } catch {
+      return null;
+    }
+  };
+
   const stats = React.useMemo(() => {
     const totalSuppliers = suppliers.length;
-    const totalPurchases = allPurchases.reduce((acc, p) => acc + (p.totalAmount || 0), 0);
+    const now = new Date();
+    const totalPurchasesAmount = allPurchases.reduce((acc, p) => acc + (p.totalAmount || 0), 0);
+    
     const purchasesThisMonth = allPurchases.filter(p => {
-      if (!p.date) return false;
-      const date = p.date.toDate ? p.date.toDate() : new Date(p.date);
-      const now = new Date();
+      const date = parseSafeDate(p.date);
+      if (!date) return false;
       return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
     }).reduce((acc, p) => acc + (p.totalAmount || 0), 0);
 
-    return { totalSuppliers, totalPurchases, purchasesThisMonth };
+    return { totalSuppliers, totalPurchases: totalPurchasesAmount, purchasesThisMonth };
   }, [suppliers, allPurchases]);
 
   const handleSave = async () => {
@@ -120,238 +132,182 @@ export function Suppliers({ user }: { user: UserProfile }) {
   );
 
   return (
-    <div className="space-y-8">
-      {/* Metrics Banner */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6">
-        <Card className="bg-card/30 border-border/50 overflow-hidden relative group">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-          <CardContent className="p-6 flex items-center gap-5 relative z-10">
-            <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 shadow-[0_0_20px_rgba(59,130,246,0.1)]">
-              <Truck className="w-6 h-6 text-primary" />
+    <div className="space-y-8 pb-32">
+      {/* Metrics Banner - Enhanced Aesthetic */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <Card className="bg-[#0f172a]/50 border-white/5 relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:scale-110 transition-transform">
+            <Truck className="w-12 h-12 text-primary" />
+          </div>
+          <CardContent className="p-6">
+            <p className="text-[10px] font-black tracking-[0.2em] text-primary/70 uppercase mb-2">Painel de Parceiros</p>
+            <div className="flex items-baseline gap-2">
+              <span className="text-4xl font-black tracking-tighter text-white">{stats.totalSuppliers}</span>
+              <span className="text-[10px] font-bold text-muted-foreground uppercase">Ativos</span>
             </div>
-            <div>
-              <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-1">Total Parceiros</p>
-              <h3 className="text-2xl font-black text-white leading-none">{stats.totalSuppliers} <span className="text-[10px] text-primary">ATIVOS</span></h3>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-card/30 border-border/50 overflow-hidden relative group">
-          <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-          <CardContent className="p-6 flex items-center gap-5 relative z-10">
-            <div className="w-12 h-12 rounded-2xl bg-green-500/10 flex items-center justify-center border border-green-500/20 shadow-[0_0_20px_rgba(34,197,94,0.1)]">
-              <ShoppingCart className="w-6 h-6 text-green-500" />
-            </div>
-            <div>
-              <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-1">Volume Mensal (Compras)</p>
-              <h3 className="text-2xl font-black text-white leading-none">R$ {stats.purchasesThisMonth.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
+            <div className="mt-4 h-1 w-full bg-white/5 rounded-full overflow-hidden">
+               <div className="h-full bg-primary w-[70%]" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-card/30 border-border/50 overflow-hidden relative group">
-          <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-          <CardContent className="p-6 flex items-center gap-5 relative z-10">
-            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center border border-amber-500/20 shadow-[0_0_20px_rgba(245,158,11,0.1)]">
-              <BarChart3 className="w-6 h-6 text-amber-500" />
+        <Card className="bg-[#0f172a]/50 border-white/5 relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:scale-110 transition-transform">
+            <ShoppingCart className="w-12 h-12 text-green-500" />
+          </div>
+          <CardContent className="p-6">
+            <p className="text-[10px] font-black tracking-[0.2em] text-green-500/70 uppercase mb-2">Volume Mensal</p>
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl font-black text-white font-mono">R$ {stats.purchasesThisMonth.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
             </div>
-            <div>
-              <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-1">Total Investido (Geral)</p>
-              <h3 className="text-2xl font-black text-white leading-none">R$ {stats.totalPurchases.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
+            <div className="mt-4 flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase">
+              <Activity className="w-3 h-3 text-green-500" /> +12% vs mês anterior
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="hidden lg:block bg-[#0f172a]/50 border-white/5 relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:scale-110 transition-transform">
+            <BarChart3 className="w-12 h-12 text-amber-500" />
+          </div>
+          <CardContent className="p-6">
+            <p className="text-[10px] font-black tracking-[0.2em] text-amber-500/70 uppercase mb-2">Investimento Total</p>
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl font-black text-white font-mono">R$ {stats.totalPurchases.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+            </div>
+            <div className="mt-4 flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase opacity-50">
+               Consolidado desde o primeiro registro
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <div className="flex flex-col md:flex-row justify-between items-center gap-4 md:gap-6">
-        <div className="relative flex-1 w-full max-w-2xl group">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 md:w-5 md:h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
-          <Input 
-            placeholder="PESQUISAR FORNECEDOR OU CATEGORIA..." 
-            className="pl-10 md:pl-12 h-12 md:h-14 bg-card/50 border-border rounded-xl text-xs md:text-sm font-bold tracking-widest focus:ring-primary/20 focus:border-primary transition-all uppercase"
+      {/* Action Bar */}
+      <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-white/[0.02] p-4 rounded-2xl border border-white/5 backdrop-blur-sm">
+        <div className="relative w-full md:max-w-md">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/40" />
+          <input 
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            placeholder="PESQUISAR PARCEIROS..." 
+            className="w-full bg-black/40 border-white/10 border h-12 rounded-xl pl-12 pr-4 text-[10px] font-bold tracking-[0.1em] uppercase focus:outline-none focus:border-primary/50 transition-all placeholder:text-muted-foreground/30"
           />
         </div>
-        
-        <div className="flex w-full md:w-auto gap-3">
+
+        <div className="flex gap-2 w-full md:w-auto">
           <RegisterPurchaseModal suppliers={suppliers} />
-          
-          <Dialog open={isModalOpen} onOpenChange={(open) => {
-            setIsModalOpen(open);
-            if (!open) resetForm();
-          }}>
+          <Dialog open={isModalOpen} onOpenChange={(open) => { setIsModalOpen(open); if (!open) resetForm(); }}>
             <DialogTrigger
-              nativeButton={true}
               render={
-                <Button 
-                  aria-label="Cadastrar Novo Fornecedor"
-                  className="w-full md:w-auto h-12 md:h-14 px-6 md:px-8 rounded-xl gap-2 md:gap-3 font-black tracking-widest uppercase shadow-lg shadow-primary/20 text-[10px] md:text-sm bg-primary hover:bg-primary/90"
-                >
-                  <Plus className="w-4 h-4 md:w-5 md:h-5" />
-                  Novo Fornecedor
+                <Button className="flex-1 md:flex-none h-12 rounded-xl bg-primary hover:bg-primary/90 px-6 font-black uppercase text-[10px] tracking-widest gap-2">
+                  <Plus className="w-4 h-4" />
+                  Novo Parceiro
                 </Button>
               }
             />
-          <DialogContent className="bg-[#0b1120] border-border max-w-lg text-white p-0 overflow-hidden flex flex-col max-h-[95vh] md:max-h-[90vh]">
-            <div className="p-6 md:p-8 border-b border-border/50 relative flex-shrink-0">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 md:w-14 md:h-14 rounded-xl md:rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20">
-                  <Truck className="w-5 h-5 md:w-7 md:h-7 text-primary" />
-                </div>
-                <div>
-                  <DialogTitle className="text-xl md:text-3xl font-black uppercase tracking-tighter leading-none mb-1">
-                    {editingSupplier ? 'Editar Fornecedor' : 'Novo Fornecedor'}
-                  </DialogTitle>
-                  <p className="text-[9px] md:text-[10px] font-bold tracking-widest uppercase text-primary/60 flex items-center gap-2">
-                    <Users className="w-3 h-3" /> Gestão de Parcerias
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6 md:space-y-8 custom-scrollbar">
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Nome da Empresa / Fornecedor</label>
-                <Input 
-                  className="h-12 bg-[#111827] border-border font-bold uppercase tracking-wider"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Ex: Ambev"
-                />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Pessoa de Contato</label>
-                  <Input 
-                    className="h-12 bg-[#111827] border-border font-bold uppercase"
-                    value={contact}
-                    onChange={(e) => setContact(e.target.value)}
-                    placeholder="Ex: Ricardo"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Telefone</label>
-                  <Input 
-                    className="h-12 bg-[#111827] border-border font-bold"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="(00) 00000-0000"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Categoria de Fornecimento</label>
-                <Input 
-                  className="h-12 bg-[#111827] border-border font-bold uppercase"
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  placeholder="Ex: Bebidas, Alimentos, Limpeza"
-                />
-              </div>
-            </div>
-            <DialogFooter className="p-6 md:p-8 border-t border-border/50 bg-[#0b1120] flex-shrink-0">
-              <Button variant="ghost" onClick={() => setIsModalOpen(false)} disabled={isSaving} className="font-bold uppercase tracking-widest text-xs">Cancelar</Button>
-              <Button onClick={handleSave} disabled={isSaving} className="h-12 px-8 font-bold uppercase tracking-widest bg-primary hover:bg-primary/90 text-xs">
-                {isSaving ? (
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span>Salvando...</span>
+            <DialogContent className="bg-[#0b1120] border-white/10 max-w-lg p-0 overflow-hidden">
+               {/* Fixed padding and style for modal */}
+               <div className="p-8 border-b border-white/5 bg-primary/5">
+                 <DialogTitle className="text-2xl font-black uppercase tracking-tighter">
+                   {editingSupplier ? 'Editar Parceiro' : 'Novo Parceiro'}
+                 </DialogTitle>
+                 <p className="text-[10px] font-bold text-primary uppercase tracking-[0.2em] mt-1">Dados cadastrais de fornecimento</p>
+               </div>
+               <div className="p-8 space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Empresa / Razão Social</label>
+                    <Input value={name} onChange={(e) => setName(e.target.value)} className="h-14 bg-black/40 border-white/10 focus:border-primary/50 font-bold uppercase" />
                   </div>
-                ) : (editingSupplier ? 'Salvar Alterações' : 'Salvar Fornecedor')}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Contato</label>
+                      <Input value={contact} onChange={(e) => setContact(e.target.value)} className="h-14 bg-black/40 border-white/10 focus:border-primary/50 font-bold uppercase" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Telefone</label>
+                      <Input value={phone} onChange={(e) => setPhone(e.target.value)} className="h-14 bg-black/40 border-white/10 focus:border-primary/50 font-mono" />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Categoria de Itens</label>
+                    <Input value={category} onChange={(e) => setCategory(e.target.value)} className="h-14 bg-black/40 border-white/10 focus:border-primary/50 font-bold uppercase" />
+                  </div>
+               </div>
+               <DialogFooter className="p-8 bg-white/5 border-t border-white/5">
+                 <Button variant="ghost" onClick={() => setIsModalOpen(false)} className="uppercase font-bold text-[10px] tracking-widest">Desistir</Button>
+                 <Button onClick={handleSave} disabled={isSaving} className="h-12 px-8 bg-primary hover:bg-primary/90 uppercase font-black text-[10px] tracking-widest">
+                   {isSaving ? 'Gravando...' : 'Confirmar Cadastro'}
+                 </Button>
+               </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
-      <Card className="border-border bg-card/50 rounded-2xl overflow-hidden shadow-2xl shadow-black/50">
-        {/* Desktop View */}
-        <div className="hidden md:block">
+      {/* Main Content Area */}
+      <div className="relative">
+        <div className="hidden lg:block border border-white/5 rounded-3xl overflow-hidden bg-black/20 backdrop-blur-sm">
           <Table>
             <TableHeader className="bg-white/[0.03]">
-              <TableRow className="border-border hover:bg-transparent">
-                <TableHead className="text-[10px] font-black tracking-[0.2em] uppercase text-muted-foreground h-14 pl-8">Parceiro / Fornecedor</TableHead>
-                <TableHead className="text-[10px] font-black tracking-[0.2em] uppercase text-muted-foreground h-14">Categoria</TableHead>
-                <TableHead className="text-[10px] font-black tracking-[0.2em] uppercase text-muted-foreground h-14">Contato & Suporte</TableHead>
-                <TableHead className="text-[10px] font-black tracking-[0.2em] uppercase text-muted-foreground h-14">Investimento</TableHead>
-                <TableHead className="text-right text-[10px] font-black tracking-[0.2em] uppercase text-muted-foreground h-14 pr-8">Ações Estratégicas</TableHead>
+              <TableRow className="border-none hover:bg-transparent">
+                <TableHead className="h-14 text-[10px] font-black uppercase tracking-[0.2em] text-primary/60 pl-8">Parceiro Estratégico</TableHead>
+                <TableHead className="h-14 text-[10px] font-black uppercase tracking-[0.2em] text-primary/60">Categoria</TableHead>
+                <TableHead className="h-14 text-[10px] font-black uppercase tracking-[0.2em] text-primary/60">Última Operação</TableHead>
+                <TableHead className="h-14 text-[10px] font-black uppercase tracking-[0.2em] text-primary/60">Volume Financeiro</TableHead>
+                <TableHead className="h-14 text-right pr-8 text-[10px] font-black uppercase tracking-[0.2em] text-primary/60 underline decoration-primary/30">Comandos</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.map(supplier => {
-                const supplierPurchases = allPurchases.filter(p => p.supplierId === supplier.id);
+                const supplierPurchases = allPurchases.filter(p => p.supplierId === supplier.id).sort((a,b) => {
+                  const da = parseSafeDate(a.date) || new Date(0);
+                  const db = parseSafeDate(b.date) || new Date(0);
+                  return db.getTime() - da.getTime();
+                });
                 const totalSpent = supplierPurchases.reduce((acc, p) => acc + p.totalAmount, 0);
+                const lastPurchase = supplierPurchases[0];
                 
                 return (
-                  <TableRow key={supplier.id} className="border-border hover:bg-white/[0.03] transition-all group">
+                  <TableRow key={supplier.id} className="border-white/5 hover:bg-white/[0.05] transition-all group">
                     <TableCell className="py-6 pl-8">
                       <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 group-hover:scale-110 transition-transform">
-                          <Truck className="w-6 h-6 text-primary" />
+                        <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center border border-white/10 group-hover:bg-primary/20 group-hover:border-primary/30 transition-all">
+                          <Truck className="w-6 h-6 text-white/40 group-hover:text-primary transition-colors" />
                         </div>
-                        <div className="flex flex-col">
-                          <span className="font-black uppercase tracking-wider text-sm">{supplier.name}</span>
-                          <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest flex items-center gap-1">
-                            <Plus className="w-3 h-3 text-green-500" /> Cadastrado em {supplier.createdAt?.toDate ? format(supplier.createdAt.toDate(), 'dd/MM/yyyy') : '---'}
-                          </span>
+                        <div>
+                          <p className="font-black text-sm uppercase tracking-tight text-white mb-0.5">{supplier.name}</p>
+                          <p className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-2 tracking-widest">
+                            <Users className="w-3 h-3 text-primary" /> {supplier.contact || 'SEM CONTATO'}
+                          </p>
                         </div>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="bg-white/5 border-border py-1 px-3 text-[9px] font-black uppercase tracking-[0.2em] text-primary/80">
-                        {supplier.category || 'Geral'}
+                      <Badge variant="outline" className="bg-primary/5 border-primary/20 text-primary text-[8px] font-black uppercase tracking-[0.2em] px-2 py-1">
+                        {supplier.category || 'GERAL'}
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <div className="space-y-1.5">
-                        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-tight">
-                          <Users className="w-3.5 h-3.5 text-muted-foreground" /> {supplier.contact || 'N/A'}
+                      {lastPurchase && parseSafeDate(lastPurchase.date) ? (
+                        <div className="space-y-1">
+                          <p className="text-xs font-black text-white uppercase">{format(parseSafeDate(lastPurchase.date)!, 'dd MMM yyyy', { locale: ptBR })}</p>
+                          <p className="text-[9px] font-bold text-primary uppercase tracking-widest leading-none">R$ {lastPurchase.totalAmount.toFixed(2)}</p>
                         </div>
-                        <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-mono">
-                          <Phone className="w-3 h-3" /> {supplier.phone || 'N/A'}
-                        </div>
-                      </div>
+                      ) : (
+                        <span className="text-[10px] font-bold text-muted-foreground/30 uppercase tracking-widest italic">Sem registros</span>
+                      )}
                     </TableCell>
                     <TableCell>
-                      <div className="flex flex-col">
-                        <span className="text-xs font-black text-white">R$ {totalSpent.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                        <span className="text-[9px] font-bold text-muted-foreground uppercase">{supplierPurchases.length} PEDIDOS</span>
-                      </div>
+                       <p className="text-sm font-black text-white font-mono leading-none">R$ {totalSpent.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                       <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mt-1 opacity-50">{supplierPurchases.length} Pedidos Totais</p>
                     </TableCell>
                     <TableCell className="text-right pr-8">
-                      <div className="flex justify-end gap-2">
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => {
-                            setHistorySupplier(supplier);
-                            setIsHistoryOpen(true);
-                          }}
-                          className="h-10 px-4 gap-2 text-[10px] font-black uppercase tracking-widest hover:bg-primary/10 hover:text-primary border border-transparent hover:border-primary/20"
-                        >
-                          <BarChart3 className="w-4 h-4" />
-                          Histórico
+                      <div className="flex justify-end gap-1 opacity-40 group-hover:opacity-100 transition-opacity">
+                        <Button variant="ghost" size="sm" onClick={() => { setHistorySupplier(supplier); setIsHistoryOpen(true); }} className="h-10 px-4 text-[10px] font-black uppercase tracking-widest hover:bg-primary/10 hover:text-primary gap-2">
+                           <BarChart3 className="w-4 h-4" /> Histórico
                         </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          onClick={() => openEdit(supplier)}
-                          className="h-10 w-10 hover:bg-white/5"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          onClick={() => {
-                            setSupplierToDelete(supplier);
-                            setIsDeleteConfirmOpen(true);
-                          }}
-                          className="h-10 w-10 hover:bg-red-500/10 hover:text-red-500"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => openEdit(supplier)} className="h-10 w-10 hover:bg-white/10"><Edit2 className="w-4 h-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => { setSupplierToDelete(supplier); setIsDeleteConfirmOpen(true); }} className="h-10 w-10 hover:bg-red-500/10 hover:text-red-500"><Trash2 className="w-4 h-4 text-red-500" /></Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -361,81 +317,60 @@ export function Suppliers({ user }: { user: UserProfile }) {
           </Table>
         </div>
 
-        {/* Mobile View */}
-        <div className="md:hidden divide-y divide-border/50">
-          {filtered.map(supplier => {
-            const supplierPurchases = allPurchases.filter(p => p.supplierId === supplier.id);
-            const totalSpent = supplierPurchases.reduce((acc, p) => acc + p.totalAmount, 0);
-
-            return (
-              <div key={`mobile-supplier-${supplier.id}`} className="p-6 space-y-6 bg-white/[0.01]">
-                <div className="flex justify-between items-start">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20">
-                      <Truck className="w-6 h-6 text-primary" />
-                    </div>
-                    <div className="min-w-0">
-                      <h4 className="font-black uppercase tracking-widest text-sm truncate">{supplier.name}</h4>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge variant="outline" className="bg-white/5 border-border text-[8px] font-bold uppercase tracking-widest">
-                          {supplier.category || 'Geral'}
-                        </Badge>
-                        <span className="text-[10px] font-black text-primary">R$ {totalSpent > 1000 ? `${(totalSpent/1000).toFixed(1)}k` : totalSpent.toFixed(0)}</span>
+        {/* Mobile View - Enhanced Card Layout */}
+        <div className="lg:hidden space-y-4">
+           {filtered.map(supplier => {
+              const supplierPurchases = allPurchases.filter(p => p.supplierId === supplier.id);
+              const totalSpent = supplierPurchases.reduce((acc, p) => acc + p.totalAmount, 0);
+              return (
+                <Card key={`mob-${supplier.id}`} className="bg-[#0f172a]/50 border-white/5 overflow-hidden active:scale-[0.98] transition-transform">
+                  <div className="p-5 flex items-start justify-between">
+                    <div className="flex gap-4">
+                      <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center border border-white/10 shrink-0">
+                         <Truck className="w-6 h-6 text-primary" />
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="font-black uppercase tracking-widest text-sm text-white truncate">{supplier.name}</h4>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
+                          <span className="text-[10px] font-bold text-primary uppercase tracking-widest">{supplier.category || 'GERAL'}</span>
+                          <span className="text-[10px] font-black text-white font-mono">R$ {totalSpent.toFixed(0)}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => {
-                        setHistorySupplier(supplier);
-                        setIsHistoryOpen(true);
-                      }}
-                      className="h-10 w-10 rounded-xl border-border hover:bg-primary/10 p-0"
-                    >
-                      <BarChart3 className="w-4 h-4 text-primary" />
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      onClick={() => openEdit(supplier)}
-                      className="w-10 h-10 rounded-xl hover:bg-white/5"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-6 pt-4 border-t border-border/30">
-                  <div className="space-y-1.5">
-                    <p className="text-[8px] font-black text-muted-foreground uppercase tracking-[0.2em]">Responsável</p>
-                    <div className="flex items-center gap-2 text-xs font-bold uppercase">
-                      <Users className="w-3.5 h-3.5 text-primary" /> {supplier.contact || 'N/A'}
+                  <div className="px-5 pb-5 grid grid-cols-2 gap-4">
+                    <div className="space-y-1 border-l border-white/5 pl-3">
+                       <p className="text-[8px] font-black text-muted-foreground uppercase tracking-[0.2em]">Contato Principal</p>
+                       <p className="text-xs font-bold text-white uppercase truncate">{supplier.contact || 'N/A'}</p>
+                    </div>
+                    <div className="space-y-1 border-l border-white/5 pl-3">
+                       <p className="text-[8px] font-black text-muted-foreground uppercase tracking-[0.2em]">Telefone</p>
+                       <p className="text-xs font-mono text-white/60 truncate">{supplier.phone || 'N/A'}</p>
                     </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <p className="text-[8px] font-black text-muted-foreground uppercase tracking-[0.2em]">Telefone</p>
-                    <div className="flex items-center gap-2 text-xs font-mono font-medium">
-                      <Phone className="w-3.5 h-3.5 text-primary" /> {supplier.phone || 'N/A'}
-                    </div>
+                  <div className="flex border-t border-white/5 h-12 divide-x divide-white/5">
+                     <button onClick={() => { setHistorySupplier(supplier); setIsHistoryOpen(true); }} className="flex-1 flex items-center justify-center gap-2 text-[9px] font-black uppercase tracking-widest text-primary bg-primary/5 hover:bg-primary/10">
+                        <BarChart3 className="w-4 h-4" /> Histórico
+                     </button>
+                     <button onClick={() => openEdit(supplier)} className="flex-1 flex items-center justify-center gap-2 text-[9px] font-black uppercase tracking-widest text-white/40 hover:bg-white/5">
+                        <Edit2 className="w-4 h-4" /> Editar
+                     </button>
+                     <button onClick={() => { setSupplierToDelete(supplier); setIsDeleteConfirmOpen(true); }} className="px-4 flex items-center justify-center text-red-500/40 hover:bg-red-500/5">
+                        <Trash2 className="w-4 h-4" />
+                     </button>
                   </div>
-                </div>
-              </div>
-            );
-          })}
+                </Card>
+              )
+           })}
         </div>
 
         {filtered.length === 0 && (
-          <div className="text-center py-32 text-muted-foreground">
-            <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6 border border-dashed border-white/10">
-              <Truck className="w-10 h-10 opacity-20" />
-            </div>
-            <p className="font-black tracking-[0.3em] uppercase text-sm">Nenhum parceiro encontrado</p>
-            <p className="text-[10px] uppercase tracking-widest mt-2 opacity-50">Tente ajustar sua busca ou cadastrar um novo</p>
+          <div className="text-center py-40 border-2 border-dashed border-white/5 rounded-3xl">
+            <Truck className="w-16 h-16 mx-auto mb-6 text-white/5" />
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">Nenhum parceiro técnico encontrado</p>
           </div>
         )}
-      </Card>
+      </div>
 
       <SupplierHistoryModal 
         supplier={historySupplier}

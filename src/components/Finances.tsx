@@ -19,8 +19,10 @@ import { handleFirestoreError, OperationType } from '../lib/firebase-utils';
 import { cn } from '../lib/utils';
 
 import { useFetchCollection } from '../hooks/useFetchCollection';
+import { usePaymentFees } from '../hooks/usePaymentFees';
 
 export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveTab: (tab: string) => void }) {
+  const { calculateNet } = usePaymentFees();
   const transConstraints = React.useMemo(() => [orderBy('date', 'desc'), limit(500)], []);
   const expConstraints = React.useMemo(() => [orderBy('date', 'desc'), limit(500)], []);
 
@@ -50,6 +52,13 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [relatedOrder, setRelatedOrder] = useState<Order | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  
+  // Recurring Editing states
+  const [editingRecurring, setEditingRecurring] = useState<RecurringExpense | null>(null);
+  const [isEditingRecurringModalOpen, setIsEditingRecurringModalOpen] = useState(false);
+  const [editRecAmount, setEditRecAmount] = useState('');
+  const [editRecDescription, setEditRecDescription] = useState('');
+  const [editRecDueDate, setEditRecDueDate] = useState('');
 
   // Date filter states
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month' | 'custom'>('today');
@@ -185,6 +194,34 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
     }
   };
 
+  const handleEditRecurringClick = (exp: RecurringExpense) => {
+    setEditingRecurring(exp);
+    setEditRecAmount(exp.amount.toString());
+    setEditRecDescription(exp.description);
+    setEditRecDueDate(exp.dueDate.toString());
+    setIsEditingRecurringModalOpen(true);
+  };
+
+  const handleUpdateRecurring = async () => {
+    if (!editingRecurring || !editRecAmount || !editRecDescription) return;
+    setIsSaving(true);
+    try {
+      await updateDoc(doc(db, 'recurring_expenses', editingRecurring.id), {
+        description: editRecDescription,
+        amount: parseFloat(editRecAmount),
+        dueDate: parseInt(editRecDueDate),
+        updatedAt: serverTimestamp()
+      });
+      toast.success('Despesa recorrente atualizada');
+      setIsEditingRecurringModalOpen(false);
+      setEditingRecurring(null);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, 'recurring_expenses');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleDeleteRecurring = async (id: string) => {
     try {
       await deleteDoc(doc(db, 'recurring_expenses', id));
@@ -261,17 +298,35 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
   const now = new Date();
   const currentMonthDays = daysInMonth(now.getMonth(), now.getFullYear());
   
+  // Calculate specific period income for Meta progress
+  const incomeMetaProgress = React.useMemo(() => {
+    const today = rawTransactions.filter(t => t.type === 'income' && !(t as any).isFiado && isToday(t.date?.toDate ? t.date.toDate() : new Date(0))).reduce((acc, t) => acc + (t.amount || 0), 0);
+    const week = rawTransactions.filter(t => t.type === 'income' && !(t as any).isFiado && isThisWeek(t.date?.toDate ? t.date.toDate() : new Date(0), { weekStartsOn: 0 })).reduce((acc, t) => acc + (t.amount || 0), 0);
+    const month = rawTransactions.filter(t => t.type === 'income' && !(t as any).isFiado && isThisMonth(t.date?.toDate ? t.date.toDate() : new Date(0))).reduce((acc, t) => acc + (t.amount || 0), 0);
+    return { today, week, month };
+  }, [rawTransactions]);
+
+  // Calculate actual variable costs (purchases) incurred this month
+  const variableCostsMonth = React.useMemo(() => {
+    return transactions
+      .filter(t => t.type === 'expense' && t.category === 'Compra de Estoque' && isThisMonth(t.date?.toDate ? t.date.toDate() : new Date(0)))
+      .reduce((sum, t) => sum + (t.amount || 0), 0);
+  }, [transactions]);
+
   const monthlyObligations = React.useMemo(() => {
     const recurring = recurringExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
     const installments = installmentExpenses.reduce((sum, e) => sum + (e.installmentValue || 0), 0);
     
-    // Also include non-recurring expenses of the current month to show progress?
-    // User wants to calculate what we NEED to pay.
-    return recurring + installments;
-  }, [recurringExpenses, installmentExpenses]);
+    // Include variable costs of the month to the total target required to cover expenses
+    return recurring + installments + variableCostsMonth;
+  }, [recurringExpenses, installmentExpenses, variableCostsMonth]);
 
   const dailyGoal = monthlyObligations / currentMonthDays;
-  const weeklyGoal = dailyGoal * 7;
+  const weeklyGoal = (monthlyObligations / currentMonthDays) * 7;
+
+  const currentMetaAmount = metasView === 'daily' ? dailyGoal : metasView === 'weekly' ? weeklyGoal : monthlyObligations;
+  const currentIncomeInView = metasView === 'daily' ? incomeMetaProgress.today : metasView === 'weekly' ? incomeMetaProgress.week : incomeMetaProgress.month;
+  const metaProgressPercent = Math.min(100, (currentIncomeInView / currentMetaAmount) * 100);
 
   const filteredTransactions = dateFilteredTransactions.filter(t => {
     if (typeFilter === 'all') return true;
@@ -390,55 +445,114 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="bg-card/40 border-border/50 overflow-hidden relative group">
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent" />
-            <CardContent className="p-6">
-              <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-4">
-                Meta {metasView === 'daily' ? 'Diária' : metasView === 'weekly' ? 'Semanal' : 'Mensal'}
-              </p>
-              <div className="flex items-baseline gap-2">
-                <h3 className="text-3xl font-black text-white tabular-nums">
-                  R$ {(metasView === 'daily' ? dailyGoal : metasView === 'weekly' ? weeklyGoal : monthlyObligations).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+          <Card className="bg-card/40 border-border/50 overflow-hidden relative group flex flex-col justify-center">
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent opacity-50" />
+            <CardContent className="p-8 relative z-10">
+              <div className="flex items-center justify-between mb-6">
+                <p className="text-[10px] font-black tracking-[0.2em] uppercase text-muted-foreground">
+                  Meta {metasView === 'daily' ? 'Diária' : metasView === 'weekly' ? 'Semanal' : 'Mensal'}
+                </p>
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <TrendingUp className="w-4 h-4 text-primary" />
+                </div>
+              </div>
+              
+              <div className="space-y-1">
+                <h3 className="text-4xl font-black text-white tabular-nums tracking-tighter">
+                  R$ {currentMetaAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </h3>
+                <p className="text-[10px] font-black text-primary/60 uppercase tracking-widest">Ponto de Equilíbrio Est.</p>
               </div>
-              <div className="mt-4 h-2 bg-white/5 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-primary transition-all duration-1000" 
-                  style={{ width: `${Math.min(100, (totalIncome / (metasView === 'daily' ? dailyGoal : metasView === 'weekly' ? weeklyGoal : monthlyObligations)) * 100)}%` }} 
-                />
+
+              <div className="mt-8 space-y-3">
+                <div className="flex justify-between items-end">
+                  <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Progresso Real</p>
+                  <p className="text-sm font-black text-white tabular-nums">{metaProgressPercent.toFixed(1)}%</p>
+                </div>
+                <div className="h-3 bg-white/5 rounded-full overflow-hidden border border-white/5 p-0.5">
+                  <div 
+                    className="h-full bg-primary rounded-full transition-all duration-1000 shadow-[0_0_15px_rgba(59,130,246,0.5)]" 
+                    style={{ width: `${metaProgressPercent}%` }} 
+                  />
+                </div>
+                <div className="flex justify-between text-[9px] font-bold text-muted-foreground uppercase tracking-widest">
+                  <span>R$ {currentIncomeInView.toLocaleString('pt-BR')}</span>
+                  <span>Objetivo Alcançado</span>
+                </div>
               </div>
-              <p className="mt-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-                Progresso: {Math.min(100, (totalIncome / (metasView === 'daily' ? dailyGoal : metasView === 'weekly' ? weeklyGoal : monthlyObligations)) * 100).toFixed(1)}% atingido
-              </p>
             </CardContent>
           </Card>
 
           <Card className="bg-card/40 border-border/50 overflow-hidden rounded-2xl md:col-span-2">
-             <CardContent className="p-6">
-               <div className="flex items-center justify-between mb-4">
-                 <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground">Detalhamento de Custos Fixos & Parcelas</p>
-                 <Badge variant="outline" className="text-[9px] font-black uppercase tracking-widest bg-white/5 border-white/10">
-                   Total Mensal: R$ {monthlyObligations.toFixed(2)}
-                 </Badge>
+             <CardContent className="p-8 h-full flex flex-col">
+               <div className="flex items-center justify-between mb-8">
+                 <div className="space-y-1">
+                    <p className="text-[10px] font-black tracking-[0.2em] uppercase text-muted-foreground">Detalhamento de Obrigações</p>
+                    <p className="text-[9px] text-muted-foreground/60 uppercase font-medium tracking-widest italic">Valores consolidados para o ciclo vigente</p>
+                 </div>
+                 <div className="px-5 py-2 bg-white/5 rounded-xl border border-white/10 text-right">
+                   <p className="text-[8px] font-black uppercase tracking-widest text-primary mb-0.5">Total de Custos (Mês)</p>
+                   <p className="text-xl font-black text-white font-mono">R$ {monthlyObligations.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                 </div>
                </div>
-               <div className="space-y-3">
-                 {recurringExpenses.map(exp => (
-                   <div key={exp.id} className="flex justify-between items-center text-xs border-b border-border/20 pb-2">
-                     <span className="font-bold text-muted-foreground uppercase tracking-tighter">{exp.description}</span>
-                     <span className="font-mono font-bold text-white">R$ {exp.amount.toFixed(2)}</span>
+               
+               <div className="flex-1 space-y-2 overflow-y-auto custom-scrollbar pr-2">
+                 {/* Fixed Costs Section */}
+                 <div className="space-y-2">
+                   <div className="flex items-center gap-2 mb-2">
+                     <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+                     <span className="text-[9px] font-black uppercase tracking-[0.3em] text-orange-500/80">Custos Fixos & Recorrência</span>
                    </div>
-                 ))}
-                 {installmentExpenses.map(exp => (
-                   <div key={exp.id} className="flex justify-between items-center text-xs border-b border-border/20 pb-2">
-                     <div className="flex items-center gap-2">
-                       <span className="font-bold text-muted-foreground uppercase tracking-tighter">{exp.description}</span>
-                       <Badge className="text-[8px] bg-primary/20 text-primary border-none">{exp.remainingInstallments}/{exp.installmentsCount}</Badge>
+                   {recurringExpenses.map(exp => (
+                     <div key={exp.id} className="flex justify-between items-center bg-white/[0.02] p-3 rounded-lg border border-white/5 hover:bg-white/[0.04] transition-colors group">
+                       <div className="flex flex-col">
+                         <span className="text-xs font-black text-white/90 uppercase tracking-tight group-hover:text-white">{exp.description}</span>
+                         <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest">Vence todo dia {exp.dueDate}</span>
+                       </div>
+                       <span className="font-mono font-bold text-sm text-white">R$ {exp.amount.toFixed(2)}</span>
                      </div>
-                     <span className="font-mono font-bold text-white">R$ {exp.installmentValue.toFixed(2)}</span>
+                   ))}
+                 </div>
+
+                 {/* Installments Section */}
+                 {installmentExpenses.length > 0 && (
+                   <div className="space-y-2 mt-6">
+                     <div className="flex items-center gap-2 mb-2">
+                       <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                       <span className="text-[9px] font-black uppercase tracking-[0.3em] text-blue-500/80">Parcelamentos Ativos</span>
+                     </div>
+                     {installmentExpenses.map(exp => (
+                       <div key={exp.id} className="flex justify-between items-center bg-white/[0.02] p-3 rounded-lg border border-white/5 hover:bg-white/[0.04] transition-colors group">
+                         <div className="flex flex-col">
+                           <span className="text-xs font-black text-white/90 uppercase tracking-tight group-hover:text-white">{exp.description}</span>
+                           <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest">Parcela {exp.installmentsCount - exp.remainingInstallments + 1} de {exp.installmentsCount}</span>
+                         </div>
+                         <span className="font-mono font-bold text-sm text-white">R$ {exp.installmentValue.toFixed(2)}</span>
+                       </div>
+                     ))}
                    </div>
-                 ))}
-                 {recurringExpenses.length === 0 && installmentExpenses.length === 0 && (
-                   <p className="text-[10px] text-muted-foreground uppercase font-bold text-center py-4">Nenhuma obrigação recorrente cadastrada</p>
+                 )}
+
+                 {/* Variable Costs Section -> Supplier Purchases */}
+                 <div className="space-y-2 mt-6">
+                   <div className="flex items-center gap-2 mb-2">
+                     <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                     <span className="text-[9px] font-black uppercase tracking-[0.3em] text-green-500/80">Custos Variáveis (Suprimentos)</span>
+                   </div>
+                   <div className="flex justify-between items-center bg-green-500/5 p-3 rounded-lg border border-green-500/10 hover:bg-green-500/10 transition-colors group">
+                     <div className="flex flex-col">
+                       <span className="text-xs font-black text-white/90 uppercase tracking-tight group-hover:text-white">Compras de Estoque</span>
+                       <span className="text-[8px] font-bold text-green-500/60 uppercase tracking-widest">Baseado em notas de entrada do período</span>
+                     </div>
+                     <span className="font-mono font-bold text-sm text-green-500">R$ {variableCostsMonth.toFixed(2)}</span>
+                   </div>
+                 </div>
+
+                 {recurringExpenses.length === 0 && installmentExpenses.length === 0 && variableCostsMonth === 0 && (
+                   <div className="flex flex-col items-center justify-center py-10 opacity-30">
+                     <Settings2 className="w-10 h-10 mb-2" />
+                     <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">Estrutura de custos vazia</p>
+                   </div>
                  )}
                </div>
              </CardContent>
@@ -946,22 +1060,35 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
               </div>
             </div>
 
-            {selectedTransaction?.feeAmount !== undefined && selectedTransaction.feeAmount > 0 && (
-              <div className="grid grid-cols-2 gap-8 border-t border-border/50 pt-6">
-                <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest text-red-500/80">Taxa do Cartão / Pix</p>
-                  <p className="font-mono font-bold text-base text-red-500/80">
-                    - R$ {selectedTransaction.feeAmount.toFixed(2)}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest text-green-500">Valor Líquido (Recebido)</p>
-                  <p className="font-mono font-black text-xl text-green-500">
-                    R$ {(selectedTransaction.netAmount || (selectedTransaction.amount - selectedTransaction.feeAmount)).toFixed(2)}
-                  </p>
-                </div>
-              </div>
-            )}
+            {(() => {
+              const displayFee = selectedTransaction?.feeAmount !== undefined && selectedTransaction.feeAmount > 0 
+                ? selectedTransaction.feeAmount 
+                : (selectedTransaction?.type === 'income' && selectedTransaction.paymentMethod ? calculateNet(selectedTransaction.amount, selectedTransaction.paymentMethod).feeAmount : 0);
+              
+              const displayNet = selectedTransaction?.netAmount !== undefined && selectedTransaction.netAmount > 0
+                ? selectedTransaction.netAmount
+                : (selectedTransaction?.amount || 0) - displayFee;
+
+              if (displayFee > 0) {
+                return (
+                  <div className="grid grid-cols-2 gap-8 border-t border-border/50 pt-6">
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest text-red-500/80">Taxa do Cartão / Pix</p>
+                      <p className="font-mono font-bold text-base text-red-500/80">
+                        - R$ {displayFee.toFixed(2)}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest text-green-500">Valor Líquido (Recebido)</p>
+                      <p className="font-mono font-black text-xl text-green-500">
+                        R$ {displayNet.toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })()}
 
             <div className="space-y-2 pt-2">
               <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Descrição / Observações</p>
@@ -1057,16 +1184,33 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
             {recurringExpenses.map(expense => {
               const category = expenseCategories.find(c => c.id === expense.categoryId);
               return (
-                <Card key={expense.id} className="bg-card/30 border-border/50 relative group overflow-hidden">
+                <Card key={expense.id} className="bg-card/30 border-border/50 relative group overflow-hidden hover:border-primary/30 transition-all">
                   <div className="p-4 flex justify-between items-center">
                     <div className="space-y-1">
                       <p className="text-[10px] font-black text-orange-500 uppercase tracking-widest">Dia {expense.dueDate}</p>
                       <h4 className="font-black text-sm uppercase truncate max-w-[150px]">{expense.description}</h4>
                       <p className="text-[8px] text-muted-foreground uppercase font-bold tracking-widest">{category?.name}</p>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <p className="text-sm font-black text-white font-mono">R$ {expense.amount.toFixed(2)}</p>
-                      <Button variant="ghost" size="icon" onClick={() => handleDeleteRecurring(expense.id)} className="text-muted-foreground hover:text-red-500"><Trash2 className="w-4 h-4" /></Button>
+                    <div className="flex items-center gap-3">
+                      <p className="text-base font-black text-white font-mono">R$ {expense.amount.toFixed(2)}</p>
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => handleEditRecurringClick(expense)} 
+                          className="text-muted-foreground hover:text-primary h-8 w-8"
+                        >
+                          <Settings2 className="w-4 h-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => handleDeleteRecurring(expense.id)} 
+                          className="text-muted-foreground hover:text-red-500 h-8 w-8"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </Card>
@@ -1221,6 +1365,71 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
               ))}
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Recurring Modal */}
+      <Dialog open={isEditingRecurringModalOpen} onOpenChange={setIsEditingRecurringModalOpen}>
+        <DialogContent className="bg-[#0b1224] border-border max-w-lg text-white p-0 overflow-hidden flex flex-col">
+          <div className="p-8 border-b border-border/50 bg-primary/5">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20">
+                <Settings2 className="w-7 h-7 text-primary" />
+              </div>
+              <div>
+                <DialogTitle className="text-3xl font-black uppercase tracking-tighter leading-none mb-1">Ajustar Custo Fixo</DialogTitle>
+                <p className="text-[10px] font-bold tracking-widest uppercase text-primary/60">Recorrência Mensal</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-8 space-y-6">
+            <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Valor (R$)</label>
+                <Input 
+                  type="number" 
+                  step="0.01" 
+                  className="h-14 bg-background border-border font-black text-lg"
+                  value={editRecAmount}
+                  onChange={(e) => setEditRecAmount(e.target.value)}
+                  placeholder="0,00"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Dia Vencimento</label>
+                <Select value={editRecDueDate} onValueChange={setEditRecDueDate}>
+                  <SelectTrigger className="h-14 bg-background border-border font-bold uppercase tracking-widest">
+                    <SelectValue placeholder="Dia" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#0b1224] border-border max-h-[250px]">
+                    {Array.from({ length: 31 }, (_, i) => (
+                      <SelectItem key={i + 1} value={(i + 1).toString()} className="font-mono">
+                        Dia {i + 1}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Nome / Descrição</label>
+              <Input 
+                className="h-14 bg-background border-border font-bold uppercase"
+                value={editRecDescription}
+                onChange={(e) => setEditRecDescription(e.target.value)}
+                placeholder="Ex: Aluguel"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="p-8 border-t border-border/50 bg-card">
+            <Button variant="ghost" onClick={() => setIsEditingRecurringModalOpen(false)} disabled={isSaving} className="font-bold uppercase tracking-widest text-xs">Descartar</Button>
+            <Button onClick={handleUpdateRecurring} disabled={isSaving} className="h-14 px-10 bg-primary hover:bg-primary/90 font-black uppercase tracking-widest text-xs">
+              {isSaving ? 'Gravando...' : 'Atualizar Custo'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

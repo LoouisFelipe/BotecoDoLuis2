@@ -140,6 +140,8 @@ export interface Transaction {
   orderId?: string;
   customerId?: string;
   paymentMethod?: string;
+  isFiado?: boolean;
+  isSaldo?: boolean;
 }
 
 export interface PaymentFeeConfig {

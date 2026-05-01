@@ -23,11 +23,11 @@ export function usePaymentFees() {
     
     let pct = 0;
     const upperMethod = method.toUpperCase();
-    if (upperMethod === 'CRÉDITO' || upperMethod === 'CREDITO') {
+    if (upperMethod.includes('CRÉDITO') || upperMethod.includes('CREDITO')) {
       pct = fees.credit_pct || 0;
-    } else if (upperMethod === 'DÉBITO' || upperMethod === 'DEBITO') {
+    } else if (upperMethod.includes('DÉBITO') || upperMethod.includes('DEBITO')) {
       pct = fees.debit_pct || 0;
-    } else if (upperMethod === 'PIX') {
+    } else if (upperMethod.includes('PIX')) {
       pct = fees.pix_pct || 0;
     }
 

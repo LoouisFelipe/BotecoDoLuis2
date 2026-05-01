@@ -841,7 +841,8 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
           orderId: order.id,
           customerId: targetCustomerId === 'none' ? '' : targetCustomerId,
           paymentMethod: payment.method,
-          isFiado: payment.method === 'FIADO' // Mark for filtering in reports
+          isFiado: payment.method === 'FIADO',
+          isSaldo: payment.method === 'SALDO'
         });
       }
 
