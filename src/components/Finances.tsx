@@ -16,7 +16,7 @@ import { toast } from 'sonner';
 import { format, isToday, isThisWeek, isThisMonth, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { handleFirestoreError, OperationType } from '../lib/firebase-utils';
-import { cn } from '../lib/utils';
+import { cn, getShiftInterval, formatShiftDateTime, getShiftDate } from '../lib/utils';
 
 import { useFetchCollection } from '../hooks/useFetchCollection';
 import { usePaymentFees } from '../hooks/usePaymentFees';
@@ -102,6 +102,7 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
   
   // Form states
   const [amount, setAmount] = useState('');
+  const [expenseDate, setExpenseDate] = useState(getShiftDate());
   const [category, setCategory] = useState('');
   const [subCategory, setSubCategory] = useState('');
   const [description, setDescription] = useState('');
@@ -167,7 +168,7 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
           category: selectedCat?.name || category,
           amount: installmentValue,
           description: `${description} (Entrada/Parcela 1/${count})`,
-          date: serverTimestamp()
+          date: new Date(expenseDate + "T12:00:00")
         });
         
         toast.success('Compra parcelada registrada');
@@ -179,7 +180,7 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
           category: selectedCat?.name || category, // Legacy support
           amount: parseFloat(amount),
           description,
-          date: serverTimestamp()
+          date: new Date(expenseDate + "T12:00:00")
         });
         toast.success('Despesa registrada');
       }
@@ -271,7 +272,10 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
     if (dateFilter !== 'all') {
       const tDate = t.date?.toDate ? t.date.toDate() : new Date(0);
       switch (dateFilter) {
-        case 'today': return isToday(tDate);
+        case 'today': {
+          const { start, end } = getShiftInterval();
+          return isWithinInterval(tDate, { start, end });
+        }
         case 'week': return isThisWeek(tDate, { weekStartsOn: 0 });
         case 'month': return isThisMonth(tDate);
         case 'custom':
@@ -280,7 +284,7 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
             const end = endOfDay(endDate);
             return isWithinInterval(tDate, { start, end });
           }
-          return true; // show all if custom dates are incomplete
+          return true;
       }
     }
     return true;
@@ -620,62 +624,73 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
           </div>
 
           <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto items-center">
-              <Select value={dateFilter} onValueChange={(val: any) => setDateFilter(val)}>
-                <SelectTrigger className="w-full md:w-[180px] h-12 px-6 rounded-[20px] gap-3 font-bold tracking-widest uppercase border-border hover:bg-white/5 text-[10px] bg-card/50">
-                  <Filter className="w-4 h-4 text-primary" />
-                  <SelectValue placeholder="Período" />
-                </SelectTrigger>
-                <SelectContent className="bg-[#0b1224] border-border text-white">
-                  <SelectItem value="all" className="uppercase font-bold tracking-widest text-xs">Todos</SelectItem>
-                  <SelectItem value="today" className="uppercase font-bold tracking-widest text-xs">Hoje</SelectItem>
-                  <SelectItem value="week" className="uppercase font-bold tracking-widest text-xs">Semana</SelectItem>
-                  <SelectItem value="month" className="uppercase font-bold tracking-widest text-xs">Mês</SelectItem>
-                  <SelectItem value="custom" className="uppercase font-bold tracking-widest text-xs">Personalizado</SelectItem>
-                </SelectContent>
-              </Select>
+            <Select value={dateFilter} onValueChange={(val: any) => setDateFilter(val)}>
+              <SelectTrigger className="w-full md:w-[180px] h-12 px-6 rounded-[20px] gap-3 font-bold tracking-widest uppercase border-border hover:bg-white/5 text-[10px] bg-card/50">
+                <Filter className="w-4 h-4 text-primary" />
+                <SelectValue placeholder="Período" />
+              </SelectTrigger>
+              <SelectContent className="bg-[#0b1224] border-border text-white">
+                <SelectItem value="all" className="uppercase font-bold tracking-widest text-xs">Todos</SelectItem>
+                <SelectItem value="today" className="uppercase font-bold tracking-widest text-xs">Hoje</SelectItem>
+                <SelectItem value="week" className="uppercase font-bold tracking-widest text-xs">Semana</SelectItem>
+                <SelectItem value="month" className="uppercase font-bold tracking-widest text-xs">Mês</SelectItem>
+                <SelectItem value="custom" className="uppercase font-bold tracking-widest text-xs">Personalizado</SelectItem>
+              </SelectContent>
+            </Select>
 
-              <Dialog open={isExpenseModalOpen} onOpenChange={setIsExpenseModalOpen}>
-                <DialogTrigger
-                  nativeButton={true}
-                  render={
-                    <Button className="w-full md:w-auto h-12 px-8 rounded-[20px] gap-3 font-bold tracking-widest uppercase bg-red-600 hover:bg-red-700 shadow-lg shadow-red-600/20 text-[10px]">
-                      <Plus className="w-4 h-4" />
-                      Lançar Saída
-                    </Button>
-                  }
-                />
+            <Dialog open={isExpenseModalOpen} onOpenChange={setIsExpenseModalOpen}>
+              <DialogTrigger
+              nativeButton={true}
+              render={
+                <Button className="w-full md:w-auto h-12 px-8 rounded-[20px] gap-3 font-bold tracking-widest uppercase bg-red-600 hover:bg-red-700 shadow-lg shadow-red-600/20 text-[10px]">
+                  <Plus className="w-4 h-4" />
+                  Lançar Saída
+                </Button>
+                }
+            />
 
-            <DialogContent className="bg-[#0b1224] border-border max-w-lg text-white p-0 overflow-hidden flex flex-col max-h-[95vh] md:max-h-[90vh]">
-              <div className="p-6 md:p-8 border-b border-border/50 relative flex-shrink-0">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 md:w-14 md:h-14 rounded-xl md:rounded-2xl bg-red-500/10 flex items-center justify-center border border-red-500/20">
-                    <TrendingDown className="w-5 h-5 md:w-7 md:h-7 text-red-500" />
+              <DialogContent className="bg-[#0b1224] border-border max-w-lg text-white p-0 overflow-hidden flex flex-col max-h-[95vh] md:max-h-[90vh]">
+                <div className="p-6 md:p-8 border-b border-border/50 relative flex-shrink-0">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 md:w-14 md:h-14 rounded-xl md:rounded-2xl bg-red-500/10 flex items-center justify-center border border-red-500/20">
+                      <TrendingDown className="w-5 h-5 md:w-7 md:h-7 text-red-500" />
+                    </div>
+                    <div>
+                      <DialogTitle className="text-xl md:text-3xl font-black uppercase tracking-tighter leading-none mb-1">Nova Despesa</DialogTitle>
+                      <p className="text-[9px] md:text-[10px] font-bold tracking-widest uppercase text-red-500/60 flex items-center gap-2">
+                        <ArrowDownRight className="w-3 h-3" /> Registro de saída financeira
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <DialogTitle className="text-xl md:text-3xl font-black uppercase tracking-tighter leading-none mb-1">Nova Despesa</DialogTitle>
-                    <p className="text-[9px] md:text-[10px] font-bold tracking-widest uppercase text-red-500/60 flex items-center gap-2">
-                      <ArrowDownRight className="w-3 h-3" /> Registro de saída financeira
-                    </p>
-                  </div>
+                  <button onClick={() => setIsExpenseModalOpen(false)} className="absolute right-6 top-6 text-muted-foreground hover:text-white transition-colors">
+                    <X className="w-5 h-5" />
+                  </button>
                 </div>
-                <button onClick={() => setIsExpenseModalOpen(false)} className="absolute right-6 top-6 text-muted-foreground hover:text-white transition-colors">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
 
-              <div className="p-6 md:p-8 space-y-6 md:space-y-8 overflow-y-auto custom-scrollbar flex-1">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Valor (R$)</label>
-                    <Input 
-                      type="number" 
-                      step="0.01" 
-                      className="h-12 bg-background border-border font-black"
-                      value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
-                      placeholder="0,00"
-                    />
+                <div className="p-6 md:p-8 space-y-6 md:space-y-8 overflow-y-auto custom-scrollbar flex-1">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Valor (R$)</label>
+                      <Input 
+                        type="number" 
+                        step="0.01" 
+                        className="h-12 bg-background border-border font-black"
+                        value={amount}
+                        onChange={(e) => setAmount(e.target.value)}
+                        placeholder="0,00"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Data do Lançamento</label>
+                      <Input 
+                        type="date"
+                        className="h-12 bg-background border-border font-bold uppercase tracking-widest text-[10px]"
+                        value={expenseDate}
+                        onChange={(e) => setExpenseDate(e.target.value)}
+                      />
+                    </div>
                   </div>
+                  
                   <div className="space-y-2">
                     <div className="flex justify-between items-center ml-1">
                       <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Categoria</label>
@@ -717,124 +732,123 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
                       </SelectContent>
                     </Select>
                   </div>
-                </div>
 
-                {category && expenseCategories.find(c => c.id === category)?.subcategories?.length! > 0 && (
-                  <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
-                    <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Subcategoria (Opcional)</label>
-                    <Select value={subCategory} onValueChange={setSubCategory}>
-                      <SelectTrigger className="h-12 bg-background border-border font-bold uppercase tracking-widest text-[10px]">
-                        <SelectValue placeholder="Selecionar Subcategoria" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-[#0b1224] border-border">
-                        {expenseCategories.find(c => c.id === category)?.subcategories.map(sub => (
-                          <SelectItem key={sub} value={sub} className="uppercase font-bold tracking-widest text-xs">
-                            {sub}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Descrição</label>
-                  <Input 
-                    className="h-12 bg-background border-border"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Ex: Reposição de Cerveja"
-                  />
-                </div>
-
-                <div className="pt-4 border-t border-border/50 space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="flex items-center justify-between bg-white/5 p-3 rounded-xl border border-border/50">
-                      <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground">Fixa Mensal?</label>
-                      <input 
-                        type="checkbox" 
-                        className="w-5 h-5 rounded border-border bg-background accent-primary"
-                        checked={isRecurring}
-                        onChange={(e) => {
-                          setIsRecurring(e.target.checked);
-                          if (e.target.checked) setIsInstallment(false);
-                        }}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between bg-white/5 p-3 rounded-xl border border-border/50">
-                      <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground">Parcelada?</label>
-                      <input 
-                        type="checkbox" 
-                        className="w-5 h-5 rounded border-border bg-background accent-primary"
-                        checked={isInstallment}
-                        onChange={(e) => {
-                          setIsInstallment(e.target.checked);
-                          if (e.target.checked) setIsRecurring(false);
-                        }}
-                      />
-                    </div>
-                  </div>
-                  
-                  {isRecurring && (
-                    <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
-                      <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Dia do Vencimento</label>
-                      <Select value={dueDate} onValueChange={setDueDate}>
+                  {category && expenseCategories.find(c => c.id === category)?.subcategories?.length! > 0 && (
+                    <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                      <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Subcategoria (Opcional)</label>
+                      <Select value={subCategory} onValueChange={setSubCategory}>
                         <SelectTrigger className="h-12 bg-background border-border font-bold uppercase tracking-widest text-[10px]">
-                          <SelectValue placeholder="Selecionar Dia" />
+                          <SelectValue placeholder="Selecionar Subcategoria" />
                         </SelectTrigger>
-                        <SelectContent className="bg-[#0b1224] border-border max-h-[200px]">
-                          {Array.from({ length: 31 }, (_, i) => (
-                            <SelectItem key={i + 1} value={(i + 1).toString()} className="font-mono">
-                              Dia {i + 1}
+                        <SelectContent className="bg-[#0b1224] border-border">
+                          {expenseCategories.find(c => c.id === category)?.subcategories.map(sub => (
+                            <SelectItem key={sub} value={sub} className="uppercase font-bold tracking-widest text-xs">
+                              {sub}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
-                      <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-widest leading-tight">
-                        Esta despesa será listada automaticamente no relatório mensal.
-                      </p>
                     </div>
                   )}
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Descrição</label>
+                    <Input 
+                      className="h-12 bg-background border-border"
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="Ex: Reposição de Cerveja"
+                    />
+                  </div>
 
-                  {isInstallment && (
-                    <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Número de Parcelas</label>
-                        <Select value={installmentsCount} onValueChange={setInstallmentsCount}>
+                  <div className="pt-4 border-t border-border/50 space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex items-center justify-between bg-white/5 p-3 rounded-xl border border-border/50">
+                        <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground">Fixa Mensal?</label>
+                        <input 
+                          type="checkbox" 
+                          className="w-5 h-5 rounded border-border bg-background accent-primary"
+                          checked={isRecurring}
+                          onChange={(e) => {
+                            setIsRecurring(e.target.checked);
+                            if (e.target.checked) setIsInstallment(false);
+                          }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between bg-white/5 p-3 rounded-xl border border-border/50">
+                        <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground">Parcelada?</label>
+                        <input 
+                          type="checkbox" 
+                          className="w-5 h-5 rounded border-border bg-background accent-primary"
+                          checked={isInstallment}
+                          onChange={(e) => {
+                            setIsInstallment(e.target.checked);
+                            if (e.target.checked) setIsRecurring(false);
+                          }}
+                        />
+                      </div>
+                    </div>
+                    
+                    {isRecurring && (
+                      <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
+                        <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Dia do Vencimento</label>
+                        <Select value={dueDate} onValueChange={setDueDate}>
                           <SelectTrigger className="h-12 bg-background border-border font-bold uppercase tracking-widest text-[10px]">
-                            <SelectValue placeholder="Selecionar Parcelas" />
+                            <SelectValue placeholder="Selecionar Dia" />
                           </SelectTrigger>
-                          <SelectContent className="bg-[#0b1224] border-border">
-                            {[2,3,4,5,6,10,12,24].map(n => (
-                              <SelectItem key={n} value={n.toString()} className="font-mono">{n} Parcelas</SelectItem>
+                          <SelectContent className="bg-[#0b1224] border-border max-h-[200px]">
+                            {Array.from({ length: 31 }, (_, i) => (
+                              <SelectItem key={i + 1} value={(i + 1).toString()} className="font-mono">
+                                Dia {i + 1}
+                              </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
-                      </div>
-                      <div className="p-4 bg-primary/5 border border-primary/20 rounded-xl">
-                        <p className="text-[10px] font-bold text-primary uppercase tracking-widest mb-1 text-center">Simulação</p>
-                        <p className="text-sm font-black text-white text-center">
-                          {installmentsCount}x de R$ {(parseFloat(amount || '0') / parseInt(installmentsCount)).toFixed(2)}
+                        <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-widest leading-tight">
+                          Esta despesa será listada automaticamente no relatório mensal.
                         </p>
                       </div>
-                    </div>
-                  )}
+                    )}
+
+                    {isInstallment && (
+                      <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Número de Parcelas</label>
+                          <Select value={installmentsCount} onValueChange={setInstallmentsCount}>
+                            <SelectTrigger className="h-12 bg-background border-border font-bold uppercase tracking-widest text-[10px]">
+                              <SelectValue placeholder="Selecionar Parcelas" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-[#0b1224] border-border">
+                              {[2,3,4,5,6,10,12,24].map(n => (
+                                <SelectItem key={n} value={n.toString()} className="font-mono">{n} Parcelas</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="p-4 bg-primary/5 border border-primary/20 rounded-xl">
+                          <p className="text-[10px] font-bold text-primary uppercase tracking-widest mb-1 text-center">Simulação</p>
+                          <p className="text-sm font-black text-white text-center">
+                            {installmentsCount}x de R$ {(parseFloat(amount || '0') / parseInt(installmentsCount)).toFixed(2)}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <DialogFooter className="p-6 md:p-8 border-t border-border/50 bg-card flex-shrink-0">
-                <Button variant="ghost" onClick={() => setIsExpenseModalOpen(false)} disabled={isSaving} className="font-bold uppercase tracking-widest text-xs">Cancelar</Button>
-                <Button onClick={handleAddExpense} disabled={isSaving} className="h-12 px-8 bg-red-600 hover:bg-red-700 font-bold uppercase tracking-widest text-xs">
-                  {isSaving ? (
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      <span>Salvando...</span>
-                    </div>
-                  ) : 'Salvar Despesa'}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+                <DialogFooter className="p-6 md:p-8 border-t border-border/50 bg-card flex-shrink-0">
+                  <Button variant="ghost" onClick={() => setIsExpenseModalOpen(false)} disabled={isSaving} className="font-bold uppercase tracking-widest text-xs">Cancelar</Button>
+                  <Button onClick={handleAddExpense} disabled={isSaving} className="h-12 px-8 bg-red-600 hover:bg-red-700 font-bold uppercase tracking-widest text-xs">
+                    {isSaving ? (
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        <span>Salvando...</span>
+                      </div>
+                    ) : 'Salvar Despesa'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
-      </div>
 
         {/* Desktop Table View */}
         <div className="hidden md:block">
@@ -856,7 +870,7 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
                   onClick={() => setSelectedTransaction(t)}
                 >
                   <TableCell className="py-6 px-8 text-xs font-bold text-muted-foreground uppercase tracking-widest group-hover:text-primary transition-colors">
-                    {t.date?.toDate ? format(t.date.toDate(), 'dd MMM, HH:mm') : '...'}
+                    {t.date ? formatShiftDateTime(t.date) : '...'}
                   </TableCell>
                   <TableCell className="px-8">
                     <Badge 
@@ -894,7 +908,7 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
               <div className="flex justify-between items-start">
                 <div className="space-y-1">
                   <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">
-                    {t.date?.toDate ? format(t.date.toDate(), 'dd MMM, HH:mm') : '...'}
+                    {t.date ? formatShiftDateTime(t.date) : '...'}
                   </p>
                   <h4 className="font-black text-sm uppercase tracking-widest">{t.category}</h4>
                 </div>
@@ -1028,7 +1042,7 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
               <div className="space-y-1">
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Data e Hora</p>
                 <p className="font-bold text-sm uppercase">
-                  {selectedTransaction?.date?.toDate ? format(selectedTransaction.date.toDate(), 'dd/MM/yyyy HH:mm:ss') : '...'}
+                  {selectedTransaction?.date ? formatShiftDateTime(selectedTransaction.date) : '...'}
                 </p>
               </div>
               <div className="space-y-1">

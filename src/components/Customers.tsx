@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { toast } from 'sonner';
 import { handleFirestoreError, OperationType } from '../lib/firebase-utils';
-import { cn } from '../lib/utils';
+import { cn, formatShiftDateTime } from '../lib/utils';
 import { ConfirmDialog } from './ConfirmDialog';
 import { Badge } from './ui/badge';
 import { format } from 'date-fns';
@@ -677,7 +677,7 @@ export function Customers({ user }: { user: UserProfile }) {
                         </div>
                         <div>
                           <p className="text-xs md:text-sm font-black uppercase tracking-widest">
-                            {order.closedAt?.toDate ? format(order.closedAt.toDate(), 'dd/MM/yyyy HH:mm') : 'Data desconhecida'}
+                            {order.closedAt ? formatShiftDateTime(order.closedAt) : 'Data desconhecida'}
                           </p>
                           <p className="text-[9px] md:text-[10px] font-bold tracking-widest uppercase text-muted-foreground">
                             {order.items.reduce((sum, i) => sum + i.quantity, 0)} ITENS

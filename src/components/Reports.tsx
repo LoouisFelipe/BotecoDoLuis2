@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogTitle, DialogHeader, DialogFooter } from '
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { toast } from 'sonner';
-import { cn } from '../lib/utils';
+import { cn, getShiftInterval } from '../lib/utils';
 import { geminiService } from '../services/geminiService';
 import Markdown from 'react-markdown';
 
@@ -160,9 +160,8 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
       }
 
       const fetchDays = Array.from({ length: 7 }, (_, i) => {
-        const date = subDays(new Date(), i);
-        const start = startOfDay(date);
-        const end = endOfDay(date);
+        const targetDate = subDays(new Date(), i);
+        const { start, end } = getShiftInterval(targetDate);
 
         const qTrans = query(
           collection(db, 'transactions'),
@@ -207,9 +206,9 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
           const totalDayExpense = expenseFromTrans + expenseFromExp + paymentFees;
 
           return {
-            date,
-            name: format(date, 'EEE', { locale: ptBR }).toUpperCase(),
-            fullDate: format(date, 'dd/MM'),
+            date: targetDate,
+            name: format(targetDate, 'EEE', { locale: ptBR }).toUpperCase(),
+            fullDate: format(targetDate, 'dd/MM'),
             income, // Actual Cash Entry
             totalSalesValue, // All sales including Fiado
             expense: totalDayExpense,

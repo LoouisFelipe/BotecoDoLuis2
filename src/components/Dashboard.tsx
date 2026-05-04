@@ -411,7 +411,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
   const [checkoutDiscount, setCheckoutDiscount] = useState(0);
   const [checkoutAdjustment, setCheckoutAdjustment] = useState(0);
   const [checkoutPayments, setCheckoutPayments] = useState<{method: string, amount: number}[]>([]);
-  const [checkoutDate, setCheckoutDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [checkoutDate, setCheckoutDate] = useState(getShiftDate());
   const [checkoutCustomerId, setCheckoutCustomerId] = useState(order.customerId || 'none');
 
   useEffect(() => {
