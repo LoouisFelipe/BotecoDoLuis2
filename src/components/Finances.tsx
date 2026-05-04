@@ -311,15 +311,23 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
 
   // Calculate actual variable costs (purchases) incurred this month
   const variableCostsMonth = React.useMemo(() => {
-    const expensePurchases = transactions
-      .filter(t => t.type === 'expense' && (t.category === 'Compra de Estoque' || t.category === 'Suprimentos') && isThisMonth(t.date?.toDate ? t.date.toDate() : new Date(0)))
-      .reduce((sum, t) => sum + (t.amount || 0), 0);
-    
+    // Source of Truth for inventory: rawPurchases (Notas de Entrada)
     const directPurchases = rawPurchases
       .filter(p => isThisMonth(p.date?.toDate ? p.date.toDate() : new Date(0)))
       .reduce((sum, p) => sum + (p.totalAmount || 0), 0);
+    
+    // For other variable expenses, we take only those NOT categorized as Stock Purchases
+    // to avoid doubling with the directPurchases calculation.
+    const otherVariableExpenses = transactions
+      .filter(t => 
+        t.type === 'expense' && 
+        t.category !== 'Compra de Estoque' && 
+        t.category !== 'Suprimentos' &&
+        isThisMonth(t.date?.toDate ? t.date.toDate() : new Date(0))
+      )
+      .reduce((sum, t) => sum + (t.amount || 0), 0);
       
-    return expensePurchases + directPurchases;
+    return otherVariableExpenses + directPurchases;
   }, [transactions, rawPurchases]);
 
   const monthlyObligations = React.useMemo(() => {
@@ -353,12 +361,12 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 animate-in fade-in duration-700">
       {/* Financial Health - Metrics Banner */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         <Card 
           className={cn(
-            "bg-card/30 border-border/50 overflow-hidden relative group cursor-pointer transition-all",
+            "bg-card/30 border-border/50 overflow-hidden relative group cursor-pointer transition-all rounded-[40px]",
             typeFilter === 'income' && "ring-2 ring-green-500/50 bg-green-500/10"
           )}
           onClick={() => setTypeFilter(typeFilter === 'income' ? 'all' : 'income')}
@@ -370,14 +378,14 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
             </div>
             <div>
               <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-1">Entradas (Periodo)</p>
-              <h3 className="text-2xl font-black text-green-500 leading-none">R$ {totalIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
+              <h3 className="text-2xl font-black text-green-500 leading-none font-mono tracking-tighter">R$ {totalIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
             </div>
           </CardContent>
         </Card>
         
         <Card 
           className={cn(
-            "bg-card/30 border-border/50 overflow-hidden relative group cursor-pointer transition-all",
+            "bg-card/30 border-border/50 overflow-hidden relative group cursor-pointer transition-all rounded-[40px]",
             typeFilter === 'expense' && "ring-2 ring-red-500/50 bg-red-500/10"
           )}
           onClick={() => setTypeFilter(typeFilter === 'expense' ? 'all' : 'expense')}
@@ -389,12 +397,12 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
             </div>
             <div>
               <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-1">Saídas (Periodo)</p>
-              <h3 className="text-2xl font-black text-red-500 leading-none">R$ {totalExpense.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
+              <h3 className="text-2xl font-black text-red-500 leading-none font-mono tracking-tighter">R$ {totalExpense.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-primary/90 border-primary overflow-hidden relative group">
+        <Card className="bg-primary/90 border-primary overflow-hidden relative group rounded-[40px]">
           <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
           <CardContent className="p-6 flex items-center gap-5 relative z-10">
             <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center border border-white/30 shadow-lg">
@@ -402,13 +410,13 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
             </div>
             <div>
               <p className="text-[10px] font-black tracking-widest uppercase text-white/70 mb-1">Lucro Operacional</p>
-              <h3 className="text-2xl font-black text-white leading-none">R$ {(totalIncome - totalExpense).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
+              <h3 className="text-2xl font-black text-white leading-none font-mono tracking-tighter">R$ {(totalIncome - totalExpense).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
             </div>
           </CardContent>
         </Card>
 
         <Card 
-          className="bg-card/30 border-orange-500/20 overflow-hidden relative group cursor-pointer transition-all"
+          className="bg-card/30 border-orange-500/20 overflow-hidden relative group cursor-pointer transition-all rounded-[40px]"
           onClick={() => setIsFiadoModalOpen(true)}
         >
           <div className="absolute inset-0 bg-gradient-to-br from-orange-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -418,7 +426,7 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
             </div>
             <div>
               <p className="text-[10px] font-black tracking-widest uppercase text-orange-500/80 mb-1">Fiado Pendente</p>
-              <h3 className="text-2xl font-black text-orange-500 leading-none">R$ {totalFiado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
+              <h3 className="text-2xl font-black text-orange-500 leading-none font-mono tracking-tighter">R$ {totalFiado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
             </div>
           </CardContent>
         </Card>
@@ -432,7 +440,7 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
               <TrendingUp className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="font-black uppercase tracking-widest text-xl leading-tight">Metas de Receita</h3>
+              <h3 className="font-black uppercase tracking-widest text-xl leading-tight">Gestão de Objetivos Financeiros</h3>
               <p className="text-[10px] text-muted-foreground tracking-[0.2em] uppercase font-bold">Monitoramento de Ponto de Equilíbrio Operacional</p>
             </div>
           </div>
@@ -454,7 +462,7 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="bg-card/40 border-border/50 overflow-hidden relative group flex flex-col justify-center min-h-[300px]">
+          <Card className="bg-card/40 border-border/50 overflow-hidden relative group flex flex-col justify-center min-h-[300px] rounded-[40px]">
             <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent opacity-50" />
             <CardContent className="p-8 relative z-10 flex flex-col items-center text-center">
               <p className="text-[10px] font-black tracking-[0.3em] uppercase text-primary mb-2">
@@ -462,7 +470,7 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
               </p>
               
               <div className="mb-8">
-                <h3 className="text-5xl font-black text-white tabular-nums tracking-tighter mb-2">
+                <h3 className="text-5xl font-black text-white tabular-nums tracking-tighter mb-2 font-mono">
                   R$ {currentMetaAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </h3>
                 <div className="flex items-center justify-center gap-2 text-muted-foreground px-4 py-1 bg-white/5 rounded-full border border-white/5">
@@ -474,7 +482,7 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
               <div className="w-full space-y-4">
                 <div className="flex justify-between items-end mb-1">
                   <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Progresso Realizado</p>
-                  <p className="text-xl font-black text-primary tabular-nums">{metaProgressPercent.toFixed(1)}%</p>
+                  <p className="text-xl font-black text-primary tabular-nums font-mono">{metaProgressPercent.toFixed(1)}%</p>
                 </div>
                 <div className="h-6 bg-white/5 rounded-2xl overflow-hidden border border-white/5 p-1 relative">
                   <div 
@@ -494,11 +502,11 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
                 <div className="flex justify-between items-center bg-white/[0.03] p-3 rounded-xl border border-white/5">
                    <div className="text-left">
                      <p className="text-[8px] font-black text-muted-foreground uppercase tracking-widest leading-none mb-1">Alcançado</p>
-                     <p className="text-sm font-black text-white tabular-nums">R$ {currentIncomeInView.toLocaleString('pt-BR')}</p>
+                     <p className="text-sm font-black text-white tabular-nums font-mono">R$ {currentIncomeInView.toLocaleString('pt-BR')}</p>
                    </div>
                    <div className="text-right">
                      <p className="text-[8px] font-black text-muted-foreground uppercase tracking-widest leading-none mb-1">Faltam</p>
-                     <p className="text-sm font-black text-orange-500 tabular-nums">
+                     <p className="text-sm font-black text-orange-500 tabular-nums font-mono">
                        R$ {Math.max(0, currentMetaAmount - currentIncomeInView).toLocaleString('pt-BR')}
                      </p>
                    </div>
@@ -507,7 +515,7 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
             </CardContent>
           </Card>
 
-          <Card className="bg-card/40 border-border/50 overflow-hidden rounded-[2.5rem] md:col-span-2">
+          <Card className="bg-card/40 border-border/50 overflow-hidden rounded-[40px] md:col-span-2">
              <CardContent className="p-8 h-full flex flex-col">
                <div className="flex items-center justify-between mb-8 pb-6 border-b border-white/5">
                  <div className="space-y-1">
@@ -516,7 +524,7 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
                  </div>
                  <div className="px-6 py-3 bg-white/5 rounded-2xl border border-white/10 text-right">
                    <p className="text-[8px] font-black uppercase tracking-widest text-primary mb-1">Total de Saídas Projetadas (Mês)</p>
-                   <p className="text-3xl font-black text-white font-mono tabular-nums leading-none">R$ {monthlyObligations.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                   <p className="text-3xl font-black text-white font-mono tabular-nums leading-none tracking-tighter">R$ {monthlyObligations.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
                  </div>
                </div>
                
@@ -532,7 +540,7 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
                    </div>
                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {recurringExpenses.map(exp => (
-                      <div key={exp.id} className="flex justify-between items-center bg-white/[0.02] p-4 rounded-2xl border border-white/5 hover:bg-white/[0.04] transition-all group hover:border-orange-500/20">
+                      <div key={exp.id} className="flex justify-between items-center bg-white/[0.02] p-4 rounded-[40px] border border-white/5 hover:bg-white/[0.04] transition-all group hover:border-orange-500/20 px-8">
                         <div className="flex flex-col">
                           <span className="text-xs font-black text-white/90 uppercase tracking-tight group-hover:text-white">{exp.description}</span>
                           <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-[0.2em] mt-1 italic">Vencimento: Dia {exp.dueDate}</span>
@@ -555,7 +563,7 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
                      </div>
                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {installmentExpenses.map(exp => (
-                        <div key={exp.id} className="flex justify-between items-center bg-white/[0.02] p-4 rounded-2xl border border-white/5 hover:bg-white/[0.04] transition-all group hover:border-blue-500/20">
+                        <div key={exp.id} className="flex justify-between items-center bg-white/[0.02] p-4 rounded-[40px] border border-white/5 hover:bg-white/[0.04] transition-all group hover:border-blue-500/20 px-8">
                           <div className="flex flex-col">
                             <span className="text-xs font-black text-white/90 uppercase tracking-tight group-hover:text-white">{exp.description}</span>
                             <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-[0.2em] mt-1 italic">Parcela {exp.installmentsCount - exp.remainingInstallments + 1}/{exp.installmentsCount}</span>
@@ -576,7 +584,7 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
                      </div>
                      <Badge variant="outline" className="text-[8px] font-black uppercase tracking-widest border-green-500/20 text-green-500 bg-green-500/5">Variável</Badge>
                    </div>
-                   <div className="flex justify-between items-center bg-green-500/5 p-5 rounded-[2rem] border border-green-500/10 hover:bg-green-500/10 transition-all group">
+                   <div className="flex justify-between items-center bg-green-500/5 p-5 rounded-[40px] border border-green-500/10 hover:bg-green-500/10 transition-all group">
                      <div className="flex flex-col">
                        <span className="text-sm font-black text-white/90 uppercase tracking-tight group-hover:text-white">Compras de Estoque Reais (Mês)</span>
                        <p className="text-[9px] font-bold text-green-500/60 uppercase tracking-[0.1em] mt-1">Consolidado de todas as transações e notas de entrada</p>
@@ -599,97 +607,44 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
         </div>
       </div>
 
-      <div className="flex flex-col md:flex-row justify-between items-center gap-4 md:gap-6">
-        <div className="flex items-center gap-4 w-full md:w-auto">
-          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
-            <Receipt className="w-5 h-5" />
+      <Card className="bg-card/40 border-border/50 overflow-hidden rounded-[40px] shadow-2xl">
+        <div className="p-8 border-b border-white/5 flex flex-col md:flex-row justify-between items-center gap-6">
+          <div className="flex items-center gap-4 w-full md:w-auto">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
+              <Receipt className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-black uppercase tracking-widest text-lg leading-tight">Histórico de Transações</h3>
+              <p className="text-[10px] text-muted-foreground tracking-widest uppercase font-bold">Monitoramento de Fluxo {getFilterLabel()}</p>
+            </div>
           </div>
-          <div>
-            <h3 className="font-black uppercase tracking-tighter text-lg leading-tight">Histórico de Transações</h3>
-            <p className="text-[10px] text-muted-foreground tracking-widest uppercase font-bold">Monitoramento de Fluxo {getFilterLabel()}</p>
-          </div>
-        </div>
 
-        <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto mt-4 md:mt-0 items-center">
-            <Select value={dateFilter} onValueChange={(val: any) => setDateFilter(val)}>
-              <SelectTrigger className="w-full md:w-[180px] h-12 md:h-14 px-4 md:px-6 rounded-xl gap-2 md:gap-3 font-bold tracking-widest uppercase border-border hover:bg-white/5 text-[10px] md:text-sm bg-card/50">
-                <Filter className="w-4 h-4 md:w-5 md:h-5 text-primary" />
-                <SelectValue placeholder="Período" />
-              </SelectTrigger>
-              <SelectContent className="bg-[#0b1224] border-border">
-                <SelectItem value="all" className="uppercase font-bold tracking-widest text-xs">Todos</SelectItem>
-                <SelectItem value="today" className="uppercase font-bold tracking-widest text-xs">Hoje</SelectItem>
-                <SelectItem value="week" className="uppercase font-bold tracking-widest text-xs">Semana</SelectItem>
-                <SelectItem value="month" className="uppercase font-bold tracking-widest text-xs">Mês</SelectItem>
-                <SelectItem value="custom" className="uppercase font-bold tracking-widest text-xs">Personalizado</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto items-center">
+              <Select value={dateFilter} onValueChange={(val: any) => setDateFilter(val)}>
+                <SelectTrigger className="w-full md:w-[180px] h-12 px-6 rounded-[20px] gap-3 font-bold tracking-widest uppercase border-border hover:bg-white/5 text-[10px] bg-card/50">
+                  <Filter className="w-4 h-4 text-primary" />
+                  <SelectValue placeholder="Período" />
+                </SelectTrigger>
+                <SelectContent className="bg-[#0b1224] border-border text-white">
+                  <SelectItem value="all" className="uppercase font-bold tracking-widest text-xs">Todos</SelectItem>
+                  <SelectItem value="today" className="uppercase font-bold tracking-widest text-xs">Hoje</SelectItem>
+                  <SelectItem value="week" className="uppercase font-bold tracking-widest text-xs">Semana</SelectItem>
+                  <SelectItem value="month" className="uppercase font-bold tracking-widest text-xs">Mês</SelectItem>
+                  <SelectItem value="custom" className="uppercase font-bold tracking-widest text-xs">Personalizado</SelectItem>
+                </SelectContent>
+              </Select>
 
-            {dateFilter === 'custom' && (
-              <div className="flex gap-2 w-full md:w-auto">
-                <Popover>
-                  <PopoverTrigger 
-                    render={
-                      <Button
-                        variant={"outline"}
-                        className={cn(
-                          "w-full h-12 md:h-14 md:w-[150px] justify-start text-left font-normal bg-card/50 border-border text-xs md:text-sm uppercase tracking-wider",
-                          !startDate && "text-muted-foreground"
-                        )}
-                      >
-                        <Calendar className="mr-2 h-4 w-4" />
-                        {startDate ? format(startDate, 'dd/MM/yyyy') : <span>Data inicial</span>}
-                      </Button>
-                    } 
-                  />
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <CalendarUI
-                      mode="single"
-                      selected={startDate}
-                      onSelect={(date) => setStartDate(date as Date)}
-                      initialFocus
-                      locale={ptBR}
-                    />
-                  </PopoverContent>
-                </Popover>
+              <Dialog open={isExpenseModalOpen} onOpenChange={setIsExpenseModalOpen}>
+                <DialogTrigger
+                  nativeButton={true}
+                  render={
+                    <Button className="w-full md:w-auto h-12 px-8 rounded-[20px] gap-3 font-bold tracking-widest uppercase bg-red-600 hover:bg-red-700 shadow-lg shadow-red-600/20 text-[10px]">
+                      <Plus className="w-4 h-4" />
+                      Lançar Saída
+                    </Button>
+                  }
+                />
 
-                <Popover>
-                  <PopoverTrigger 
-                    render={
-                      <Button
-                        variant={"outline"}
-                        className={cn(
-                          "w-full h-12 md:h-14 md:w-[150px] justify-start text-left font-normal bg-card/50 border-border text-xs md:text-sm uppercase tracking-wider",
-                          !endDate && "text-muted-foreground"
-                        )}
-                      >
-                        <Calendar className="mr-2 h-4 w-4" />
-                        {endDate ? format(endDate, 'dd/MM/yyyy') : <span>Data final</span>}
-                      </Button>
-                    } 
-                  />
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <CalendarUI
-                      mode="single"
-                      selected={endDate}
-                      onSelect={(date) => setEndDate(date as Date)}
-                      initialFocus
-                      locale={ptBR}
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-            )}
-          <Dialog open={isExpenseModalOpen} onOpenChange={setIsExpenseModalOpen}>
-            <DialogTrigger
-              nativeButton={true}
-              render={
-                <Button className="flex-1 md:flex-none h-12 md:h-14 px-4 md:px-8 rounded-xl gap-2 md:gap-3 font-bold tracking-widest uppercase bg-red-600 hover:bg-red-700 shadow-lg shadow-red-600/20 text-[10px] md:text-sm">
-                  <Plus className="w-4 h-4 md:w-5 md:h-5" />
-                  Nova Despesa
-                </Button>
-              }
-            />
             <DialogContent className="bg-[#0b1224] border-border max-w-lg text-white p-0 overflow-hidden flex flex-col max-h-[95vh] md:max-h-[90vh]">
               <div className="p-6 md:p-8 border-b border-border/50 relative flex-shrink-0">
                 <div className="flex items-center gap-4">
@@ -881,44 +836,43 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
         </div>
       </div>
 
-      <Card className="border-border bg-card/50 rounded-2xl overflow-hidden">
         {/* Desktop Table View */}
         <div className="hidden md:block">
           <Table>
             <TableHeader className="bg-white/5">
-              <TableRow className="border-border hover:bg-transparent">
-                <TableHead className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground h-14">Data</TableHead>
-                <TableHead className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground h-14">Tipo</TableHead>
-                <TableHead className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground h-14">Categoria</TableHead>
-                <TableHead className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground h-14">Descrição</TableHead>
-                <TableHead className="text-right text-[10px] font-bold tracking-widest uppercase text-muted-foreground h-14">Valor</TableHead>
+              <TableRow className="border-border hover:bg-transparent border-b">
+                <TableHead className="text-[10px] font-black tracking-widest uppercase text-muted-foreground h-16 px-8">Data</TableHead>
+                <TableHead className="text-[10px] font-black tracking-widest uppercase text-muted-foreground h-16 px-8">Tipo</TableHead>
+                <TableHead className="text-[10px] font-black tracking-widest uppercase text-muted-foreground h-16 px-8">Categoria</TableHead>
+                <TableHead className="text-[10px] font-black tracking-widest uppercase text-muted-foreground h-16 px-8">Descrição</TableHead>
+                <TableHead className="text-right text-[10px] font-black tracking-widest uppercase text-muted-foreground h-16 px-8">Valor</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredTransactions.map((t, idx) => (
                 <TableRow 
                   key={`${t.id}-${idx}`} 
-                  className="border-border hover:bg-white/5 transition-colors cursor-pointer"
+                  className="border-border hover:bg-white/5 transition-all cursor-pointer group"
                   onClick={() => setSelectedTransaction(t)}
                 >
-                  <TableCell className="py-4 text-xs font-bold text-muted-foreground uppercase tracking-widest">
+                  <TableCell className="py-6 px-8 text-xs font-bold text-muted-foreground uppercase tracking-widest group-hover:text-primary transition-colors">
                     {t.date?.toDate ? format(t.date.toDate(), 'dd MMM, HH:mm') : '...'}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="px-8">
                     <Badge 
                       variant={t.type === 'income' ? 'outline' : 'destructive'} 
                       className={cn(
-                        "text-[10px] font-bold uppercase tracking-widest border-none",
+                        "text-[9px] font-black uppercase tracking-widest border-none px-3 py-1 rounded-full",
                         t.type === 'income' ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"
                       )}
                     >
                       {t.type === 'income' ? 'Entrada' : 'Saída'}
                     </Badge>
                   </TableCell>
-                  <TableCell className="font-bold text-xs uppercase tracking-widest">{t.category}</TableCell>
-                  <TableCell className="max-w-[200px] truncate text-sm font-medium">{t.description}</TableCell>
+                  <TableCell className="px-8 font-black text-xs uppercase tracking-widest">{t.category}</TableCell>
+                  <TableCell className="px-8 max-w-[200px] truncate text-xs font-bold uppercase tracking-wider text-muted-foreground">{t.description}</TableCell>
                   <TableCell className={cn(
-                    "text-right font-mono font-bold text-lg",
+                    "px-8 text-right font-mono font-black text-xl",
                     ((t.type === 'income' ? t.amount : -t.amount) || 0) >= 0 ? 'text-green-500' : 'text-red-500'
                   )}>
                     {((t.type === 'income' ? t.amount : -t.amount) || 0) >= 0 ? '+' : '-'} R$ {Math.abs(t.amount || 0).toFixed(2)}
@@ -930,34 +884,33 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
         </div>
 
         {/* Mobile Card View */}
-        <div className="md:hidden divide-y divide-border/50">
+        <div className="md:hidden divide-y divide-white/5">
           {filteredTransactions.map((t, idx) => (
             <div 
               key={`mobile-trans-${t.id}-${idx}`} 
-              className="p-4 space-y-3 cursor-pointer active:bg-white/5"
+              className="p-6 space-y-4 cursor-pointer active:bg-white/5 transition-colors"
               onClick={() => setSelectedTransaction(t)}
             >
               <div className="flex justify-between items-start">
                 <div className="space-y-1">
-                  <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">
+                  <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">
                     {t.date?.toDate ? format(t.date.toDate(), 'dd MMM, HH:mm') : '...'}
                   </p>
-                  <h4 className="font-bold text-sm uppercase tracking-wider">{t.category}</h4>
+                  <h4 className="font-black text-sm uppercase tracking-widest">{t.category}</h4>
                 </div>
                 <Badge 
-                  variant={t.type === 'income' ? 'outline' : 'destructive'} 
                   className={cn(
-                    "text-[8px] font-bold uppercase tracking-widest border-none",
+                    "text-[8px] font-black uppercase tracking-widest border-none px-2 py-0.5 rounded-full",
                     t.type === 'income' ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"
                   )}
                 >
                   {t.type === 'income' ? 'Entrada' : 'Saída'}
                 </Badge>
               </div>
-              <p className="text-xs text-muted-foreground truncate">{t.description}</p>
-              <div className="flex justify-end">
+              <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest truncate">{t.description}</p>
+              <div className="flex justify-end pt-2 border-t border-white/5">
                 <p className={cn(
-                  "font-mono font-bold text-base",
+                  "font-mono font-black text-lg",
                   ((t.type === 'income' ? t.amount : -t.amount) || 0) >= 0 ? 'text-green-500' : 'text-red-500'
                 )}>
                   {((t.type === 'income' ? t.amount : -t.amount) || 0) >= 0 ? '+' : '-'} R$ {Math.abs(t.amount || 0).toFixed(2)}
@@ -967,10 +920,10 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
           ))}
         </div>
 
-        {transactions.length === 0 && (
-          <div className="text-center py-24 text-muted-foreground">
-            <Receipt className="w-16 h-16 mx-auto mb-4 opacity-10" />
-            <p className="font-bold tracking-widest uppercase">Nenhuma transação registrada</p>
+        {filteredTransactions.length === 0 && (
+          <div className="text-center py-32 text-muted-foreground">
+            <Receipt className="w-16 h-16 mx-auto mb-6 opacity-10 animate-pulse" />
+            <p className="font-black tracking-widest uppercase text-xs">Nenhuma transação registrada no período</p>
           </div>
         )}
       </Card>
