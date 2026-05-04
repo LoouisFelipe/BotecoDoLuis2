@@ -32,6 +32,9 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
   const { data: rawExpenses } = useFetchCollection<Transaction>('expenses', {
     constraints: expConstraints
   });
+  const { data: rawPurchases } = useFetchCollection<any>('purchases', {
+    constraints: React.useMemo(() => [orderBy('date', 'desc'), limit(100)], [])
+  });
   const { data: recurringExpenses } = useFetchCollection<RecurringExpense>('recurring_expenses');
   const { data: installmentExpenses } = useFetchCollection<InstallmentExpense>('installment_expenses');
   const { data: customers } = useFetchCollection<Customer>('customers');
@@ -308,10 +311,16 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
 
   // Calculate actual variable costs (purchases) incurred this month
   const variableCostsMonth = React.useMemo(() => {
-    return transactions
-      .filter(t => t.type === 'expense' && t.category === 'Compra de Estoque' && isThisMonth(t.date?.toDate ? t.date.toDate() : new Date(0)))
+    const expensePurchases = transactions
+      .filter(t => t.type === 'expense' && (t.category === 'Compra de Estoque' || t.category === 'Suprimentos') && isThisMonth(t.date?.toDate ? t.date.toDate() : new Date(0)))
       .reduce((sum, t) => sum + (t.amount || 0), 0);
-  }, [transactions]);
+    
+    const directPurchases = rawPurchases
+      .filter(p => isThisMonth(p.date?.toDate ? p.date.toDate() : new Date(0)))
+      .reduce((sum, p) => sum + (p.totalAmount || 0), 0);
+      
+    return expensePurchases + directPurchases;
+  }, [transactions, rawPurchases]);
 
   const monthlyObligations = React.useMemo(() => {
     const recurring = recurringExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
@@ -419,23 +428,23 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500 border border-blue-500/20">
-              <TrendingUp className="w-5 h-5" />
+            <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-500 border border-blue-500/20 shadow-[0_0_20px_rgba(59,130,246,0.1)]">
+              <TrendingUp className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="font-black uppercase tracking-tighter text-lg leading-tight">Metas de Receita</h3>
-              <p className="text-[10px] text-muted-foreground tracking-widest uppercase font-bold">Cobertura de custos baseada em obrigações</p>
+              <h3 className="font-black uppercase tracking-widest text-xl leading-tight">Metas de Receita</h3>
+              <p className="text-[10px] text-muted-foreground tracking-[0.2em] uppercase font-bold">Monitoramento de Ponto de Equilíbrio Operacional</p>
             </div>
           </div>
           
-          <div className="flex bg-white/5 p-1 rounded-lg border border-border/50">
+          <div className="flex bg-white/5 p-1 rounded-xl border border-border/50">
             {(['daily', 'weekly', 'monthly'] as const).map((view) => (
               <button
                 key={view}
                 onClick={() => setMetasView(view)}
                 className={cn(
-                  "px-4 py-1.5 rounded-md text-[10px] font-black uppercase tracking-widest transition-all",
-                  metasView === view ? "bg-primary text-white shadow-lg" : "text-muted-foreground hover:text-white"
+                  "px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                  metasView === view ? "bg-primary text-white shadow-[0_0_15px_rgba(59,130,246,0.3)]" : "text-muted-foreground hover:text-white"
                 )}
               >
                 {view === 'daily' ? 'Diário' : view === 'weekly' ? 'Semanal' : 'Mensal'}
@@ -445,113 +454,143 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="bg-card/40 border-border/50 overflow-hidden relative group flex flex-col justify-center">
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent opacity-50" />
-            <CardContent className="p-8 relative z-10">
-              <div className="flex items-center justify-between mb-6">
-                <p className="text-[10px] font-black tracking-[0.2em] uppercase text-muted-foreground">
-                  Meta {metasView === 'daily' ? 'Diária' : metasView === 'weekly' ? 'Semanal' : 'Mensal'}
-                </p>
-                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <TrendingUp className="w-4 h-4 text-primary" />
-                </div>
-              </div>
+          <Card className="bg-card/40 border-border/50 overflow-hidden relative group flex flex-col justify-center min-h-[300px]">
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent opacity-50" />
+            <CardContent className="p-8 relative z-10 flex flex-col items-center text-center">
+              <p className="text-[10px] font-black tracking-[0.3em] uppercase text-primary mb-2">
+                Objetivo {metasView === 'daily' ? 'Diário' : metasView === 'weekly' ? 'Semanal' : 'Mensal'}
+              </p>
               
-              <div className="space-y-1">
-                <h3 className="text-4xl font-black text-white tabular-nums tracking-tighter">
+              <div className="mb-8">
+                <h3 className="text-5xl font-black text-white tabular-nums tracking-tighter mb-2">
                   R$ {currentMetaAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </h3>
-                <p className="text-[10px] font-black text-primary/60 uppercase tracking-widest">Ponto de Equilíbrio Est.</p>
+                <div className="flex items-center justify-center gap-2 text-muted-foreground px-4 py-1 bg-white/5 rounded-full border border-white/5">
+                  <Settings2 className="w-3 h-3" />
+                  <span className="text-[9px] font-black uppercase tracking-widest">Baseado em Custos Atuais</span>
+                </div>
               </div>
 
-              <div className="mt-8 space-y-3">
-                <div className="flex justify-between items-end">
-                  <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Progresso Real</p>
-                  <p className="text-sm font-black text-white tabular-nums">{metaProgressPercent.toFixed(1)}%</p>
+              <div className="w-full space-y-4">
+                <div className="flex justify-between items-end mb-1">
+                  <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Progresso Realizado</p>
+                  <p className="text-xl font-black text-primary tabular-nums">{metaProgressPercent.toFixed(1)}%</p>
                 </div>
-                <div className="h-3 bg-white/5 rounded-full overflow-hidden border border-white/5 p-0.5">
+                <div className="h-6 bg-white/5 rounded-2xl overflow-hidden border border-white/5 p-1 relative">
                   <div 
-                    className="h-full bg-primary rounded-full transition-all duration-1000 shadow-[0_0_15px_rgba(59,130,246,0.5)]" 
+                    className={cn(
+                      "h-full rounded-xl transition-all duration-1000 relative z-10",
+                      metaProgressPercent >= 100 ? "bg-green-500 shadow-[0_0_20px_rgba(34,197,94,0.4)]" : "bg-primary shadow-[0_0_20px_rgba(59,130,246,0.4)]"
+                    )} 
                     style={{ width: `${metaProgressPercent}%` }} 
-                  />
+                  >
+                    {metaProgressPercent > 15 && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse" />
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="flex justify-between text-[9px] font-bold text-muted-foreground uppercase tracking-widest">
-                  <span>R$ {currentIncomeInView.toLocaleString('pt-BR')}</span>
-                  <span>Objetivo Alcançado</span>
+                <div className="flex justify-between items-center bg-white/[0.03] p-3 rounded-xl border border-white/5">
+                   <div className="text-left">
+                     <p className="text-[8px] font-black text-muted-foreground uppercase tracking-widest leading-none mb-1">Alcançado</p>
+                     <p className="text-sm font-black text-white tabular-nums">R$ {currentIncomeInView.toLocaleString('pt-BR')}</p>
+                   </div>
+                   <div className="text-right">
+                     <p className="text-[8px] font-black text-muted-foreground uppercase tracking-widest leading-none mb-1">Faltam</p>
+                     <p className="text-sm font-black text-orange-500 tabular-nums">
+                       R$ {Math.max(0, currentMetaAmount - currentIncomeInView).toLocaleString('pt-BR')}
+                     </p>
+                   </div>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-card/40 border-border/50 overflow-hidden rounded-2xl md:col-span-2">
+          <Card className="bg-card/40 border-border/50 overflow-hidden rounded-[2.5rem] md:col-span-2">
              <CardContent className="p-8 h-full flex flex-col">
-               <div className="flex items-center justify-between mb-8">
+               <div className="flex items-center justify-between mb-8 pb-6 border-b border-white/5">
                  <div className="space-y-1">
-                    <p className="text-[10px] font-black tracking-[0.2em] uppercase text-muted-foreground">Detalhamento de Obrigações</p>
-                    <p className="text-[9px] text-muted-foreground/60 uppercase font-medium tracking-widest italic">Valores consolidados para o ciclo vigente</p>
+                    <p className="text-[10px] font-black tracking-[0.3em] uppercase text-muted-foreground">Composição de Custos Operacionais</p>
+                    <p className="text-[9px] text-muted-foreground/60 uppercase font-medium tracking-widest italic">Valores consolidados para o ciclo de faturamento vigente</p>
                  </div>
-                 <div className="px-5 py-2 bg-white/5 rounded-xl border border-white/10 text-right">
-                   <p className="text-[8px] font-black uppercase tracking-widest text-primary mb-0.5">Total de Custos (Mês)</p>
-                   <p className="text-xl font-black text-white font-mono">R$ {monthlyObligations.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                 <div className="px-6 py-3 bg-white/5 rounded-2xl border border-white/10 text-right">
+                   <p className="text-[8px] font-black uppercase tracking-widest text-primary mb-1">Total de Saídas Projetadas (Mês)</p>
+                   <p className="text-3xl font-black text-white font-mono tabular-nums leading-none">R$ {monthlyObligations.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
                  </div>
                </div>
                
-               <div className="flex-1 space-y-2 overflow-y-auto custom-scrollbar pr-2">
+               <div className="flex-1 space-y-4 overflow-y-auto custom-scrollbar pr-2 max-h-[400px]">
                  {/* Fixed Costs Section */}
-                 <div className="space-y-2">
-                   <div className="flex items-center gap-2 mb-2">
-                     <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
-                     <span className="text-[9px] font-black uppercase tracking-[0.3em] text-orange-500/80">Custos Fixos & Recorrência</span>
-                   </div>
-                   {recurringExpenses.map(exp => (
-                     <div key={exp.id} className="flex justify-between items-center bg-white/[0.02] p-3 rounded-lg border border-white/5 hover:bg-white/[0.04] transition-colors group">
-                       <div className="flex flex-col">
-                         <span className="text-xs font-black text-white/90 uppercase tracking-tight group-hover:text-white">{exp.description}</span>
-                         <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest">Vence todo dia {exp.dueDate}</span>
-                       </div>
-                       <span className="font-mono font-bold text-sm text-white">R$ {exp.amount.toFixed(2)}</span>
+                 <div className="space-y-3">
+                   <div className="flex items-center justify-between mb-3">
+                     <div className="flex items-center gap-2">
+                       <span className="w-2 h-2 rounded-full bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.5)]" />
+                       <span className="text-[10px] font-black uppercase tracking-[0.3em] text-orange-500">Obrigações Fixas</span>
                      </div>
-                   ))}
+                     <Badge variant="outline" className="text-[8px] font-black uppercase tracking-widest border-orange-500/20 text-orange-500 bg-orange-500/5">Recorrente</Badge>
+                   </div>
+                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {recurringExpenses.map(exp => (
+                      <div key={exp.id} className="flex justify-between items-center bg-white/[0.02] p-4 rounded-2xl border border-white/5 hover:bg-white/[0.04] transition-all group hover:border-orange-500/20">
+                        <div className="flex flex-col">
+                          <span className="text-xs font-black text-white/90 uppercase tracking-tight group-hover:text-white">{exp.description}</span>
+                          <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-[0.2em] mt-1 italic">Vencimento: Dia {exp.dueDate}</span>
+                        </div>
+                        <span className="font-mono font-black text-sm text-white">R$ {exp.amount.toFixed(2)}</span>
+                      </div>
+                    ))}
+                   </div>
                  </div>
 
                  {/* Installments Section */}
                  {installmentExpenses.length > 0 && (
-                   <div className="space-y-2 mt-6">
-                     <div className="flex items-center gap-2 mb-2">
-                       <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                       <span className="text-[9px] font-black uppercase tracking-[0.3em] text-blue-500/80">Parcelamentos Ativos</span>
-                     </div>
-                     {installmentExpenses.map(exp => (
-                       <div key={exp.id} className="flex justify-between items-center bg-white/[0.02] p-3 rounded-lg border border-white/5 hover:bg-white/[0.04] transition-colors group">
-                         <div className="flex flex-col">
-                           <span className="text-xs font-black text-white/90 uppercase tracking-tight group-hover:text-white">{exp.description}</span>
-                           <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest">Parcela {exp.installmentsCount - exp.remainingInstallments + 1} de {exp.installmentsCount}</span>
-                         </div>
-                         <span className="font-mono font-bold text-sm text-white">R$ {exp.installmentValue.toFixed(2)}</span>
+                   <div className="space-y-3 mt-8">
+                     <div className="flex items-center justify-between mb-3">
+                       <div className="flex items-center gap-2">
+                         <span className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
+                         <span className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-500">Contratos de Parcelamento</span>
                        </div>
-                     ))}
+                       <Badge variant="outline" className="text-[8px] font-black uppercase tracking-widest border-blue-500/20 text-blue-500 bg-blue-500/5">Ativos</Badge>
+                     </div>
+                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {installmentExpenses.map(exp => (
+                        <div key={exp.id} className="flex justify-between items-center bg-white/[0.02] p-4 rounded-2xl border border-white/5 hover:bg-white/[0.04] transition-all group hover:border-blue-500/20">
+                          <div className="flex flex-col">
+                            <span className="text-xs font-black text-white/90 uppercase tracking-tight group-hover:text-white">{exp.description}</span>
+                            <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-[0.2em] mt-1 italic">Parcela {exp.installmentsCount - exp.remainingInstallments + 1}/{exp.installmentsCount}</span>
+                          </div>
+                          <span className="font-mono font-black text-sm text-white">R$ {exp.installmentValue.toFixed(2)}</span>
+                        </div>
+                      ))}
+                     </div>
                    </div>
                  )}
 
                  {/* Variable Costs Section -> Supplier Purchases */}
-                 <div className="space-y-2 mt-6">
-                   <div className="flex items-center gap-2 mb-2">
-                     <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                     <span className="text-[9px] font-black uppercase tracking-[0.3em] text-green-500/80">Custos Variáveis (Suprimentos)</span>
-                   </div>
-                   <div className="flex justify-between items-center bg-green-500/5 p-3 rounded-lg border border-green-500/10 hover:bg-green-500/10 transition-colors group">
-                     <div className="flex flex-col">
-                       <span className="text-xs font-black text-white/90 uppercase tracking-tight group-hover:text-white">Compras de Estoque</span>
-                       <span className="text-[8px] font-bold text-green-500/60 uppercase tracking-widest">Baseado em notas de entrada do período</span>
+                 <div className="space-y-3 mt-8">
+                   <div className="flex items-center justify-between mb-3">
+                     <div className="flex items-center gap-2">
+                       <span className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]" />
+                       <span className="text-[10px] font-black uppercase tracking-[0.3em] text-green-500">Suprimentos & Fornecedores</span>
                      </div>
-                     <span className="font-mono font-bold text-sm text-green-500">R$ {variableCostsMonth.toFixed(2)}</span>
+                     <Badge variant="outline" className="text-[8px] font-black uppercase tracking-widest border-green-500/20 text-green-500 bg-green-500/5">Variável</Badge>
+                   </div>
+                   <div className="flex justify-between items-center bg-green-500/5 p-5 rounded-[2rem] border border-green-500/10 hover:bg-green-500/10 transition-all group">
+                     <div className="flex flex-col">
+                       <span className="text-sm font-black text-white/90 uppercase tracking-tight group-hover:text-white">Compras de Estoque Reais (Mês)</span>
+                       <p className="text-[9px] font-bold text-green-500/60 uppercase tracking-[0.1em] mt-1">Consolidado de todas as transações e notas de entrada</p>
+                     </div>
+                     <div className="text-right">
+                       <span className="font-mono font-black text-2xl text-green-500 tabular-nums">R$ {variableCostsMonth.toFixed(2)}</span>
+                     </div>
                    </div>
                  </div>
 
                  {recurringExpenses.length === 0 && installmentExpenses.length === 0 && variableCostsMonth === 0 && (
-                   <div className="flex flex-col items-center justify-center py-10 opacity-30">
-                     <Settings2 className="w-10 h-10 mb-2" />
-                     <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">Estrutura de custos vazia</p>
+                   <div className="flex flex-col items-center justify-center py-16 opacity-30 grayscale">
+                     <Settings2 className="w-12 h-12 mb-3 animate-spin-slow" />
+                     <p className="text-[10px] text-muted-foreground uppercase font-black tracking-[0.3em]">Nenhuma obrigação detectada</p>
                    </div>
                  )}
                </div>
