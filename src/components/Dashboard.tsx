@@ -16,6 +16,7 @@ import { cn, getShiftDate } from '../lib/utils';
 import { ConfirmDialog } from './ConfirmDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { calculateAvailableDoses } from '../lib/stock-utils';
+import { DateRangePicker } from './DateRangePicker';
 
 import { useFetchCollection } from '../hooks/useFetchCollection';
 import { usePaymentFees } from '../hooks/usePaymentFees';
@@ -36,6 +37,11 @@ export function Dashboard({ user, setActiveTab }: { user: UserProfile, setActive
   const [newCustomerName, setNewCustomerName] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
+  
+  // Date filter state
+  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'custom'>('today');
+  const [startDate, setStartDate] = useState<Date>();
+  const [endDate, setEndDate] = useState<Date>();
 
   const handleCreateOrder = async (name: string, type: 'table' | 'customer', customerId: string = '', isNewCustomer: boolean = false) => {
     setIsCreatingOrder(true);
@@ -98,6 +104,13 @@ export function Dashboard({ user, setActiveTab }: { user: UserProfile, setActive
   const filteredOrders = orders.filter(o => 
     (o.customerName || '').toLowerCase().includes(search.toLowerCase())
   );
+
+  const getFilterLabel = () => {
+    if (dateFilter === 'custom' && startDate && endDate) {
+      return `${format(startDate, 'dd/MM')} - ${format(endDate, 'dd/MM')}`;
+    }
+    return dateFilter === 'today' ? 'Hoje' : 'Sempre';
+  };
 
   return (
     <div className="space-y-8">
@@ -172,6 +185,40 @@ export function Dashboard({ user, setActiveTab }: { user: UserProfile, setActive
         </div>
         
         <div className="flex items-center gap-3 w-full md:w-auto">
+          <div className="flex items-center gap-2">
+            <Select value={dateFilter} onValueChange={(val: any) => {
+              setDateFilter(val);
+              if (val !== 'custom') {
+                setStartDate(undefined);
+                setEndDate(undefined);
+              }
+            }}>
+              <SelectTrigger className="w-full md:w-[140px] h-12 md:h-14 px-4 rounded-xl gap-2 font-bold tracking-widest uppercase border-border hover:bg-white/5 text-[10px] bg-card/50">
+                <Filter className="w-4 h-4 text-primary" />
+                <SelectValue placeholder="Period" />
+              </SelectTrigger>
+              <SelectContent className="bg-[#0b1224] border-border text-white">
+                <SelectItem value="all" className="uppercase font-bold tracking-widest text-[10px]">Todos</SelectItem>
+                <SelectItem value="today" className="uppercase font-bold tracking-widest text-[10px]">Hoje</SelectItem>
+                <SelectItem value="custom" className="uppercase font-bold tracking-widest text-[10px]">Personalizado</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {dateFilter === 'custom' && (
+              <DateRangePicker 
+                onApply={(range) => {
+                  if (range) {
+                    setStartDate(range.from);
+                    setEndDate(range.to);
+                    toast.success('Filtro de data aplicado ao painel');
+                  }
+                }}
+                initialRange={startDate && endDate ? { from: startDate, to: endDate } : undefined}
+                className="w-full md:min-w-[240px]"
+              />
+            )}
+          </div>
+
           <Dialog open={isNewOrderOpen} onOpenChange={(open) => {
             setIsNewOrderOpen(open);
             if (!open) {
@@ -1328,7 +1375,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                           {/* Level 2: Subcategories */}
                           {selectedMenuCategory && !selectedMenuSubcategory && (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-3">
-                              <AnimatePresence mode="wait">
+                              <AnimatePresence>
                                 {Array.from(new Set(
                                   products
                                     .filter(p => (p.categoryId || 'Outros') === selectedMenuCategory)
@@ -1366,7 +1413,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                           {/* Level 3: Products */}
                           {selectedMenuCategory && selectedMenuSubcategory && (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-2">
-                              <AnimatePresence mode="wait">
+                              <AnimatePresence>
                                 {products
                                   .filter(p => (p.categoryId || 'Outros') === selectedMenuCategory && (p.subcategory || 'Diversos') === selectedMenuSubcategory)
                                   .map(product => (

@@ -5,7 +5,8 @@ import { Transaction, UserProfile, PaymentFeeConfig, Product } from '../types';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, AreaChart, Area } from 'recharts';
-import { startOfDay, endOfDay, subDays, format } from 'date-fns';
+import { startOfDay, endOfDay, subDays, format, differenceInDays, addDays } from 'date-fns';
+import { DateRangePicker } from './DateRangePicker';
 import { ptBR } from 'date-fns/locale';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Loader2, TrendingUp, TrendingDown, DollarSign, BarChart3, Calendar, Activity, Sparkles, ArrowUpRight, ArrowDownRight, Minus, PackageMinus, MessageSquare, Send } from 'lucide-react';
@@ -41,6 +42,11 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
     popularProducts: [],
     topCustomers: [],
     hourlyStats: []
+  });
+
+  const [dateRange, setDateRange] = useState<{from: Date, to: Date}>({
+    from: subDays(new Date(), 6),
+    to: new Date()
   });
 
   const handleSendMessage = async () => {
@@ -133,245 +139,152 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
     }
   };
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      
-      // Fetch Monthly Summary
-      const currentMonth = format(new Date(), 'yyyy-MM');
-      try {
-        const summaryDoc = await getDoc(doc(db, 'bi_summaries', currentMonth));
-        if (summaryDoc.exists()) {
-          setMonthlySummary(summaryDoc.data());
-        }
-      } catch (error) {
-        console.error("Error fetching monthly summary:", error);
-      }
+  const fetchDailyDataByRange = async (range: {from: Date, to: Date}) => {
+    setLoading(true);
+    
+    // Fetch Rates
+    let rates: PaymentFeeConfig = { credit_pct: 0, debit_pct: 0, pix_pct: 0 };
+    try {
+      const docSnap = await getDoc(doc(db, 'payment_fees', 'config_rates'));
+      if (docSnap.exists()) rates = docSnap.data() as PaymentFeeConfig;
+    } catch (err) { console.error('Error fetching rates', err); }
 
-      // Fetch Rates explicitly for strict accuracy
-      let rates: PaymentFeeConfig = { credit_pct: 0, debit_pct: 0, pix_pct: 0 };
-      try {
-        const docSnap = await getDoc(doc(db, 'payment_fees', 'config_rates'));
-        if (docSnap.exists()) {
-          rates = docSnap.data() as PaymentFeeConfig;
-        }
-      } catch (err) {
-        console.error('Error fetching rates', err);
-      }
+    const daysCount = differenceInDays(range.to, range.from) + 1;
+    const daysArray = Array.from({ length: daysCount }, (_, i) => addDays(range.from, i));
 
-      const fetchDays = Array.from({ length: 7 }, (_, i) => {
-        const targetDate = subDays(new Date(), i);
-        const { start, end } = getShiftInterval(targetDate);
+    const fetchDays = daysArray.map(targetDate => {
+      const { start, end } = getShiftInterval(targetDate);
+      const qTrans = query(collection(db, 'transactions'), where('date', '>=', Timestamp.fromDate(start)), where('date', '<=', Timestamp.fromDate(end)));
+      const qExp = query(collection(db, 'expenses'), where('date', '>=', Timestamp.fromDate(start)), where('date', '<=', Timestamp.fromDate(end)));
 
-        const qTrans = query(
-          collection(db, 'transactions'),
-          where('date', '>=', Timestamp.fromDate(start)),
-          where('date', '<=', Timestamp.fromDate(end))
-        );
-
-        const qExp = query(
-          collection(db, 'expenses'),
-          where('date', '>=', Timestamp.fromDate(start)),
-          where('date', '<=', Timestamp.fromDate(end))
-        );
-
-        return Promise.all([getDocs(qTrans), getDocs(qExp)]).then(([transSnapshot, expSnapshot]) => {
-          const dayTransactions = transSnapshot.docs.map(doc => doc.data() as Transaction);
-          const dayExpenses = expSnapshot.docs.map(doc => ({ ...doc.data() as Transaction, id: doc.id }));
-          
-          let rawIncome = 0;
-          let paymentFees = 0;
-          
-          dayTransactions.filter(t => t.type === 'income' && !t.isFiado && !t.isSaldo).forEach(t => {
-             rawIncome += t.amount;
-             
-             // Dynamic fee calculation
-             let pct = 0;
-             const method = t.paymentMethod?.toUpperCase();
-             if (method === 'CRÉDITO' || method === 'CREDITO') pct = rates.credit_pct || 0;
-             else if (method === 'DÉBITO' || method === 'DEBITO') pct = rates.debit_pct || 0;
-             else if (method === 'PIX') pct = rates.pix_pct || 0;
-
-             // Only deduct if not natively present (backwards compatibility)
-             paymentFees += t.feeAmount !== undefined ? t.feeAmount : ((t.amount * pct) / 100);
-          });
-          
-          const income = rawIncome; // Keep raw income for Gross Revenue
-          const totalSalesValue = dayTransactions.filter(t => t.type === 'income').reduce((s, t) => s + (t.amount || 0), 0);
-          const cost = dayTransactions.filter(t => t.type === 'income').reduce((s, t) => s + (t.cost || 0), 0);
-          
-          const expenseFromTrans = dayTransactions.filter(t => t.type === 'expense').reduce((s, t) => s + (t.amount || 0), 0);
-          const expenseFromExp = dayExpenses.reduce((s, t) => s + (t.amount || 0), 0);
-
-          const totalDayExpense = expenseFromTrans + expenseFromExp + paymentFees;
-
-          return {
-            date: targetDate,
-            name: format(targetDate, 'EEE', { locale: ptBR }).toUpperCase(),
-            fullDate: format(targetDate, 'dd/MM'),
-            income, // Actual Cash Entry
-            totalSalesValue, // All sales including Fiado
-            expense: totalDayExpense,
-            paymentFees,
-            numFeesCalc: dayTransactions.filter(t => t.type === 'income' && !t.isFiado && !t.isSaldo).length,
-            cost,
-            grossProfit: totalSalesValue - cost,
-            profit: totalSalesValue - cost - totalDayExpense
-          };
+      return Promise.all([getDocs(qTrans), getDocs(qExp)]).then(([transSnapshot, expSnapshot]) => {
+        const dayTransactions = transSnapshot.docs.map(doc => doc.data() as Transaction);
+        const dayExpenses = expSnapshot.docs.map(doc => ({ ...doc.data() as Transaction, id: doc.id }));
+        
+        let rawIncome = 0;
+        let paymentFees = 0;
+        dayTransactions.filter(t => t.type === 'income' && !t.isFiado && !t.isSaldo).forEach(t => {
+           rawIncome += t.amount;
+           let pct = 0;
+           const method = t.paymentMethod?.toUpperCase();
+           if (method === 'CRÉDITO' || method === 'CREDITO') pct = rates.credit_pct || 0;
+           else if (method === 'DÉBITO' || method === 'DEBITO') pct = rates.debit_pct || 0;
+           else if (method === 'PIX') pct = rates.pix_pct || 0;
+           paymentFees += t.feeAmount !== undefined ? t.feeAmount : ((t.amount * pct) / 100);
         });
+        
+        const totalSalesValue = dayTransactions.filter(t => t.type === 'income').reduce((s, t) => s + (t.amount || 0), 0);
+        const cost = dayTransactions.filter(t => t.type === 'income').reduce((s, t) => s + (t.cost || 0), 0);
+        const expenseFromTrans = dayTransactions.filter(t => t.type === 'expense').reduce((s, t) => s + (t.amount || 0), 0);
+        const totalDayExpense = expenseFromTrans + dayExpenses.reduce((s, t) => s + (t.amount || 0), 0) + paymentFees;
+
+        return {
+          date: targetDate,
+          name: format(targetDate, 'EEE', { locale: ptBR }).toUpperCase(),
+          fullDate: format(targetDate, 'dd/MM'),
+          income: rawIncome,
+          totalSalesValue,
+          expense: totalDayExpense,
+          cost,
+          grossProfit: totalSalesValue - cost,
+          profit: totalSalesValue - cost - totalDayExpense
+        };
       });
+    });
 
-      // Fetch Top Products for Margin Analysis
-      const fetchTopProducts = async () => {
-        try {
-          const prodSnapshot = await getDocs(collection(db, 'products'));
-          const products = prodSnapshot.docs.map(doc => ({ ...doc.data() as Product, id: doc.id }));
-          
-          const sorted = products
-            .filter(p => (p.cost || 0) > 0)
-            .map(p => ({
-              ...p,
-              margin: ((p.price - p.cost) / p.cost) * 100,
-              potentialProfit: (p.price - p.cost) * (p.stock || 0)
-            }))
-            .sort((a, b) => b.margin - a.margin)
-            .slice(0, 5);
-            
-          setTopProducts(sorted);
-
-          // Calculate ABC Curve (based on Total Inventory Value as proxy for importance)
-          const sortedByValue = products
-            .filter(p => (p.price * (p.stock || 0)) > 0)
-            .sort((a, b) => (b.price * (b.stock || 0)) - (a.price * (a.stock || 0)));
-          
-          const totalVal = sortedByValue.reduce((sum, p) => sum + (p.price * (p.stock || 0)), 0);
-          let cumulative = 0;
-          const abc = sortedByValue.map(p => {
-            const val = p.price * (p.stock || 0);
-            cumulative += val;
-            const pct = totalVal > 0 ? (cumulative / totalVal) * 100 : 0;
-            let group = 'C';
-            if (pct <= 70) group = 'A';
-            else if (pct <= 90) group = 'B';
-            return { ...p, value: val, accumulatedPct: pct, group };
-          });
-          setAbcData(abc);
-
-        } catch (error) {
-          console.error("Error fetching top products:", error);
-        }
-      };
-
-      // Fetch last 7 days of closed orders for deep analysis
-      const fetchDeepAnalysisData = async () => {
-        try {
-          const sevenDaysAgo = subDays(new Date(), 7);
-          const qOrders = query(
-            collection(db, 'open_orders'),
-            where('status', '==', 'closed'),
-            where('closedAt', '>=', Timestamp.fromDate(sevenDaysAgo))
-          );
-          
-          const orderSnap = await getDocs(qOrders);
-          const orders = orderSnap.docs.map(doc => doc.data());
-          
-          // Agregação de Produtos
-          const productMap: Record<string, { name: string, qty: number, total: number }> = {};
-          // Agregação de Clientes
-          const customerMap: Record<string, { name: string, total: number, visits: number }> = {};
-          // Horários (0-23)
-          const hourMap: Record<number, number> = {};
-          
-          orders.forEach(order => {
-            // Clientes
-            const cId = order.customerId || 'anonimo';
-            const cName = order.customerName || 'Cliente Avulso';
-            if (!customerMap[cId]) customerMap[cId] = { name: cName, total: 0, visits: 0 };
-            customerMap[cId].total += order.totalAmount || 0;
-            customerMap[cId].visits += 1;
-            
-            // Produtos
-            (order.items || []).forEach((item: any) => {
-              const pId = item.productId || item.id || item.productID || item.product?.id;
-              let pName = item.productName || item.name || item.product?.name;
-              
-              // Evita nomes como 'undefined' ou vazios
-              if (!pName || pName === 'undefined' || pName === 'null') {
-                pName = 'Produto Desconhecido';
-              }
-              
-              if (pId && pId !== 'undefined') {
-                if (!productMap[pId]) productMap[pId] = { name: pName, qty: 0, total: 0 };
-                productMap[pId].qty += item.quantity || 1;
-                productMap[pId].total += ((item.price || 0) * (item.quantity || 1));
-              }
-            });
-            
-            // Horários
-            if (order.closedAt) {
-              const date = (order.closedAt as Timestamp).toDate();
-              const hour = date.getHours();
-              hourMap[hour] = (hourMap[hour] || 0) + 1;
-            }
-          });
-          
-          const popularProducts = Object.values(productMap)
-            .filter(p => p.name !== 'Produto Desconhecido')
-            .sort((a,b) => b.qty - a.qty)
-            .slice(0, 10);
-          const topCustomers = Object.values(customerMap).sort((a,b) => b.total - a.total).slice(0, 5);
-          const hourlyStats = Object.entries(hourMap).map(([hour, count]) => ({ hour: `${hour}h`, count })).sort((a,b) => b.count - a.count);
-          
-          setExtraData({ popularProducts, topCustomers, hourlyStats });
-        } catch (error) {
-          console.error("Error fetching deep analysis data:", error);
-        }
-      };
-
+    const fetchDeepAnalysisData = async () => {
       try {
-        await fetchDeepAnalysisData();
-        await fetchTopProducts();
-        const results = await Promise.all(fetchDays);
-        const sortedResults = results.sort((a, b) => a.date.getTime() - b.date.getTime());
+        const qOrders = query(
+          collection(db, 'open_orders'), 
+          where('status', '==', 'closed'), 
+          where('closedAt', '>=', Timestamp.fromDate(startOfDay(range.from))), 
+          where('closedAt', '<=', Timestamp.fromDate(endOfDay(range.to)))
+        );
+        const orderSnap = await getDocs(qOrders);
+        const orders = orderSnap.docs.map(doc => doc.data());
+        const productMap: Record<string, { name: string, qty: number, total: number }> = {};
+        const customerMap: Record<string, { name: string, total: number, visits: number }> = {};
+        const hourMap: Record<number, number> = {};
         
-        let totalIncome = 0;
-        let totalSalesVolume = 0;
-        let totalExpense = 0;
-        let totalCost = 0;
+        orders.forEach(order => {
+           const cName = order.customerName || 'Cliente Avulso';
+           const cId = order.customerId || 'anonimo';
+           if (!customerMap[cId]) customerMap[cId] = { name: cName, total: 0, visits: 0 };
+           customerMap[cId].total += order.totalAmount || 0;
+           customerMap[cId].visits += 1;
+           (order.items || []).forEach((item: any) => {
+              const pName = item.productName || item.name || item.product?.name || 'Produto Desconhecido';
+              if (!productMap[pName]) productMap[pName] = { name: pName, qty: 0, total: 0 };
+              productMap[pName].qty += item.quantity || 1;
+              productMap[pName].total += item.totalPrice || ((item.price || 0) * (item.quantity || 1)) || 0;
+           });
+           if (order.closedAt) {
+             const hour = order.closedAt.toDate ? order.closedAt.toDate().getHours() : new Date(order.closedAt).getHours();
+             hourMap[hour] = (hourMap[hour] || 0) + 1;
+           }
+        });
         
-        sortedResults.forEach(r => {
-          totalIncome += r.income;
-          totalSalesVolume += r.totalSalesValue;
-          totalExpense += r.expense;
-          totalCost += r.cost;
+        setExtraData({
+          popularProducts: Object.values(productMap).sort((a, b) => b.qty - a.qty).slice(0, 10),
+          topCustomers: Object.values(customerMap).sort((a, b) => b.total - a.total).slice(0, 5),
+          hourlyStats: Object.entries(hourMap).map(([h, count]) => ({ hour: `${h}h`, count })).sort((a, b) => b.count - a.count)
         });
-
-        const totalGrossProfit = totalSalesVolume - totalCost;
-        const generalGrossMargin = totalSalesVolume > 0 ? (totalGrossProfit / totalSalesVolume) * 100 : 0;
-
-        const enhancedResults = sortedResults.map(r => ({
-          ...r,
-          grossMarginPct: r.totalSalesValue > 0 ? (r.grossProfit / r.totalSalesValue) * 100 : 0,
-          generalGrossMargin
-        }));
-
-        setDailyData(enhancedResults);
-        setStats({ 
-          income: totalIncome, 
-          expense: totalExpense, 
-          profit: totalSalesVolume - totalExpense - totalCost,
-          grossProfit: totalGrossProfit,
-          grossMarginPct: generalGrossMargin,
-          projectedProfit30d: (totalSalesVolume - totalExpense - totalCost) / 7 * 30
-        });
-      } catch (error) {
-        console.error("Error fetching daily data:", error);
-      }
-      setLoading(false);
+      } catch (error) { console.error("Error in deep analysis:", error); }
     };
 
-    fetchData();
-  }, []);
+    const fetchTopProducts = async () => {
+      try {
+        const prodSnapshot = await getDocs(collection(db, 'products'));
+        const products = prodSnapshot.docs.map(doc => ({ ...doc.data() as Product, id: doc.id }));
+        const sorted = products
+          .filter(p => (p.cost || 0) > 0)
+          .map(p => ({
+            ...p,
+            margin: ((p.price - p.cost) / p.cost) * 100,
+            potentialProfit: (p.price - p.cost) * (p.stock || 0)
+          }))
+          .sort((a, b) => b.margin - a.margin)
+          .slice(0, 5);
+        setTopProducts(sorted);
+        const sortedByValue = products
+          .filter(p => (p.price * (p.stock || 0)) > 0)
+          .sort((a, b) => (b.price * (b.stock || 0)) - (a.price * (a.stock || 0)));
+        const totalVal = sortedByValue.reduce((sum, p) => sum + (p.price * (p.stock || 0)), 0);
+        let cumulative = 0;
+        const abc = sortedByValue.map(p => {
+          const val = p.price * (p.stock || 0);
+          cumulative += val;
+          const pct = totalVal > 0 ? (cumulative / totalVal) * 100 : 0;
+          let group = 'C';
+          if (pct <= 70) group = 'A'; else if (pct <= 90) group = 'B';
+          return { ...p, value: val, accumulatedPct: pct, group };
+        });
+        setAbcData(abc);
+      } catch (error) { console.error("Error fetching top products:", error); }
+    };
+
+    Promise.all([Promise.all(fetchDays), fetchDeepAnalysisData(), fetchTopProducts()]).then(([days]) => {
+      setDailyData(days);
+      const totalIncome = days.reduce((s, d) => s + d.income, 0);
+      const totalExp = days.reduce((s, d) => s + d.expense, 0);
+      const totalCost = days.reduce((s, d) => s + d.cost, 0);
+      const totalSales = days.reduce((s, d) => s + d.totalSalesValue, 0);
+      const profit = totalSales - totalCost - totalExp;
+      setStats({
+        income: totalIncome,
+        expense: totalExp,
+        profit,
+        grossProfit: totalSales - totalCost,
+        grossMarginPct: totalSales > 0 ? ((totalSales - totalCost) / totalSales) * 100 : 0,
+        projectedProfit30d: (profit / Math.max(1, daysCount)) * 30
+      });
+      setLoading(false);
+    });
+  };
+
+  useEffect(() => {
+    fetchDailyDataByRange(dateRange);
+  }, [dateRange]);
 
   if (loading) {
     return (
@@ -384,6 +297,35 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
 
   return (
     <div className="space-y-8">
+      <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 shadow-lg">
+            <Sparkles className="w-6 h-6 text-primary" />
+          </div>
+          <div>
+            <h2 className="text-3xl font-black uppercase tracking-tighter text-white leading-none mb-1">Business Intelligence</h2>
+            <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground flex items-center gap-2">
+              <Activity className="w-3 h-3 text-primary" /> Relatórios operacionais e margens
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          <DateRangePicker 
+            onApply={(range) => range && setDateRange({ from: range.from, to: range.to })}
+            initialRange={dateRange}
+            className="md:w-[280px]"
+          />
+          <Button 
+            className="h-12 bg-primary/10 border-primary/20 text-primary hover:bg-primary/20 font-black uppercase tracking-widest text-[10px] gap-2 rounded-xl px-6"
+            onClick={handleSmartAnalysis}
+            disabled={analyzing}
+          >
+            {analyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+            Gerar Insights AI
+          </Button>
+        </div>
+      </div>
+
       {monthlySummary && (
         <Card 
           className="bg-primary/20 border-primary/30 rounded-2xl overflow-hidden cursor-pointer relative group transition-all active:scale-[0.99]"
@@ -424,24 +366,24 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
         </Card>
       )}
 
-      {/* 7-Day Performance Banner */}
+      {/* Performance Banner */}
       <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
         <StatCard 
-          title="Entradas Caixa (7d)" 
+          title="Entradas Caixa" 
           value={stats.income} 
           icon={<TrendingUp className="w-6 h-6 text-green-500" />} 
           variant="green"
           onClick={() => setActiveTab('finances')}
         />
         <StatCard 
-          title="Despesa Geral (7d)" 
+          title="Despesa Geral" 
           value={stats.expense} 
           icon={<TrendingDown className="w-6 h-6 text-red-500" />} 
           variant="red"
           onClick={() => setActiveTab('finances')}
         />
         <StatCard 
-          title="Lucro Líquido (7d)" 
+          title="Lucro Líquido" 
           value={stats.profit} 
           icon={<DollarSign className="w-6 h-6 text-primary" />} 
           variant="blue"

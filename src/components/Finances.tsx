@@ -10,13 +10,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Calendar as CalendarUI } from './ui/calendar';
-import { Plus, TrendingUp, TrendingDown, Receipt, Calendar, ArrowUpRight, ArrowDownRight, Filter, X, Users, ChevronRight, Settings2, Trash2 } from 'lucide-react';
+import { Plus, TrendingUp, TrendingDown, Receipt, Calendar, ArrowUpRight, ArrowDownRight, Filter, X, Users, ChevronRight, Settings2, Trash2, Info } from 'lucide-react';
 import { Badge } from './ui/badge';
 import { toast } from 'sonner';
 import { format, isToday, isThisWeek, isThisMonth, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { handleFirestoreError, OperationType } from '../lib/firebase-utils';
 import { cn, getShiftInterval, formatShiftDateTime, getShiftDate } from '../lib/utils';
+import { DateRangePicker } from './DateRangePicker';
 
 import { useFetchCollection } from '../hooks/useFetchCollection';
 import { usePaymentFees } from '../hooks/usePaymentFees';
@@ -624,19 +625,43 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
           </div>
 
           <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto items-center">
-            <Select value={dateFilter} onValueChange={(val: any) => setDateFilter(val)}>
-              <SelectTrigger className="w-full md:w-[180px] h-12 px-6 rounded-[20px] gap-3 font-bold tracking-widest uppercase border-border hover:bg-white/5 text-[10px] bg-card/50">
-                <Filter className="w-4 h-4 text-primary" />
-                <SelectValue placeholder="Período" />
-              </SelectTrigger>
-              <SelectContent className="bg-[#0b1224] border-border text-white">
-                <SelectItem value="all" className="uppercase font-bold tracking-widest text-xs">Todos</SelectItem>
-                <SelectItem value="today" className="uppercase font-bold tracking-widest text-xs">Hoje</SelectItem>
-                <SelectItem value="week" className="uppercase font-bold tracking-widest text-xs">Semana</SelectItem>
-                <SelectItem value="month" className="uppercase font-bold tracking-widest text-xs">Mês</SelectItem>
-                <SelectItem value="custom" className="uppercase font-bold tracking-widest text-xs">Personalizado</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-2 w-full md:w-auto">
+              <Select value={dateFilter} onValueChange={(val: any) => {
+                setDateFilter(val);
+                if (val !== 'custom') {
+                  setStartDate(undefined);
+                  setEndDate(undefined);
+                }
+              }}>
+                <SelectTrigger className="w-full md:w-[160px] h-12 px-6 rounded-[20px] gap-3 font-bold tracking-widest uppercase border-border hover:bg-white/5 text-[10px] bg-card/50">
+                  <Filter className="w-4 h-4 text-primary" />
+                  <SelectValue placeholder="Período" />
+                </SelectTrigger>
+                <SelectContent className="bg-[#0b1224] border-border text-white">
+                  <SelectItem value="all" className="uppercase font-bold tracking-widest text-xs">Todos</SelectItem>
+                  <SelectItem value="today" className="uppercase font-bold tracking-widest text-xs">Hoje</SelectItem>
+                  <SelectItem value="week" className="uppercase font-bold tracking-widest text-xs">Semana</SelectItem>
+                  <SelectItem value="month" className="uppercase font-bold tracking-widest text-xs">Mês</SelectItem>
+                  <SelectItem value="custom" className="uppercase font-bold tracking-widest text-xs">Personalizado</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {dateFilter === 'custom' && (
+                <div className="animate-in slide-in-from-left-2 duration-300">
+                  <DateRangePicker 
+                    onApply={(range) => {
+                      if (range) {
+                        setStartDate(range.from);
+                        setEndDate(range.to);
+                        toast.success('Filtro de data aplicado');
+                      }
+                    }}
+                    initialRange={startDate && endDate ? { from: startDate, to: endDate } : undefined}
+                    className="w-full md:min-w-[280px]"
+                  />
+                </div>
+              )}
+            </div>
 
             <Dialog open={isExpenseModalOpen} onOpenChange={setIsExpenseModalOpen}>
               <DialogTrigger
@@ -789,23 +814,33 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
                     </div>
                     
                     {isRecurring && (
-                      <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
-                        <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Dia do Vencimento</label>
-                        <Select value={dueDate} onValueChange={setDueDate}>
-                          <SelectTrigger className="h-12 bg-background border-border font-bold uppercase tracking-widest text-[10px]">
-                            <SelectValue placeholder="Selecionar Dia" />
-                          </SelectTrigger>
-                          <SelectContent className="bg-[#0b1224] border-border max-h-[200px]">
-                            {Array.from({ length: 31 }, (_, i) => (
-                              <SelectItem key={i + 1} value={(i + 1).toString()} className="font-mono">
-                                Dia {i + 1}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-widest leading-tight">
-                          Esta despesa será listada automaticamente no relatório mensal.
-                        </p>
+                      <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
+                        <div className="p-4 bg-orange-500/5 border border-orange-500/20 rounded-xl space-y-1">
+                          <p className="text-[10px] font-black text-orange-500 uppercase tracking-widest flex items-center gap-2">
+                            <Info className="w-3 h-3" /> Definição de Custo Fixo
+                          </p>
+                          <p className="text-[9px] text-muted-foreground leading-tight uppercase font-bold tracking-tighter">
+                            Essencial e previsível. Ocorrem todo mês (Ex: Aluguel, Internet).
+                          </p>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Dia do Vencimento</label>
+                          <Select value={dueDate} onValueChange={setDueDate}>
+                            <SelectTrigger className="h-12 bg-background border-border font-bold uppercase tracking-widest text-[10px]">
+                              <SelectValue placeholder="Selecionar Dia" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-[#0b1224] border-border max-h-[200px]">
+                              {Array.from({ length: 31 }, (_, i) => (
+                                <SelectItem key={i + 1} value={(i + 1).toString()} className="font-mono">
+                                  DIA {String(i + 1).padStart(2, '0')}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-widest leading-tight">
+                            Esta despesa será listada automaticamente no relatório mensal.
+                          </p>
+                        </div>
                       </div>
                     )}
 
@@ -1190,21 +1225,26 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
             {recurringExpenses.map(expense => {
               const category = expenseCategories.find(c => c.id === expense.categoryId);
               return (
-                <Card key={expense.id} className="bg-card/30 border-border/50 relative group overflow-hidden hover:border-primary/30 transition-all">
-                  <div className="p-4 flex justify-between items-center">
+                <Card key={expense.id} className="bg-card/30 border-border/50 relative group overflow-hidden hover:border-orange-500/30 transition-all border-l-4 border-l-orange-500/50">
+                  <div className="p-5 flex justify-between items-center">
                     <div className="space-y-1">
-                      <p className="text-[10px] font-black text-orange-500 uppercase tracking-widest">Dia {expense.dueDate}</p>
-                      <h4 className="font-black text-sm uppercase truncate max-w-[150px]">{expense.description}</h4>
-                      <p className="text-[8px] text-muted-foreground uppercase font-bold tracking-widest">{category?.name}</p>
+                      <h4 className="font-black text-sm md:text-base uppercase tracking-widest leading-none text-white">{expense.description || 'SEM DESCRIÇÃO'}</h4>
+                      <div className="flex items-center gap-3">
+                        <p className="text-[10px] font-black text-orange-500 uppercase tracking-widest flex items-center gap-1.5">
+                          <Calendar className="w-3 h-3" /> DIA {expense.dueDate}
+                        </p>
+                        <span className="w-1 h-1 rounded-full bg-border" />
+                        <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-widest">{category?.name || 'Geral'}</p>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <p className="text-base font-black text-white font-mono">R$ {expense.amount.toFixed(2)}</p>
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center gap-5">
+                      <p className="text-lg font-black text-white font-mono tabular-nums">R$ {expense.amount.toFixed(2)}</p>
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">
                         <Button 
                           variant="ghost" 
                           size="icon" 
                           onClick={() => handleEditRecurringClick(expense)} 
-                          className="text-muted-foreground hover:text-primary h-8 w-8"
+                          className="text-muted-foreground hover:text-primary h-8 w-8 rounded-lg hover:bg-primary/10"
                         >
                           <Settings2 className="w-4 h-4" />
                         </Button>
@@ -1212,7 +1252,7 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
                           variant="ghost" 
                           size="icon" 
                           onClick={() => handleDeleteRecurring(expense.id)} 
-                          className="text-muted-foreground hover:text-red-500 h-8 w-8"
+                          className="text-muted-foreground hover:text-red-500 h-8 w-8 rounded-lg hover:bg-red-500/10"
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -1241,28 +1281,30 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
             {installmentExpenses.map(expense => {
               const category = expenseCategories.find(c => c.id === expense.categoryId);
               return (
-                <Card key={expense.id} className="bg-card/30 border-border/50 relative group overflow-hidden">
-                  <div className="p-4 flex justify-between items-center">
+                <Card key={expense.id} className="bg-card/30 border-border/50 relative group overflow-hidden border-l-4 border-l-primary/50 hover:border-primary/30 transition-all">
+                  <div className="p-5 flex justify-between items-center">
                     <div className="space-y-1">
-                      <Badge variant="outline" className="text-[8px] font-black uppercase tracking-widest border-primary/20 bg-primary/5 text-primary">
-                        {expense.remainingInstallments} restantes
+                      <Badge variant="outline" className="text-[8px] font-black uppercase tracking-widest border-primary/20 bg-primary/5 text-primary mb-1">
+                        {expense.remainingInstallments} parcelas restantes
                       </Badge>
-                      <h4 className="font-black text-sm uppercase truncate max-w-[150px]">{expense.description}</h4>
-                      <p className="text-[8px] text-muted-foreground uppercase font-bold tracking-widest">{category?.name}</p>
+                      <h4 className="font-black text-sm md:text-base uppercase tracking-widest leading-none text-white">{expense.description || 'PARCELAMENTO'}</h4>
+                      <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-widest">{category?.name || 'Geral'}</p>
                     </div>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-6">
                       <div className="text-right">
-                        <p className="text-sm font-black text-white font-mono">R$ {expense.installmentValue.toFixed(2)}</p>
-                        <p className="text-[9px] text-muted-foreground uppercase font-bold">Total: {expense.totalAmount.toFixed(0)}</p>
+                        <p className="text-lg font-black text-white font-mono tabular-nums">R$ {expense.installmentValue.toFixed(2)}</p>
+                        <p className="text-[10px] text-muted-foreground uppercase font-black tracking-tighter">Total: R$ {expense.totalAmount.toFixed(2)}</p>
                       </div>
                       <Button variant="ghost" size="icon" onClick={async () => {
-                        try {
-                          await deleteDoc(doc(db, 'installment_expenses', expense.id));
-                          toast.success('Parcelamento removido');
-                        } catch (error) {
-                          handleFirestoreError(error, OperationType.DELETE, 'installment_expenses');
+                        if (confirm('Deseja cancelar este parcelamento?')) {
+                          try {
+                            await deleteDoc(doc(db, 'installment_expenses', expense.id));
+                            toast.success('Parcelamento removido');
+                          } catch (error) {
+                            handleFirestoreError(error, OperationType.DELETE, 'installment_expenses');
+                          }
                         }
-                      }} className="text-muted-foreground hover:text-red-500"><Trash2 className="w-4 h-4" /></Button>
+                      }} className="text-muted-foreground hover:text-red-500 h-10 w-10 opacity-40 hover:opacity-100"><Trash2 className="w-4 h-4" /></Button>
                     </div>
                   </div>
                 </Card>
@@ -1390,13 +1432,23 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
           </div>
 
           <div className="p-8 space-y-6">
+            <div className="p-4 bg-orange-500/5 border border-orange-500/20 rounded-xl space-y-1">
+              <p className="text-[10px] font-black text-orange-500 uppercase tracking-widest flex items-center gap-2">
+                <Info className="w-3 h-3" /> Guia de Lançamento
+              </p>
+              <p className="text-[9px] text-muted-foreground leading-tight uppercase font-bold tracking-tighter">
+                Custos Fixos são previsíveis e essenciais (Aluguel, Internet, Assinaturas). 
+                Não use para compras sazonais ou variáveis de estoque.
+              </p>
+            </div>
+
             <div className="grid grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Valor (R$)</label>
                 <Input 
                   type="number" 
                   step="0.01" 
-                  className="h-14 bg-background border-border font-black text-lg"
+                  className="h-14 bg-background border-border font-black text-xl tabular-nums focus:border-primary transition-all shadow-inner"
                   value={editRecAmount}
                   onChange={(e) => setEditRecAmount(e.target.value)}
                   placeholder="0,00"
@@ -1405,13 +1457,13 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
               <div className="space-y-2">
                 <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Dia Vencimento</label>
                 <Select value={editRecDueDate} onValueChange={setEditRecDueDate}>
-                  <SelectTrigger className="h-14 bg-background border-border font-bold uppercase tracking-widest">
+                  <SelectTrigger className="h-14 bg-background border-border font-bold uppercase tracking-widest text-sm">
                     <SelectValue placeholder="Dia" />
                   </SelectTrigger>
-                  <SelectContent className="bg-[#0b1224] border-border max-h-[250px]">
+                  <SelectContent className="bg-[#0b1224] border-border max-h-[300px]">
                     {Array.from({ length: 31 }, (_, i) => (
                       <SelectItem key={i + 1} value={(i + 1).toString()} className="font-mono">
-                        Dia {i + 1}
+                        DIAS {String(i + 1).padStart(2, '0')}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1420,12 +1472,12 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Nome / Descrição</label>
+              <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Identificação do Custo</label>
               <Input 
-                className="h-14 bg-background border-border font-bold uppercase"
+                className="h-14 bg-background border-border font-black uppercase tracking-widest text-sm focus:border-primary transition-all placeholder:text-muted-foreground/30"
                 value={editRecDescription}
                 onChange={(e) => setEditRecDescription(e.target.value)}
-                placeholder="Ex: Aluguel"
+                placeholder="EX: MENSALIDADE INTERNET"
               />
             </div>
           </div>
