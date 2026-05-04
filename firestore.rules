@@ -144,20 +144,17 @@ service cloud.firestore {
     }
 
     match /recurring_expenses/{expenseId} {
-      allow list: if isVerified();
-      allow get: if isVerified();
+      allow read: if isVerified();
       allow write: if isAdmin();
     }
 
     match /expense_categories/{categoryId} {
-      allow list: if isVerified();
-      allow get: if isVerified();
+      allow read: if isVerified();
       allow write: if isAdmin();
     }
 
     match /installment_expenses/{expenseId} {
-      allow list: if isVerified();
-      allow get: if isVerified();
+      allow read: if isVerified();
       allow write: if isAdmin();
     }
 
