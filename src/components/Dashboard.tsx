@@ -115,7 +115,7 @@ export function Dashboard({ user, setActiveTab }: { user: UserProfile, setActive
   return (
     <div className="space-y-8">
       {/* Digital Operations Dashboard - Metrics Banner */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-6">
         <Card className="bg-card/30 border-border/50 overflow-hidden relative group cursor-pointer" onClick={() => setIsNewOrderOpen(true)}>
           <div className="absolute inset-0 bg-gradient-to-br from-[#0070f3]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
           <CardContent className="p-4 md:p-6 flex items-center gap-4 md:gap-5 relative z-10">
@@ -150,7 +150,7 @@ export function Dashboard({ user, setActiveTab }: { user: UserProfile, setActive
             </div>
             <div className="min-w-0">
               <p className="text-[8px] md:text-[9px] font-black tracking-widest uppercase text-muted-foreground mb-1 leading-none">Valor em Aberto</p>
-              <h3 className="text-base md:text-2xl font-black text-[#0070f3] leading-none truncate font-mono">
+              <h3 className="text-base md:text-2xl font-black text-[#0070f3] leading-none truncate font-mono tabular-nums">
                 R$ {orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </h3>
             </div>
@@ -165,8 +165,26 @@ export function Dashboard({ user, setActiveTab }: { user: UserProfile, setActive
             </div>
             <div className="min-w-0">
               <p className="text-[8px] md:text-[9px] font-black tracking-widest uppercase text-muted-foreground mb-1 leading-none">Ticket Médio</p>
-              <h3 className="text-base md:text-2xl font-black text-green-500 leading-none truncate font-mono">
+               <h3 className="text-base md:text-2xl font-black text-green-500 leading-none truncate font-mono tabular-nums">
                 R$ {orders.length > 0 ? (orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0) / orders.length).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '0,00'}
+              </h3>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-card/30 border-border/50 overflow-hidden relative group">
+          <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <CardContent className="p-4 md:p-6 flex items-center gap-4 md:gap-5 relative z-10">
+            <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20">
+              <Activity className="w-5 h-5 md:w-6 md:h-6 text-indigo-500" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[8px] md:text-[9px] font-black tracking-widest uppercase text-muted-foreground mb-1 leading-none">Lucro Projetado</p>
+              <h3 className="text-base md:text-2xl font-black text-indigo-500 leading-none truncate font-mono tabular-nums">
+                R$ {orders.reduce((sum, o) => {
+                  const orderCost = (o.items || []).reduce((cSum, i) => cSum + ((i.costPrice || 0) * i.quantity), 0);
+                  return sum + ((o.totalAmount || 0) - orderCost);
+                }, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </h3>
             </div>
           </CardContent>
@@ -237,7 +255,7 @@ export function Dashboard({ user, setActiveTab }: { user: UserProfile, setActive
                 <Plus className="w-8 h-8" />
               </button>
             } />
-            <DialogContent className="bg-[#05070a] border-none max-w-2xl text-white p-0 overflow-hidden flex flex-col max-h-[90vh] shadow-2xl rounded-3xl">
+            <DialogContent className="bg-[#05070a] border-none max-w-2xl text-white p-0 overflow-hidden flex flex-col max-h-[90vh] shadow-2xl rounded-[40px]">
               <div className="p-6 md:p-8 border-b border-white/5 relative flex-shrink-0 bg-[#05070a]">
                 <div className="flex items-center gap-4">
                   <div className="w-14 h-14 rounded-2xl bg-[#0070f3]/10 flex items-center justify-center border border-[#0070f3]/20 shadow-lg">
@@ -345,14 +363,14 @@ export function Dashboard({ user, setActiveTab }: { user: UserProfile, setActive
                         <button 
                           onClick={() => handleCreateOrder(newCustomerName, 'customer', '', true)}
                           disabled={isCreatingOrder}
-                          className="w-full p-4 bg-[#0d1117] hover:bg-[#161b22] border border-purple-500/20 disabled:opacity-50 rounded-2xl text-left transition-all flex items-center justify-between group"
+                          className="w-full p-4 bg-[#0d1117] hover:bg-[#161b22] border border-amber-500/20 disabled:opacity-50 rounded-2xl text-left transition-all flex items-center justify-between group"
                         >
                           <div className="flex items-center gap-4">
-                             <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center">
-                               <UserPlus className="w-5 h-5 text-purple-500" />
+                             <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center">
+                               <UserPlus className="w-5 h-5 text-amber-500" />
                              </div>
                              <div>
-                               <p className="text-[10px] font-black uppercase tracking-widest text-purple-500 mb-1">Cadastrar e Abrir Comanda</p>
+                               <p className="text-[10px] font-black uppercase tracking-widest text-amber-500 mb-1">Cadastrar e Abrir Comanda</p>
                                <p className="text-lg font-black uppercase tracking-widest">{newCustomerName}</p>
                              </div>
                           </div>
