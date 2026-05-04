@@ -6,7 +6,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from './ui/dialog';
 import { Combobox } from './ui/combobox';
-import { ProductFormModal } from './ProductFormModal';
+import { ProductForm } from './Product';
 import { toast } from 'sonner';
 import { getShiftDate } from '../lib/utils';
 import { ShoppingCart, Plus, Trash2, Package } from 'lucide-react';
@@ -118,7 +118,7 @@ export function RegisterPurchaseModal({ suppliers }: { suppliers: Supplier[] }) 
       }
 
       // 1. Process items: calculate subtotals
-      // (Since custom products are now created upfront via the ProductFormModal,
+      // (Since custom products are now created upfront via the ProductForm,
       // all validItems should already have real product IDs that correspond to existing products.)
       const purchaseItems = [];
       for (const item of validItems) {
@@ -263,7 +263,7 @@ export function RegisterPurchaseModal({ suppliers }: { suppliers: Supplier[] }) 
               </Button>
             </div>
             
-            <ProductFormModal
+            <ProductForm
               isOpen={isProductModalOpen}
               onOpenChange={setIsProductModalOpen}
               initialName={productModalInitialName}

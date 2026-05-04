@@ -15,7 +15,7 @@ import { handleFirestoreError, OperationType } from '../lib/firebase-utils';
 import { cn } from '../lib/utils';
 import { motion } from 'motion/react';
 
-export function ProductFormModal({
+export function ProductForm({
   isOpen,
   onOpenChange,
   editingProduct,
@@ -200,35 +200,35 @@ export function ProductFormModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-[#0b1224] border-border max-w-2xl text-white p-0 overflow-hidden flex flex-col h-[90vh] md:max-h-[85vh] shadow-[0_0_50px_rgba(0,0,0,0.5)] border-white/5">
-        <div className="p-6 md:p-8 border-b border-white/5 relative flex-shrink-0 bg-gradient-to-b from-white/[0.02] to-transparent">
+      <DialogContent className="bg-[#05070a] border-border max-w-2xl text-white p-0 overflow-hidden flex flex-col h-[90vh] md:max-h-[85vh] shadow-[0_0_50px_rgba(0,0,0,0.5)] border-white/10 rounded-[40px]">
+        <div className="p-6 md:p-8 border-b border-white/10 relative flex-shrink-0 bg-gradient-to-b from-white/[0.02] to-transparent">
           <div className="flex items-center gap-5">
-            <div className="w-12 h-12 md:w-16 md:h-16 rounded-2xl bg-primary/20 flex items-center justify-center border border-primary/30 shadow-[0_0_30px_rgba(59,130,246,0.15)] relative overflow-hidden group">
+            <div className="w-14 h-14 md:w-16 md:h-16 rounded-[20px] bg-primary/20 flex items-center justify-center border border-primary/30 shadow-[0_0_30px_rgba(0,112,243,0.15)] relative overflow-hidden group">
               <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-transparent opacity-50" />
-              <Package className="w-6 h-6 md:w-8 md:h-8 text-primary relative z-10 animate-pulse" />
+              <Package className="w-7 h-7 md:w-8 md:h-8 text-primary relative z-10" />
             </div>
             <div>
-              <DialogTitle className="text-2xl md:text-4xl font-black uppercase tracking-tighter leading-none mb-1.5 flex items-center gap-3">
+              <DialogTitle className="text-2xl md:text-3xl font-black uppercase tracking-[0.2em] leading-none mb-1.5 flex items-center gap-3 font-mono">
                 {editingProduct ? 'Editar' : 'Novo'} 
                 <span className="text-primary">item</span>
               </DialogTitle>
               <div className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                <p className="text-[10px] font-black tracking-[0.2em] uppercase text-muted-foreground">
-                  Inventário <span className="text-white/40 mx-1">/</span> {productModalTab === 'identificacao' ? 'ID' : 'PDV & Estoque'}
+                <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                <p className="text-[10px] font-black tracking-[0.3em] uppercase text-muted-foreground font-mono">
+                  Painel de Operação <span className="text-white/20 mx-1">/</span> {productModalTab === 'identificacao' ? 'ID' : 'PDV & Estoque'}
                 </p>
               </div>
             </div>
           </div>
           <button 
             onClick={() => onOpenChange(false)}
-            className="absolute top-8 right-8 text-muted-foreground hover:text-white transition-colors"
+            className="absolute top-8 right-8 text-muted-foreground hover:text-white transition-colors p-2"
           >
             <X className="w-6 h-6" />
           </button>
         </div>
         
-        <div className="flex border-b border-white/5 bg-black/20">
+        <div className="flex border-b border-white/10 bg-black/40">
           {[
             { id: 'identificacao', label: '1. Identificação', icon: Package },
             { id: 'venda_estoque', label: '2. Venda & Estoque', icon: DollarSign },
@@ -239,14 +239,14 @@ export function ProductFormModal({
               key={tab.id}
               onClick={() => setProductModalTab(tab.id as any)}
               className={cn(
-                "flex-1 py-5 text-[10px] font-black uppercase tracking-[0.2em] transition-all relative flex items-center justify-center gap-2",
+                "flex-1 py-6 text-[10px] font-black uppercase tracking-[0.3em] transition-all relative flex items-center justify-center gap-2 font-mono h-16",
                 productModalTab === tab.id ? "text-primary bg-primary/5" : "text-muted-foreground hover:text-white hover:bg-white/5"
               )}
             >
-              <tab.icon className={cn("w-3.5 h-3.5", productModalTab === tab.id ? "text-primary" : "text-muted-foreground/50")} />
-              <span>{tab.label}</span>
+              <tab.icon className={cn("w-4 h-4", productModalTab === tab.id ? "text-primary" : "text-muted-foreground/40")} />
+              <span className="hidden sm:inline">{tab.label}</span>
               {productModalTab === tab.id && (
-                <motion.div layoutId="productTabIndicator" className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary shadow-[0_0_10px_rgba(59,130,246,0.5)]" />
+                <motion.div layoutId="productTabIndicator" className="absolute bottom-0 left-0 right-0 h-1 bg-primary shadow-[0_0_20px_rgba(0,112,243,0.6)]" />
               )}
             </button>
           ))}
@@ -257,54 +257,60 @@ export function ProductFormModal({
             {/* Identificação */}
             {productModalTab === 'identificacao' && (
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                <div className="p-6 bg-primary/5 border border-primary/10 rounded-2xl flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                    <Package className="w-6 h-6 text-primary" />
+                <div className="p-6 bg-primary/5 border border-primary/10 rounded-3xl flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 shadow-[0_0_15px_rgba(0,112,243,0.1)]">
+                    <Package className="w-7 h-7 text-primary" />
                   </div>
                   <div>
-                    <h4 className="text-sm font-black uppercase tracking-widest text-white">Cadastro de Produto</h4>
-                    <p className="text-[10px] text-muted-foreground uppercase font-black">Identifique o item no sistema</p>
+                    <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-white font-mono">Cadastro de Produto</h4>
+                    <p className="text-[9px] text-muted-foreground uppercase font-black tracking-[0.3em]">Identificação de Ativo</p>
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Nome do Produto</label>
-                  <Combobox 
-                    options={Array.from(new Set(products.map(p => p.name).filter(Boolean)))}
-                    value={productName}
-                    onSelect={setProductName}
-                    placeholder="Selecione ou digite o nome"
-                    allowCustom={true}
-                  />
+                  <label className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground ml-1 font-mono">Nome do Produto</label>
+                  <div className="h-14">
+                    <Combobox 
+                      options={Array.from(new Set(products.map(p => p.name).filter(Boolean)))}
+                      value={productName}
+                      onSelect={setProductName}
+                      placeholder="Selecione ou digite o nome"
+                      allowCustom={true}
+                    />
+                  </div>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Categoria Principal</label>
-                    <Combobox 
-                      options={categories.map(c => ({ label: c.name, value: c.id }))}
-                      value={productCategoryId}
-                      onSelect={setProductCategoryId}
-                      placeholder="Cervejas, Destilados..."
-                      allowCustom={true}
-                    />
+                    <label className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground ml-1 font-mono">Categoria Principal</label>
+                    <div className="h-14">
+                      <Combobox 
+                        options={categories.map(c => ({ label: c.name, value: c.id }))}
+                        value={productCategoryId}
+                        onSelect={setProductCategoryId}
+                        placeholder="Cervejas, Destilados..."
+                        allowCustom={true}
+                      />
+                    </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Subcategoria / Tag</label>
-                    <Combobox 
-                      options={Array.from(new Set(products.filter(p => p.subcategory).map(p => p.subcategory).filter(Boolean))) as string[]}
-                      value={productSubcategory}
-                      onSelect={setProductSubcategory}
-                      placeholder="Doses, Garrafas, Long Neck..."
-                      allowCustom={true}
-                    />
+                    <label className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground ml-1 font-mono">Subcategoria / Tag</label>
+                    <div className="h-14">
+                      <Combobox 
+                        options={Array.from(new Set(products.filter(p => p.subcategory).map(p => p.subcategory).filter(Boolean))) as string[]}
+                        value={productSubcategory}
+                        onSelect={setProductSubcategory}
+                        placeholder="Doses, Garrafas, Long Neck..."
+                        allowCustom={true}
+                      />
+                    </div>
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Descrição Comercial (Opcional)</label>
+                  <label className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground ml-1 font-mono">Descrição Comercial (Opcional)</label>
                   <Textarea 
-                    className="min-h-[100px] bg-[#111827]/50 border-white/5 focus:border-primary text-sm rounded-xl resize-none font-medium leading-relaxed"
+                    className="min-h-[100px] bg-white/[0.02] border-white/5 focus:border-primary text-sm rounded-2xl resize-none font-medium leading-relaxed p-4"
                     value={productDescription}
                     onChange={(e) => setProductDescription(e.target.value)}
                     placeholder="Essa descrição aparecerá para o garçom e no cardápio..."
@@ -326,16 +332,16 @@ export function ProductFormModal({
                       if (productUnit === 'Garrafa / Inteiro') setProductUnit('Por Unidade');
                     }}
                     className={cn(
-                      "flex flex-col items-center gap-3 p-4 rounded-2xl border transition-all",
+                      "flex flex-col items-center gap-3 p-4 rounded-2xl border transition-all h-20 justify-center",
                       !isDoseControl 
-                        ? "bg-primary/10 border-primary shadow-[0_0_20px_rgba(59,130,246,0.15)]" 
-                        : "bg-white/[0.02] border-white/5 hover:bg-white/5"
+                        ? "bg-primary/10 border-primary shadow-[0_0_20px_rgba(0,112,243,0.15)]" 
+                        : "bg-white/[0.02] border-white/10 hover:bg-white/5"
                     )}
                   >
-                    <Package className={cn("w-5 h-5", !isDoseControl ? "text-primary" : "text-muted-foreground")} />
+                    <Package className={cn("w-5 h-5", !isDoseControl ? "text-primary" : "text-muted-foreground/40")} />
                     <div className="text-center">
                       <p className={cn("text-[9px] font-black uppercase tracking-widest", !isDoseControl ? "text-primary" : "text-muted-foreground")}>Item Simples</p>
-                      <p className="text-[8px] font-medium text-muted-foreground/60 uppercase">Lata, Porção, Cigarro</p>
+                      <p className="text-[8px] font-medium text-muted-foreground/40 uppercase font-mono">Lata, Porção</p>
                     </div>
                   </button>
 
@@ -347,16 +353,16 @@ export function ProductFormModal({
                       setProductSubcategory('Garrafas');
                     }}
                     className={cn(
-                      "flex flex-col items-center gap-3 p-4 rounded-2xl border transition-all",
+                      "flex flex-col items-center gap-3 p-4 rounded-2xl border transition-all h-20 justify-center",
                       (isDoseControl && !linkedProductId) 
-                        ? "bg-primary/10 border-primary shadow-[0_0_20px_rgba(59,130,246,0.15)]" 
-                        : "bg-white/[0.02] border-white/5 hover:bg-white/5"
+                        ? "bg-primary/10 border-primary shadow-[0_0_20px_rgba(0,112,243,0.15)]" 
+                        : "bg-white/[0.02] border-white/10 hover:bg-white/5"
                     )}
                   >
-                    <FlaskConical className={cn("w-5 h-5", (isDoseControl && !linkedProductId) ? "text-primary" : "text-muted-foreground")} />
+                    <FlaskConical className={cn("w-5 h-5", (isDoseControl && !linkedProductId) ? "text-primary" : "text-muted-foreground/40")} />
                     <div className="text-center">
                       <p className={cn("text-[9px] font-black uppercase tracking-widest", (isDoseControl && !linkedProductId) ? "text-primary" : "text-muted-foreground")}>Garrafa Base</p>
-                      <p className="text-[8px] font-medium text-muted-foreground/60 uppercase">Estoque de ML | Destilado</p>
+                      <p className="text-[8px] font-medium text-muted-foreground/40 uppercase font-mono">Estoque ML</p>
                     </div>
                   </button>
 
@@ -371,16 +377,16 @@ export function ProductFormModal({
                       }
                     }}
                     className={cn(
-                      "flex flex-col items-center gap-3 p-4 rounded-2xl border transition-all",
+                      "flex flex-col items-center gap-3 p-4 rounded-2xl border transition-all h-20 justify-center",
                       (isDoseControl && linkedProductId) 
-                        ? "bg-primary/10 border-primary shadow-[0_0_20px_rgba(59,130,246,0.15)]" 
-                        : "bg-white/[0.02] border-white/5 hover:bg-white/5"
+                        ? "bg-primary/10 border-primary shadow-[0_0_20px_rgba(0,112,243,0.15)]" 
+                        : "bg-white/[0.02] border-white/10 hover:bg-white/5"
                     )}
                   >
-                    <Wine className={cn("w-5 h-5", (isDoseControl && linkedProductId) ? "text-primary" : "text-muted-foreground")} />
+                    <Wine className={cn("w-5 h-5", (isDoseControl && linkedProductId) ? "text-primary" : "text-muted-foreground/40")} />
                     <div className="text-center">
                       <p className={cn("text-[9px] font-black uppercase tracking-widest", (isDoseControl && linkedProductId) ? "text-primary" : "text-muted-foreground")}>Dose Vinculada</p>
-                      <p className="text-[8px] font-medium text-muted-foreground/60 uppercase">Venda Fracionada</p>
+                      <p className="text-[8px] font-medium text-muted-foreground/40 uppercase font-mono">Fracionado</p>
                     </div>
                   </button>
                 </div>
@@ -388,21 +394,21 @@ export function ProductFormModal({
                 {/* Seção 1: Configurações de Gestão (Discretas) */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 opacity-80 group-hover:opacity-100 transition-opacity">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Preço de Custo (R$)</label>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1 font-mono">Preço de Custo (R$)</label>
                     <Input 
                       type="number"
                       step="0.01"
-                      className="h-10 bg-white/[0.02] border-white/5 rounded-lg font-bold text-xs"
+                      className="h-14 bg-white/[0.02] border-white/5 rounded-2xl font-mono tabular-nums font-bold text-sm focus:border-primary transition-all"
                       value={productCost}
                       onChange={(e) => setProductCost(e.target.value)}
                       placeholder="0.00"
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Alerta de Estoque Mínimo</label>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1 font-mono">Alerta de Estoque Mínimo</label>
                     <Input 
                       type="number"
-                      className="h-10 bg-white/[0.02] border-white/5 rounded-lg font-bold text-xs"
+                      className="h-14 bg-white/[0.02] border-white/5 rounded-2xl font-mono tabular-nums font-bold text-sm focus:border-primary transition-all"
                       value={productMinStock}
                       onChange={(e) => setProductMinStock(e.target.value)}
                       placeholder="Ex: 5"
@@ -410,22 +416,22 @@ export function ProductFormModal({
                   </div>
                 </div>
 
-                <div className="bg-white/[0.02] border border-white/5 p-6 rounded-2xl space-y-6">
+                <div className="bg-white/[0.02] border border-white/10 p-6 rounded-[30px] space-y-6">
                   <div className="flex items-center justify-between">
-                    <h4 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                    <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground flex items-center gap-2 font-mono">
                       <DollarSign className="w-4 h-4 text-green-500" /> Configuração de Venda
                     </h4>
                     <div className="flex items-center gap-2">
-                      <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Valor Aberto?</label>
+                      <label className="text-[9px] font-black text-muted-foreground uppercase tracking-widest font-mono">Valor Aberto?</label>
                       <button 
                         type="button"
                         onClick={() => setIsOpenValue(!isOpenValue)}
                         className={cn(
-                          "w-8 h-4 rounded-full transition-all relative",
+                          "w-10 h-5 rounded-full transition-all relative",
                           isOpenValue ? "bg-green-500" : "bg-white/10"
                         )}
                       >
-                        <div className={cn("absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all", isOpenValue ? "left-4.5" : "left-0.5")} />
+                        <div className={cn("absolute top-1 w-3 h-3 rounded-full bg-white transition-all", isOpenValue ? "left-6" : "left-1")} />
                       </button>
                     </div>
                   </div>
@@ -434,10 +440,10 @@ export function ProductFormModal({
                     <div className="space-y-2">
                       <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Formato de Venda</label>
                       <Select value={productUnit} onValueChange={setProductUnit}>
-                        <SelectTrigger className="h-14 bg-black/40 border-white/10 rounded-xl">
-                          <SelectValue placeholder="Como o produto é vendido?" />
+                        <SelectTrigger className="h-14 bg-black/40 border-white/10 rounded-2xl font-mono text-[10px] font-black uppercase tracking-widest">
+                          <SelectValue placeholder="Modelo de Venda" />
                         </SelectTrigger>
-                        <SelectContent className="bg-[#0b1224] border-white/10">
+                        <SelectContent className="bg-[#05070a] border-white/10">
                           {isDoseControl && linkedProductId ? (
                             <>
                               <SelectItem value="Degustação (20ml)">Degustação (20ml)</SelectItem>
@@ -482,7 +488,7 @@ export function ProductFormModal({
                         <Input 
                           type="number"
                           step="0.01"
-                          className="h-14 bg-green-500/5 border-green-500/20 focus:border-green-500/50 text-xl font-black pl-12 rounded-xl text-green-500"
+                          className="h-14 bg-green-500/5 border-green-500/20 focus:border-green-500/50 text-xl font-mono tabular-nums font-black pl-12 rounded-xl text-green-500"
                           value={productPrice}
                           onChange={(e) => setProductPrice(e.target.value)}
                           placeholder="0.00"
@@ -495,10 +501,10 @@ export function ProductFormModal({
                   {!isDoseControl && !linkedProductId && (
                     <div className="pt-2 border-t border-white/5 mt-4">
                        <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Estoque Total (Unidades / Peso)</label>
+                          <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1 font-mono">Estoque Total (Unidades / Peso)</label>
                           <Input 
                             type="number"
-                            className="h-12 bg-black/40 border-white/10 rounded-xl font-bold"
+                            className="h-14 bg-black/40 border-white/10 rounded-2xl font-mono tabular-nums font-bold text-lg focus:border-primary transition-all"
                             value={productStock}
                             onChange={(e) => setProductStock(e.target.value)}
                             placeholder="0"
@@ -506,13 +512,36 @@ export function ProductFormModal({
                         </div>
                     </div>
                   )}
+
+                  {/* Cálculo de Lucro Líquido Real */}
+                  <div className="pt-6 border-t border-white/10 mt-6 grid grid-cols-1 md:grid-cols-2 gap-6 bg-black/40 p-6 rounded-[30px] border border-white/10">
+                    <div className="space-y-1">
+                      <p className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground font-mono">Margem Estimada (ROI)</p>
+                      <div className="flex items-baseline gap-2">
+                        <span className={cn(
+                          "text-3xl font-black font-mono tabular-nums",
+                          (parseFloat(productPrice) - parseFloat(productCost)) > 0 ? "text-green-500" : "text-red-500"
+                        )}>
+                          {productPrice && productCost ? (((parseFloat(productPrice) - parseFloat(productCost)) / parseFloat(productCost)) * 100).toFixed(0) : 0}%
+                        </span>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[9px] font-black uppercase tracking-[0.2em] text-primary font-mono">Lucro Líquido Real (Taxa 2%)</p>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-3xl font-black font-mono tabular-nums text-white">
+                          R$ {productPrice && productCost ? ((parseFloat(productPrice) * 0.98) - parseFloat(productCost)).toFixed(2) : '0.00'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                   
                   {isDoseControl && !linkedProductId && (
                     <div className="pt-2 border-t border-white/5 mt-4 flex items-center justify-between p-4 bg-primary/5 rounded-xl border border-primary/20">
                        <p className="text-[10px] text-primary uppercase font-black tracking-widest">Controle por ML Detectado</p>
                        <Button 
                          variant="ghost" 
-                         className="h-8 text-[9px] uppercase tracking-widest hover:bg-primary/20 text-white"
+                         className="h-14 px-6 text-[9px] uppercase tracking-widest hover:bg-primary/20 text-white"
                          onClick={() => setProductModalTab('controle_dose')}
                        >
                          Configurar Garrafa +
@@ -525,7 +554,7 @@ export function ProductFormModal({
                        <p className="text-[10px] text-primary uppercase font-black tracking-widest">Dose Vinculada Detectada</p>
                        <Button 
                          variant="ghost" 
-                         className="h-8 text-[9px] uppercase tracking-widest hover:bg-primary/20 text-white"
+                         className="h-14 px-6 text-[9px] uppercase tracking-widest hover:bg-primary/20 text-white"
                          onClick={() => setProductModalTab('controle_dose')}
                        >
                          Configurar ML / Garrafa +
@@ -540,30 +569,32 @@ export function ProductFormModal({
             {/* 3. FICHA TÉCNICA TAB */}
             {productModalTab === 'ficha_tecnica' && (
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                <div className="p-6 bg-amber-500/5 border border-amber-500/10 rounded-2xl flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center">
-                    <List className="w-6 h-6 text-amber-500" />
+                <div className="p-6 bg-primary/5 border border-primary/10 rounded-3xl flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20">
+                    <List className="w-7 h-7 text-primary" />
                   </div>
                   <div>
-                    <h4 className="text-sm font-black uppercase tracking-widest text-white">Ficha Técnica (Composição)</h4>
-                    <p className="text-[10px] text-muted-foreground uppercase font-black">Defina os ingredientes deste item</p>
+                    <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-white font-mono">Ficha Técnica (Composição)</h4>
+                    <p className="text-[9px] text-muted-foreground uppercase font-black tracking-[0.3em]">Engenharia de Produto</p>
                   </div>
                 </div>
 
                 <div className="space-y-4">
                   <div className="flex items-center gap-2">
-                    <div className="flex-1">
-                      <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Selecionar Ingrediente (Produto)</label>
-                      <Combobox 
-                        options={products.filter(p => p.id !== editingProduct?.id).map(p => ({ label: p.name, value: p.id }))}
-                        value=""
-                        onSelect={(id) => {
-                          if (id && !ingredients.some(i => i.productId === id)) {
-                            setIngredients([...ingredients, { productId: id, quantity: 1 }]);
-                          }
-                        }}
-                        placeholder="Pesquisar produto no estoque..."
-                      />
+                    <div className="flex-1 space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground ml-1 font-mono">Selecionar Ingrediente</label>
+                      <div className="h-14">
+                        <Combobox 
+                          options={products.filter(p => p.id !== editingProduct?.id).map(p => ({ label: p.name, value: p.id }))}
+                          value=""
+                          onSelect={(id) => {
+                            if (id && !ingredients.some(i => i.productId === id)) {
+                              setIngredients([...ingredients, { productId: id, quantity: 1 }]);
+                            }
+                          }}
+                          placeholder="Pesquisar componente no estoque..."
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -589,20 +620,20 @@ export function ProductFormModal({
                                 </div>
                               </div>
                               <div className="flex items-center gap-4">
-                                <div className="flex items-center bg-black/40 rounded-lg p-1 border border-white/5">
+                                <div className="flex items-center bg-black/40 rounded-xl p-1 border border-white/5">
                                   <button 
                                     onClick={() => {
                                       const newIngs = [...ingredients];
                                       newIngs[idx].quantity = Math.max(0.01, newIngs[idx].quantity - 1);
                                       setIngredients(newIngs);
                                     }}
-                                    className="w-6 h-6 flex items-center justify-center hover:bg-white/5 rounded"
+                                    className="w-8 h-8 flex items-center justify-center hover:bg-white/5 rounded-lg transition-colors"
                                   >
-                                    <Minus className="w-3 h-3" />
+                                    <Minus className="w-4 h-4" />
                                   </button>
                                   <Input 
                                     type="number"
-                                    className="w-14 h-6 bg-transparent border-none text-center font-bold text-xs p-0 focus-visible:ring-0"
+                                    className="w-16 h-8 bg-transparent border-none text-center font-black text-xs p-0 focus-visible:ring-0 font-mono tabular-nums"
                                     value={ing.quantity}
                                     onChange={(e) => {
                                       const newIngs = [...ingredients];
@@ -616,9 +647,9 @@ export function ProductFormModal({
                                       newIngs[idx].quantity += 1;
                                       setIngredients(newIngs);
                                     }}
-                                    className="w-6 h-6 flex items-center justify-center hover:bg-white/5 rounded"
+                                    className="w-8 h-8 flex items-center justify-center hover:bg-white/5 rounded-lg transition-colors"
                                   >
-                                    <Plus className="w-3 h-3" />
+                                    <Plus className="w-4 h-4" />
                                   </button>
                                 </div>
                                 <button 
@@ -635,14 +666,14 @@ export function ProductFormModal({
                     )}
                   </div>
 
-                  <div className="p-6 bg-blue-500/5 border border-blue-500/10 rounded-2xl">
+                  <div className="p-6 bg-primary/5 border border-primary/10 rounded-2xl">
                      <div className="flex items-center gap-3 mb-2">
-                       <TrendingUp className="w-4 h-4 text-blue-500" />
+                       <TrendingUp className="w-4 h-4 text-primary" />
                        <h5 className="text-[10px] font-black uppercase tracking-widest text-[#0070f3]">Impacto no Custo</h5>
                      </div>
                      <div className="flex items-center justify-between">
                        <p className="text-xs text-muted-foreground uppercase font-bold">Custo Total dos Ingredientes:</p>
-                       <p className="text-xl font-black text-white">
+                       <p className="text-xl font-mono tabular-nums font-black text-white">
                          R$ {ingredients.reduce((sum, ing) => {
                            const p = products.find(prod => prod.id === ing.productId);
                            return sum + ((p?.cost || 0) * ing.quantity);
@@ -682,7 +713,7 @@ export function ProductFormModal({
                             <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Garrafas Fechadas (Estoque Real)</label>
                             <Input 
                               type="number"
-                              className="h-12 bg-black/40 border-white/10 rounded-xl font-bold"
+                              className="h-14 bg-black/40 border-white/10 rounded-xl font-mono tabular-nums font-bold"
                               value={productStock}
                               onChange={(e) => setProductStock(e.target.value)}
                               placeholder="Ex: 3"
@@ -693,7 +724,7 @@ export function ProductFormModal({
                             <div className="relative">
                               <Input 
                                 type="number"
-                                className="h-12 bg-black/40 border-white/10 focus:border-primary rounded-xl font-bold pl-4"
+                                className="h-14 bg-black/40 border-white/10 focus:border-primary rounded-xl font-mono tabular-nums font-bold pl-4"
                                 value={volumePerUnit}
                                 onChange={(e) => setVolumePerUnit(e.target.value)}
                                 placeholder="Ex: 910"
@@ -712,7 +743,7 @@ export function ProductFormModal({
                             <Droplets className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary" />
                             <Input 
                               type="number"
-                              className="h-14 bg-black/40 border-white/10 focus:border-primary text-xl font-black pl-12 rounded-xl text-primary"
+                              className="h-14 bg-black/40 border-white/10 focus:border-primary text-xl font-mono tabular-nums font-black pl-12 rounded-xl text-primary"
                               value={currentBottleVolume}
                               onChange={(e) => setCurrentBottleVolume(e.target.value)}
                               placeholder="Ex: 450"
@@ -776,7 +807,7 @@ export function ProductFormModal({
                                   {products.find(p => p.id === linkedProductId)?.name || "Selecione uma Capa do Estoque"}
                                 </SelectValue>
                               </SelectTrigger>
-                              <SelectContent className="bg-[#0b1224] border-white/10 max-h-[300px]">
+                              <SelectContent className="bg-[#05070a] border-white/10 max-h-[300px]">
                                 {products
                                   .filter(p => !p.linkedProductId && (p.unit === 'Garrafa / Inteiro' || (p.volumePerUnit && p.volumePerUnit > 0)))
                                   .map(p => (
@@ -798,7 +829,7 @@ export function ProductFormModal({
                               <Input 
                                 type="number"
                                 min="0"
-                                className="h-14 bg-black/40 border-primary/20 focus:border-primary text-xl font-black pl-12 rounded-xl text-primary"
+                                className="h-14 bg-black/40 border-primary/20 focus:border-primary text-xl font-mono tabular-nums font-black pl-12 rounded-xl text-primary"
                                 value={doseSize}
                                 onChange={(e) => setDoseSize(e.target.value)}
                                 placeholder="Ex: 50"
@@ -835,29 +866,29 @@ export function ProductFormModal({
           </div>
         </div>
 
-        <DialogFooter className="p-4 md:p-6 border-t border-white/5 bg-[#0b1224]/80 backdrop-blur-md flex items-center gap-3 mt-auto">
+        <DialogFooter className="p-4 md:p-6 border-t border-white/5 bg-[#05070a]/80 backdrop-blur-md flex items-center gap-3 mt-auto">
           <Button 
             variant="outline" 
             onClick={() => onOpenChange(false)} 
             disabled={isSavingProduct}
-            className="flex-1 h-12 font-bold uppercase tracking-widest text-[9px] text-muted-foreground hover:text-white hover:bg-white/5 border-white/10"
+            className="flex-1 h-14 font-bold uppercase tracking-widest text-[9px] text-muted-foreground hover:text-white hover:bg-white/5 border-white/10 rounded-xl"
           >
             Sair sem salvar
           </Button>
           <Button 
             onClick={handleSaveProduct} 
             disabled={isSavingProduct}
-            className="flex-[2] h-12 font-black uppercase tracking-[0.15em] text-[10px] bg-[#0070f3] hover:bg-[#0070f3]/90 shadow-[0_0_20px_rgba(0,112,243,0.3)] rounded-xl border border-white/10 relative overflow-hidden group"
+            className="flex-[2] h-14 font-black uppercase tracking-[0.15em] text-[10px] bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20 rounded-xl border border-white/10 relative overflow-hidden group"
           >
             <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
             {isSavingProduct ? (
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 <span>Processando...</span>
               </div>
             ) : (
               <div className="flex items-center gap-2">
-                <Check className="w-3.5 h-3.5" />
+                <Check className="w-4 h-4" />
                 <span>{editingProduct ? 'Salvar Alterações' : 'Concluir Cadastro'}</span>
               </div>
             )}

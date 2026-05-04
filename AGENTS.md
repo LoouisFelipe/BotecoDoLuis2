@@ -1,5 +1,7 @@
 # 🤖 Ecossistema de Agentes - Boteco do Luis 360
 
+**Nota de Arquitetura:** As instruções operacionais e as skills nativas (Firebase) de cada agente detalhado abaixo estão configuradas individualmente na pasta oculta `.agents/agents/`. Este documento serve como a visão consolidada de negócio e regras (Business Rules & Design System).
+
 Este projeto opera sob um regime de **Orquestração Inteligente** utilizando o Antigravity Kit. Nenhuma decisão técnica ocorre sem passar pelos especialistas.
 
 ## 📋 1. Regras de Negócio (Business Rules)
