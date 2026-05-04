@@ -41,7 +41,7 @@ export function Games({ user }: { user: UserProfile }) {
 
   const openPostResult = (game: GameModality) => {
     result.setSelectedModality(game);
-    result.setAmount(game.isOpenValue ? '' : game.price.toString());
+    result.setAmount(game.isOpenValue ? '' : (game.price || 0).toString());
     setIsResultModalOpen(true);
   };
 

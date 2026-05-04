@@ -200,9 +200,9 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
 
   const handleEditRecurringClick = (exp: RecurringExpense) => {
     setEditingRecurring(exp);
-    setEditRecAmount(exp.amount.toString());
-    setEditRecDescription(exp.description);
-    setEditRecDueDate(exp.dueDate.toString());
+    setEditRecAmount((exp.amount || 0).toString());
+    setEditRecDescription(exp.description || '');
+    setEditRecDueDate((exp.dueDate || 1).toString());
     setIsEditingRecurringModalOpen(true);
   };
 

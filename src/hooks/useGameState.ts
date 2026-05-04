@@ -48,7 +48,7 @@ export function useGameState(user: UserProfile) {
   const startEditing = useCallback((game: GameModality) => {
     setEditingGame(game);
     setName(game.name);
-    setPrice(game.price.toString());
+    setPrice((game.price || 0).toString());
     setIsOpenValue(game.isOpenValue || false);
     setIsActive(game.active);
   }, []);

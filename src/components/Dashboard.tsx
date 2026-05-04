@@ -2257,8 +2257,8 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                     const found = products.find(p => p.name.toLowerCase() === e.target.value.toLowerCase());
                     if (found) {
                       setSelectedAvulsoProduct(found);
-                      setAvulsoPrice(found.price.toString());
-                      setAvulsoCost(found.cost.toString());
+                      setAvulsoPrice((found.price || 0).toString());
+                      setAvulsoCost((found.cost || 0).toString());
                     } else {
                       setSelectedAvulsoProduct(null);
                     }
@@ -2273,8 +2273,8 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                         onClick={() => {
                           setSelectedAvulsoProduct(p);
                           setAvulsoSearch(p.name);
-                          setAvulsoPrice(p.price.toString());
-                          setAvulsoCost(p.cost.toString());
+                          setAvulsoPrice((p.price || 0).toString());
+                          setAvulsoCost((p.cost || 0).toString());
                         }}
                         className="w-full p-4 text-left hover:bg-white/5 text-xs font-bold uppercase tracking-widest border-b border-white/5 last:border-0 transition-colors"
                       >
