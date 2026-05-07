@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import { getFirestore, doc, getDocFromServer, enableIndexedDbPersistence } from 'firebase/firestore';
 import { getAnalytics } from 'firebase/analytics';
 
 // Tenta carregar a config das envs (Padrão para Produção)
@@ -23,6 +23,18 @@ console.log("🔥 Firebase Config Initializing with Project:", firebaseConfig.pr
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+
+// Habilitar persistência offline (IndexedDB) para o Firestore
+enableIndexedDbPersistence(db).catch((err) => {
+  if (err.code === 'failed-precondition') {
+    // Múltiplas abas abertas, persistência só funciona em uma.
+    console.warn("Múltiplas abas abertas. A persistência offline do Firestore funcionará apenas na aba principal.");
+  } else if (err.code === 'unimplemented') {
+    // Navegador não suporta a persistência.
+    console.warn("Este navegador não suporta persistência offline do Firestore.");
+  }
+});
+
 console.log("Firestore Initialized with Database ID:", firebaseConfig.firestoreDatabaseId);
 export const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
 
@@ -33,7 +45,7 @@ async function testConnection() {
     await getDocFromServer(doc(db, 'test', 'connection'));
   } catch (error: any) {
     if (error.code === 'unavailable' || error.message?.includes('offline')) {
-      console.warn("Firebase Firestore está temporariamente offline ou ainda sendo provisionado. O sistema tentará reconectar automaticamente.");
+      console.warn("Firebase Firestore está temporariamente offline ou ainda sendo provisionado. O sistema continuará usando os dados em cache (Modo Offline).");
     } else if (error.code === 'permission-denied') {
       console.info("Conexão com Firebase estabelecida (Permissão negada é normal para este teste).");
     } else {

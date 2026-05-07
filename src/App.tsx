@@ -16,17 +16,39 @@ import { Suppliers } from './components/Suppliers';
 import { Users as UsersComponent } from './components/Users';
 import { Settings as SettingsComponent } from './components/Settings';
 import { BottomNav } from './components/BottomNav';
-import { LayoutDashboard, Package, Receipt, BarChart3, LogOut, Shield, Users, Truck, Settings, Gamepad2, User, Activity, Globe, Database, Menu, X as CloseIcon, Plus } from 'lucide-react';
+import { LayoutDashboard, Package, Receipt, BarChart3, LogOut, Shield, Users, Truck, Settings, Gamepad2, User, Activity, Globe, Database, Menu, X as CloseIcon, Plus, Loader2, WifiOff, CheckCircle2 } from 'lucide-react';
 import { auth } from './firebase';
 import { Button } from './components/ui/button';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { cn } from './lib/utils';
 import { Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
 
 export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<'online' | 'offline' | 'syncing'>(!navigator.onLine ? 'offline' : 'online');
+  const [showOnlineBriefly, setShowOnlineBriefly] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const handleOnline = () => {
+      setSyncStatus('syncing');
+      setTimeout(() => {
+        setSyncStatus('online');
+        setShowOnlineBriefly(true);
+        setTimeout(() => setShowOnlineBriefly(false), 3000);
+      }, 1500); // Simulate sync delay
+    };
+    const handleOffline = () => setSyncStatus('offline');
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // Map routes to tab IDs for backward compatibility inside components if needed
   const activeTab = useMemo(() => {
@@ -167,6 +189,33 @@ export default function App() {
 
             {/* Main Content */}
             <div className="flex-1 flex flex-col min-w-0 w-full pb-24 lg:pb-0">
+              {(syncStatus !== 'online' || showOnlineBriefly) && (
+                <div className={cn(
+                  "border-b px-4 py-2 flex items-center justify-center gap-2 sticky top-0 z-40 backdrop-blur-sm transition-all duration-500",
+                  syncStatus === 'offline' ? "bg-red-500/10 border-red-500/20 text-red-500" : 
+                  syncStatus === 'syncing' ? "bg-blue-500/10 border-blue-500/20 text-blue-500" :
+                  "bg-green-500/10 border-green-500/20 text-green-500"
+                )}>
+                  {syncStatus === 'offline' && (
+                    <>
+                      <WifiOff className="w-3 h-3 animate-pulse" />
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em]">Modo Offline — Operando em Cache</p>
+                    </>
+                  )}
+                  {syncStatus === 'syncing' && (
+                    <>
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em]">Sincronizando Dados...</p>
+                    </>
+                  )}
+                  {syncStatus === 'online' && showOnlineBriefly && (
+                    <>
+                      <CheckCircle2 className="w-3 h-3" />
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em]">Conectado — Sistema Sincronizado</p>
+                    </>
+                  )}
+                </div>
+              )}
               <header className="h-20 border-b border-border flex items-center justify-between px-4 md:px-8 bg-background/50 backdrop-blur-sm sticky top-0 z-30">
                 <div className="flex items-center gap-3 md:gap-4">
                   <Button 

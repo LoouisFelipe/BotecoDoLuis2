@@ -210,11 +210,9 @@ export function Inventory({ user, setActiveTab }: { user: UserProfile, setActive
         
         <div className="flex flex-row gap-4 w-full md:w-auto">
           <Dialog open={isCategoryModalOpen} onOpenChange={setIsCategoryModalOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline" className="flex-1 md:flex-none h-14 px-6 rounded-2xl gap-3 font-black tracking-[0.2em] uppercase border-white/5 bg-[#05070a]/60 hover:bg-white/5 text-muted-foreground hover:text-white transition-all text-[10px]">
-                <Tag className="w-5 h-5" />
-                Categorias
-              </Button>
+            <DialogTrigger render={<Button variant="outline" className="flex-1 md:flex-none h-14 px-6 rounded-2xl gap-3 font-black tracking-[0.2em] uppercase border-white/5 bg-[#05070a]/60 hover:bg-white/5 text-muted-foreground hover:text-white transition-all text-[10px]" />}>
+              <Tag className="w-5 h-5" />
+              Categorias
             </DialogTrigger>
             <DialogContent className="bg-[#05070a] border-white/10 p-0 overflow-hidden flex flex-col max-h-[90vh] rounded-[40px] shadow-2xl">
               <DialogHeader className="p-10 border-b border-white/5 flex-shrink-0 bg-gradient-to-b from-white/[0.02] to-transparent">

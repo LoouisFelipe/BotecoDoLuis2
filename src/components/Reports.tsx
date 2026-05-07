@@ -65,7 +65,7 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
         - Lucro Projetado (Competência): R$ ${stats.profit.toFixed(2)}
         - Margem Bruta Geral: ${stats.grossMarginPct.toFixed(1)}%
         - Top Produto Vendido: ${extraData.popularProducts[0] ? `${extraData.popularProducts[0].name} (${extraData.popularProducts[0].qty} un)` : 'Sem dados de volume (use comandas)'}
-        - Top Produto (Margem): ${topProducts[0]?.name || 'N/A'} (${topProducts[0]?.margin.toFixed(1)}%)
+        - Top Produto (Margem): ${topProducts[0]?.name || 'N/A'} (${topProducts[0]?.margin?.toFixed(1) || '0.0'}%)
         - Melhores Horários: ${extraData.hourlyStats.length > 0 ? extraData.hourlyStats.slice(0, 3).map(h => h.hour).join(', ') : 'Sem dados'}
         - Clientes VIPs da Semana: ${extraData.topCustomers.length > 0 ? extraData.topCustomers.map(c => `${c.name} (R$ ${c.total.toFixed(2)})`).join(', ') : 'Sem dados'}
         
@@ -150,17 +150,40 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
     } catch (err) { console.error('Error fetching rates', err); }
 
     const daysCount = differenceInDays(range.to, range.from) + 1;
+    
+    if (daysCount > 31) {
+      toast.error('Período muito longo', {
+        description: 'Selecione no máximo 31 dias para evitar travamentos e perda de performance.'
+      });
+      setLoading(false);
+      return;
+    }
+
     const daysArray = Array.from({ length: daysCount }, (_, i) => addDays(range.from, i));
 
-    const fetchDays = daysArray.map(targetDate => {
-      const { start, end } = getShiftInterval(targetDate);
-      const qTrans = query(collection(db, 'transactions'), where('date', '>=', Timestamp.fromDate(start)), where('date', '<=', Timestamp.fromDate(end)));
-      const qExp = query(collection(db, 'expenses'), where('date', '>=', Timestamp.fromDate(start)), where('date', '<=', Timestamp.fromDate(end)));
+    const overallStart = getShiftInterval(range.from).start;
+    const overallEnd = getShiftInterval(range.to).end;
 
-      return Promise.all([getDocs(qTrans), getDocs(qExp)]).then(([transSnapshot, expSnapshot]) => {
-        const dayTransactions = transSnapshot.docs.map(doc => doc.data() as Transaction);
-        const dayExpenses = expSnapshot.docs.map(doc => ({ ...doc.data() as Transaction, id: doc.id }));
+    const qTrans = query(collection(db, 'transactions'), where('date', '>=', Timestamp.fromDate(overallStart)), where('date', '<=', Timestamp.fromDate(overallEnd)));
+    const qExp = query(collection(db, 'expenses'), where('date', '>=', Timestamp.fromDate(overallStart)), where('date', '<=', Timestamp.fromDate(overallEnd)));
+
+    const fetchAllData = async () => {
+      const [transSnapshot, expSnapshot] = await Promise.all([getDocs(qTrans), getDocs(qExp)]);
+      const allTransactions = transSnapshot.docs.map(doc => doc.data() as Transaction);
+      const allExpenses = expSnapshot.docs.map(doc => ({ ...doc.data() as Transaction, id: doc.id }));
+
+      return daysArray.map(targetDate => {
+        const { start, end } = getShiftInterval(targetDate);
         
+        const dayTransactions = allTransactions.filter(t => {
+          const tDate = t.date?.toDate ? t.date.toDate() : new Date(t.date as any);
+          return tDate >= start && tDate <= end;
+        });
+        const dayExpenses = allExpenses.filter(t => {
+          const tDate = t.date?.toDate ? t.date.toDate() : new Date(t.date as any);
+          return tDate >= start && tDate <= end;
+        });
+
         let rawIncome = 0;
         let paymentFees = 0;
         dayTransactions.filter(t => t.type === 'income' && !t.isFiado && !t.isSaldo).forEach(t => {
@@ -187,10 +210,11 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
           expense: totalDayExpense,
           cost,
           grossProfit: totalSalesValue - cost,
-          profit: totalSalesValue - cost - totalDayExpense
+          profit: totalSalesValue - cost - totalDayExpense,
+          grossMarginPct: totalSalesValue > 0 ? ((totalSalesValue - cost) / totalSalesValue) * 100 : 0
         };
       });
-    });
+    };
 
     const fetchDeepAnalysisData = async () => {
       try {
@@ -263,7 +287,7 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
       } catch (error) { console.error("Error fetching top products:", error); }
     };
 
-    Promise.all([Promise.all(fetchDays), fetchDeepAnalysisData(), fetchTopProducts()]).then(([days]) => {
+    Promise.all([fetchAllData(), fetchDeepAnalysisData(), fetchTopProducts()]).then(([days]) => {
       setDailyData(days);
       const totalIncome = days.reduce((s, d) => s + d.income, 0);
       const totalExp = days.reduce((s, d) => s + d.expense, 0);
@@ -488,7 +512,7 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
                       <p className="text-[10px] text-muted-foreground font-mono">ESTOQUE: {p.stock}</p>
                     </TableCell>
                     <TableCell className="text-right font-mono text-xs">
-                      R$ {p.price.toFixed(2)}
+                      R$ {(p.price || 0).toFixed(2)}
                     </TableCell>
                     <TableCell className="text-right pr-6">
                       <span className="inline-flex items-center px-2 py-1 rounded bg-green-500/10 text-green-500 font-black text-xs">
@@ -593,10 +617,10 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
                       <p className="text-[9px] text-muted-foreground uppercase">{item.stock} {item.unit || 'UN'} em estoque</p>
                     </TableCell>
                     <TableCell className="text-right font-mono text-xs font-bold">
-                      R$ {item.value.toFixed(2)}
+                      R$ {(item.value || 0).toFixed(2)}
                     </TableCell>
                     <TableCell className="text-right font-mono text-[10px] text-muted-foreground">
-                      {item.accumulatedPct.toFixed(1)}%
+                      {(item.accumulatedPct || 0).toFixed(1)}%
                     </TableCell>
                     <TableCell className="text-center pr-6">
                       <Badge className={cn(
