@@ -1,78 +1,62 @@
-import { GoogleGenAI, ThinkingLevel, Type } from "@google/genai";
-
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
 export const geminiService = {
+  /**
+   * Internal helper to proxy requests to the secure backend
+   */
+  async _callBackend(type: string, prompt: string, systemInstruction?: string) {
+    try {
+      const response = await fetch('/api/gemini', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ type, prompt, systemInstruction }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to call AI: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data.text;
+    } catch (error) {
+      console.error("Gemini Service Error:", error);
+      throw error;
+    }
+  },
+
   /**
    * Fast task using gemini-3.1-flash-lite-preview
    */
   async fastTask(prompt: string, systemInstruction?: string) {
-    const response = await ai.models.generateContent({
-      model: "gemini-3.1-flash-lite-preview",
-      contents: prompt,
-      config: {
-        systemInstruction: systemInstruction || "Você é um assistente rápido para tarefas simples.",
-      },
-    });
-    return response.text;
+    return this._callBackend("fast", prompt, systemInstruction);
   },
 
   /**
    * General task using gemini-3-flash-preview
    */
   async generalTask(prompt: string, systemInstruction?: string) {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: prompt,
-      config: {
-        systemInstruction: systemInstruction || "Você é um assistente inteligente para tarefas gerais.",
-      },
-    });
-    return response.text;
+    return this._callBackend("general", prompt, systemInstruction);
   },
 
   /**
    * Task with Google Search grounding using gemini-3-flash-preview
    */
   async searchGroundedTask(prompt: string, systemInstruction?: string) {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: prompt,
-      config: {
-        tools: [{ googleSearch: {} }],
-        systemInstruction: systemInstruction || "Você é um assistente que utiliza dados da pesquisa Google para fornecer informações atualizadas.",
-      },
-    });
-    return response.text;
+    return this._callBackend("searchGrounded", prompt, systemInstruction);
   },
 
   /**
    * Complex task using gemini-3.1-pro-preview
    */
   async complexTask(prompt: string, systemInstruction?: string) {
-    const response = await ai.models.generateContent({
-      model: "gemini-3.1-pro-preview",
-      contents: prompt,
-      config: {
-        systemInstruction: systemInstruction || "Você é um assistente avançado para tarefas complexas.",
-      },
-    });
-    return response.text;
+    return this._callBackend("complex", prompt, systemInstruction);
   },
 
   /**
    * High Thinking task using gemini-3.1-pro-preview
    */
   async highThinkingTask(prompt: string, systemInstruction?: string) {
-    const response = await ai.models.generateContent({
-      model: "gemini-3.1-pro-preview",
-      contents: prompt,
-      config: {
-        thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH },
-        systemInstruction: systemInstruction || "Você é um assistente de alta performance capaz de lidar com as consultas mais complexas dos usuários através de um raciocínio profundo.",
-      },
-    });
-    return response.text;
+    return this._callBackend("highThinking", prompt, systemInstruction);
   },
 
   /**
