@@ -22,6 +22,14 @@ import { DateRangePicker } from './DateRangePicker';
 import { useFetchCollection } from '../hooks/useFetchCollection';
 import { usePaymentFees } from '../hooks/usePaymentFees';
 
+const PAYMENT_METHODS = [
+  { id: 'pix', label: 'Pix', icon: QrCode, color: 'text-cyan-400' },
+  { id: 'dinheiro', label: 'Dinheiro', icon: Banknote, color: 'text-emerald-400' },
+  { id: 'cartao_credito', label: 'Crédito', icon: CreditCard, color: 'text-blue-400' },
+  { id: 'cartao_debito', label: 'Débito', icon: CreditCard, color: 'text-indigo-400' },
+  { id: 'fiado', label: 'Fiado', icon: Users, color: 'text-orange-400' },
+];
+
 export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveTab: (tab: string) => void }) {
   const { calculateNet } = usePaymentFees();
   const transConstraints = React.useMemo(() => [orderBy('date', 'desc'), limit(500)], []);
@@ -311,12 +319,64 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
   const totalNeeded = totalFixedCosts + totalExpense + totalFees;
   const breakEvenProgress = totalGrossIncome > 0 ? Math.min(100, (totalGrossIncome / totalNeeded) * 100) : 0;
 
+  // Trend Calculation
+  const trendStats = React.useMemo(() => {
+    let prevStart: Date;
+    let prevEnd: Date;
+    const now = new Date();
+
+    if (dateFilter === 'today') {
+      prevStart = startOfDay(new Date(now.getTime() - 24 * 60 * 60 * 1000));
+      prevEnd = endOfDay(new Date(now.getTime() - 24 * 60 * 60 * 1000));
+    } else if (dateFilter === 'week') {
+      prevStart = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+      prevEnd = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    } else if (dateFilter === 'month') {
+      prevStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      prevEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+    } else {
+      return { grossTrend: 0, profitTrend: 0 };
+    }
+
+    const prevTrans = transactions.filter(t => t.date >= prevStart && t.date <= prevEnd);
+    const prevIncome = prevTrans.filter(t => t.type === 'income' && !t.isFiado);
+    const prevGross = prevIncome.reduce((sum, t) => sum + (t.amount || 0), 0);
+    
+    const prevNetInc = prevIncome.reduce((sum, t) => {
+      const fee = t.feeAmount !== undefined && t.feeAmount > 0 ? t.feeAmount : calculateNet(t.amount, t.paymentMethod).feeAmount;
+      return sum + (t.amount - fee);
+    }, 0);
+    const prevExp = prevTrans.filter(t => t.type === 'expense').reduce((sum, t) => sum + (t.amount || 0), 0);
+    const prevCOGS = prevIncome.reduce((sum, t) => sum + (t.cost || 0), 0);
+    const prevProfit = prevNetInc - prevCOGS - prevExp;
+
+    const calcTrend = (curr: number, prev: number) => {
+      if (prev === 0) return curr > 0 ? 100 : 0;
+      return ((curr - prev) / prev) * 100;
+    };
+
+    return {
+      grossTrend: calcTrend(totalGrossIncome, prevGross),
+      profitTrend: calcTrend(realNetProfit, prevProfit)
+    };
+  }, [transactions, dateFilter, totalGrossIncome, realNetProfit, calculateNet]);
+
+  const getPaymentMethodIcon = (method: string) => {
+    const m = method?.toLowerCase();
+    if (m?.includes('pix')) return <QrCode className="w-4 h-4" />;
+    if (m?.includes('dinheiro')) return <Banknote className="w-4 h-4" />;
+    if (m?.includes('crédito') || m?.includes('credito')) return <CreditCard className="w-4 h-4" />;
+    if (m?.includes('débito') || m?.includes('debito')) return <CreditCard className="w-4 h-4" />;
+    if (m?.includes('fiado')) return <Users className="w-4 h-4" />;
+    return <Wallet className="w-4 h-4" />;
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
         <Card 
           className={cn(
-            "bg-[#0b1224] border-white/10 overflow-hidden relative group cursor-pointer transition-all rounded-[40px] h-[180px] hover:border-green-500/30",
+            "bg-[#0b1224] border-white/10 overflow-hidden relative group cursor-pointer transition-all rounded-[40px] h-[200px] hover:border-green-500/30 shadow-2xl",
             typeFilter === 'income' && "ring-2 ring-green-500/50 bg-green-500/10"
           )}
           onClick={() => setTypeFilter(typeFilter === 'income' ? 'all' : 'income')}
@@ -324,14 +384,18 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
           <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
           <CardContent className="p-8 h-full flex flex-col justify-between relative z-10">
             <div className="flex items-start justify-between">
-              <div className="w-14 h-14 rounded-2xl bg-green-500/10 flex items-center justify-center border border-green-500/20 shadow-[0_0_20px_rgba(34,197,94,0.15)] group-hover:scale-110 transition-transform">
+              <div className="w-14 h-14 rounded-2xl bg-green-500/10 flex items-center justify-center border border-green-500/20 shadow-[0_0_30px_rgba(34,197,94,0.2)] group-hover:scale-110 transition-transform">
                 <TrendingUp className="w-7 h-7 text-green-500" />
               </div>
               <div className="text-right">
-                <p className="text-[10px] font-bold text-green-500/50 uppercase tracking-widest">Margem Bruta</p>
-                <p className="text-sm font-black text-green-500 font-mono">
-                  {totalGrossIncome > 0 ? ((totalNetIncome / totalGrossIncome) * 100).toFixed(1) : 0}%
-                </p>
+                <p className="text-[10px] font-bold text-green-500/50 uppercase tracking-widest">Tendência</p>
+                <div className={cn(
+                  "flex items-center gap-1 text-sm font-black font-mono",
+                  trendStats.grossTrend >= 0 ? "text-green-500" : "text-red-500"
+                )}>
+                  {trendStats.grossTrend >= 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                  {Math.abs(trendStats.grossTrend).toFixed(1)}%
+                </div>
               </div>
             </div>
             <div>
@@ -345,7 +409,7 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
 
         <Card 
           className={cn(
-            "bg-[#0b1224] border-white/10 overflow-hidden relative group cursor-pointer transition-all rounded-[40px] h-[180px] hover:border-red-500/30",
+            "bg-[#0b1224] border-white/10 overflow-hidden relative group cursor-pointer transition-all rounded-[40px] h-[200px] hover:border-red-500/30 shadow-2xl",
             typeFilter === 'expense' && "ring-2 ring-red-500/50 bg-red-500/10"
           )}
           onClick={() => setTypeFilter(typeFilter === 'expense' ? 'all' : 'expense')}
@@ -353,13 +417,13 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
           <div className="absolute inset-0 bg-gradient-to-br from-red-500/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
           <CardContent className="p-8 h-full flex flex-col justify-between relative z-10">
             <div className="flex items-start justify-between">
-              <div className="w-14 h-14 rounded-2xl bg-red-500/10 flex items-center justify-center border border-red-500/20 shadow-[0_0_20px_rgba(239,68,68,0.15)] group-hover:scale-110 transition-transform">
+              <div className="w-14 h-14 rounded-2xl bg-red-500/10 flex items-center justify-center border border-red-500/20 shadow-[0_0_30px_rgba(239,68,68,0.2)] group-hover:scale-110 transition-transform">
                 <TrendingDown className="w-7 h-7 text-red-500" />
               </div>
               <div className="text-right">
-                <p className="text-[10px] font-bold text-red-500/50 uppercase tracking-widest">CMV + Taxas</p>
+                <p className="text-[10px] font-bold text-red-500/50 uppercase tracking-widest">Margem Bruta</p>
                 <p className="text-sm font-black text-red-500 font-mono">
-                  R$ {(totalCostOfGoods + totalFees).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  {totalGrossIncome > 0 ? ((totalNetIncome / totalGrossIncome) * 100).toFixed(1) : 0}%
                 </p>
               </div>
             </div>
@@ -372,17 +436,21 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
           </CardContent>
         </Card>
 
-        <Card className="bg-primary/90 border-primary overflow-hidden relative group rounded-[40px] h-[180px] shadow-2xl shadow-primary/20">
+        <Card className="bg-primary/90 border-primary overflow-hidden relative group rounded-[40px] h-[200px] shadow-2xl shadow-primary/30">
+          <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-50" />
           <CardContent className="p-8 h-full flex flex-col justify-between relative z-10">
             <div className="flex items-start justify-between">
-              <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center border border-white/20 shadow-[0_0_20px_rgba(255,255,255,0.1)]">
+              <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center border border-white/20 shadow-[0_0_30px_rgba(255,255,255,0.1)]">
                 <Zap className="w-7 h-7 text-white" />
               </div>
               <div className="text-right">
-                <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest">Margem Líquida</p>
-                <p className="text-sm font-black text-white font-mono">
-                  {totalGrossIncome > 0 ? ((realNetProfit / totalGrossIncome) * 100).toFixed(1) : 0}%
-                </p>
+                <p className="text-[10px] font-bold text-white/70 uppercase tracking-widest">Tendência de Lucro</p>
+                <div className={cn(
+                  "flex items-center gap-1 text-sm font-black font-mono text-white",
+                )}>
+                  {trendStats.profitTrend >= 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                  {Math.abs(trendStats.profitTrend).toFixed(1)}%
+                </div>
               </div>
             </div>
             <div>
@@ -395,13 +463,13 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
         </Card>
 
         <Card 
-          className="bg-card/30 border-border/50 overflow-hidden relative group cursor-pointer transition-all rounded-[40px] h-[180px] hover:border-orange-500/30"
+          className="bg-card/30 border-border/50 overflow-hidden relative group cursor-pointer transition-all rounded-[40px] h-[200px] hover:border-orange-500/30 shadow-2xl"
           onClick={() => setIsFiadoModalOpen(true)}
         >
           <div className="absolute inset-0 bg-gradient-to-br from-orange-500/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
           <CardContent className="p-8 h-full flex flex-col justify-between relative z-10">
             <div className="flex items-start justify-between">
-              <div className="w-14 h-14 rounded-2xl bg-orange-500/10 flex items-center justify-center border border-orange-500/20 shadow-[0_0_20px_rgba(249,115,22,0.15)] group-hover:scale-110 transition-transform">
+              <div className="w-14 h-14 rounded-2xl bg-orange-500/10 flex items-center justify-center border border-orange-500/20 shadow-[0_0_30px_rgba(249,115,22,0.2)] group-hover:scale-110 transition-transform">
                 <Users className="w-7 h-7 text-orange-500" />
               </div>
               <div className="text-right">
@@ -503,34 +571,73 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
             </div>
           </div>
           <div className="flex flex-wrap gap-3 w-full lg:flex-1 justify-end items-center">
+            {/* Quick Filters */}
+            <div className="flex bg-white/5 p-1 rounded-2xl border border-white/10 mr-auto">
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setDateFilter('today')}
+                className={cn(
+                  "h-10 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                  dateFilter === 'today' ? "bg-primary text-white shadow-lg" : "text-muted-foreground hover:text-white"
+                )}
+              >
+                Hoje
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setDateFilter('week')}
+                className={cn(
+                  "h-10 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                  dateFilter === 'week' ? "bg-primary text-white shadow-lg" : "text-muted-foreground hover:text-white"
+                )}
+              >
+                Semana
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setDateFilter('month')}
+                className={cn(
+                  "h-10 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                  dateFilter === 'month' ? "bg-primary text-white shadow-lg" : "text-muted-foreground hover:text-white"
+                )}
+              >
+                Mês
+              </Button>
+            </div>
+
             <div className="relative w-full md:w-64">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input 
                 placeholder="BUSCAR..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-12 h-12 bg-white/5 border-white/10 rounded-[20px] text-[10px] font-black tracking-widest uppercase"
+                className="pl-12 h-14 bg-white/5 border-white/10 rounded-[24px] text-[10px] font-black tracking-widest uppercase focus:ring-2 focus:ring-primary/50"
               />
             </div>
+            
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-full md:w-[180px] h-12 px-6 rounded-[20px] bg-card/50">
+              <SelectTrigger className="w-full md:w-[180px] h-14 px-6 rounded-[24px] bg-card/50 border-white/10">
                 <SelectValue placeholder="CATEGORIA" />
               </SelectTrigger>
               <SelectContent className="bg-[#0b1224] border-border text-white">
-                <SelectItem value="all">TODAS</SelectItem>
+                <SelectItem value="all">TODAS AS CATEGORIAS</SelectItem>
                 {expenseCategories.map(cat => <SelectItem key={cat.id} value={cat.id}>{cat.name.toUpperCase()}</SelectItem>)}
               </SelectContent>
             </Select>
+
             <Select value={dateFilter} onValueChange={(val: any) => setDateFilter(val)}>
-              <SelectTrigger className="w-full md:w-[160px] h-12 px-6 rounded-[20px] bg-card/50">
+              <SelectTrigger className="w-full md:w-[160px] h-14 px-6 rounded-[24px] bg-card/50 border-white/10">
                 <SelectValue placeholder="PERÍODO" />
               </SelectTrigger>
               <SelectContent className="bg-[#0b1224] border-border text-white">
-                <SelectItem value="all">TUDO</SelectItem>
-                <SelectItem value="today">HOJE</SelectItem>
-                <SelectItem value="week">SEMANA</SelectItem>
-                <SelectItem value="month">MÊS</SelectItem>
-                <SelectItem value="custom">PERÍODO</SelectItem>
+                <SelectItem value="all">TODO O TEMPO</SelectItem>
+                <SelectItem value="today">HOJE (EXPEDIENTE)</SelectItem>
+                <SelectItem value="week">ESTA SEMANA</SelectItem>
+                <SelectItem value="month">ESTE MÊS</SelectItem>
+                <SelectItem value="custom">PERSONALIZADO</SelectItem>
               </SelectContent>
             </Select>
 
@@ -543,19 +650,32 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
                   }
                 }}
                 initialRange={startDate && endDate ? { from: startDate, to: endDate } : undefined}
-                className="w-full md:w-auto"
+                className="w-full md:w-auto h-14"
               />
             )}
+            
             <Dialog open={isExpenseModalOpen} onOpenChange={setIsExpenseModalOpen}>
               <DialogTrigger asChild>
-                <Button className="h-12 px-8 rounded-[20px] bg-red-600 hover:bg-red-700">Lançar Saída</Button>
+                <Button className="h-14 px-8 rounded-[24px] bg-red-600 hover:bg-red-700 shadow-lg shadow-red-600/20 font-black uppercase tracking-widest text-xs">
+                  <Plus className="w-4 h-4 mr-2" /> Lançar Saída
+                </Button>
               </DialogTrigger>
-              <DialogContent className="bg-[#0b1224] text-white border-border">
-                <DialogHeader><DialogTitle>Nova Despesa</DialogTitle></DialogHeader>
-                <div className="space-y-4">
-                  <Input type="number" placeholder="Valor" value={amount} onChange={(e) => setAmount(e.target.value)} className="bg-background" />
-                  <Input placeholder="Descrição" value={description} onChange={(e) => setDescription(e.target.value)} className="bg-background" />
-                  <Button onClick={handleAddExpense} className="w-full bg-red-600">Salvar</Button>
+              <DialogContent className="bg-[#0b1224] text-white border-white/10 rounded-[40px] max-w-md">
+                <DialogHeader>
+                  <DialogTitle className="text-2xl font-black uppercase tracking-tighter">Nova Despesa</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-6 py-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest ml-1">Valor</label>
+                    <Input type="number" placeholder="0,00" value={amount} onChange={(e) => setAmount(e.target.value)} className="h-14 bg-white/5 border-white/10 rounded-2xl font-mono text-lg" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest ml-1">Descrição</label>
+                    <Input placeholder="Ex: Pagamento de Frete" value={description} onChange={(e) => setDescription(e.target.value)} className="h-14 bg-white/5 border-white/10 rounded-2xl" />
+                  </div>
+                  <Button onClick={handleAddExpense} className="w-full h-14 bg-red-600 hover:bg-red-700 rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-red-600/20">
+                    Confirmar Lançamento
+                  </Button>
                 </div>
               </DialogContent>
             </Dialog>
@@ -590,37 +710,50 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
                       onClick={() => setSelectedTransaction(t)}
                     >
                       <TableCell className="px-8 text-xs font-mono font-bold text-muted-foreground">
-                        {format(t.date, 'HH:mm')}
-                      </TableCell>
-                      <TableCell className="px-8">
-                        <Badge variant="outline" className={cn(
-                          "text-[9px] font-black uppercase tracking-widest px-2 py-0.5 border-none",
-                          t.type === 'income' ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"
-                        )}>
-                          {t.type === 'income' ? 'Entrada' : 'Saída'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="px-8">
                         <div className="flex flex-col">
-                          <span className="text-xs font-black uppercase tracking-wider text-white group-hover:text-primary transition-colors">
-                            {t.category || (t.type === 'income' ? 'Venda' : 'Geral')}
-                          </span>
-                          <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest line-clamp-1">
-                            {t.description || 'Sem descrição'}
-                          </span>
+                          <span className="text-white font-black">{format(t.date, 'HH:mm')}</span>
+                          <span className="text-[9px] uppercase tracking-tighter">{format(t.date, 'dd MMM')}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="px-8">
+                        <div className={cn(
+                          "w-10 h-10 rounded-xl flex items-center justify-center border",
+                          t.type === 'income' ? "bg-green-500/10 border-green-500/20 text-green-500 shadow-[0_0_15px_rgba(34,197,94,0.1)]" : "bg-red-500/10 border-red-500/20 text-red-500 shadow-[0_0_15px_rgba(239,68,68,0.1)]"
+                        )}>
+                          {t.type === 'income' ? <ArrowUpRight className="w-5 h-5" /> : <ArrowDownRight className="w-5 h-5" />}
+                        </div>
+                      </TableCell>
+                      <TableCell className="px-8">
+                        <div className="flex items-center gap-4">
+                          <div className={cn(
+                            "w-10 h-10 rounded-lg flex items-center justify-center bg-white/5 border border-white/10 group-hover:border-primary/30 transition-colors",
+                            t.paymentMethod === 'Pix' ? "text-cyan-500" : 
+                            t.paymentMethod === 'Dinheiro' ? "text-green-500" : 
+                            t.paymentMethod === 'Fiado' ? "text-orange-500" : "text-blue-500"
+                          )}>
+                            {getPaymentMethodIcon(t.paymentMethod)}
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-xs font-black uppercase tracking-wider text-white group-hover:text-primary transition-colors">
+                              {t.category || (t.type === 'income' ? 'Venda' : 'Geral')}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest line-clamp-1">
+                              {t.description || 'Sem descrição'}
+                            </span>
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell className={cn("px-8 text-right")}>
                         <div className="flex flex-col items-end">
                           <span className={cn(
-                            "text-sm font-mono font-black tabular-nums",
+                            "text-base font-mono font-black tabular-nums",
                             t.type === 'income' ? 'text-green-500' : 'text-red-500'
                           )}>
                             {t.type === 'income' ? '+' : '-'} R$ {Math.abs(t.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                           </span>
                           {t.type === 'income' && t.paymentMethod && (
-                            <span className="text-[8px] text-muted-foreground font-bold uppercase tracking-widest mt-0.5">
-                              {t.paymentMethod} {t.feeAmount > 0 && `(-R$ ${t.feeAmount.toFixed(2)})`}
+                            <span className="text-[9px] text-muted-foreground font-bold uppercase tracking-widest mt-0.5 flex items-center gap-1">
+                              {t.paymentMethod} {t.feeAmount > 0 && <span className="text-red-400/70">(-R$ {t.feeAmount.toFixed(2)})</span>}
                             </span>
                           )}
                         </div>
@@ -630,7 +763,7 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
                           variant="ghost" 
                           size="icon" 
                           onClick={(e) => handleDeleteTransaction(e, t.id, (t as any).source)} 
-                          className="h-9 w-9 text-red-500/50 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all"
+                          className="h-10 w-10 text-red-500/30 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all"
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -660,48 +793,50 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
                     onClick={() => setSelectedTransaction(t)}
                   >
                     <div className="flex justify-between items-start">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-4">
                         <div className={cn(
-                          "w-10 h-10 rounded-xl flex items-center justify-center border",
-                          t.type === 'income' ? "bg-green-500/10 border-green-500/20 text-green-500" : "bg-red-500/10 border-red-500/20 text-red-500"
+                          "w-12 h-12 rounded-2xl flex items-center justify-center border shadow-lg",
+                          t.type === 'income' ? "bg-green-500/10 border-green-500/20 text-green-500 shadow-green-500/5" : "bg-red-500/10 border-red-500/20 text-red-500 shadow-red-500/5"
                         )}>
-                          {t.type === 'income' ? <ArrowUpRight className="w-5 h-5" /> : <ArrowDownRight className="w-5 h-5" />}
+                          {t.type === 'income' ? <ArrowUpRight className="w-6 h-6" /> : <ArrowDownRight className="w-6 h-6" />}
                         </div>
                         <div>
-                          <p className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em] tabular-nums leading-none mb-1">
-                            {t.date ? format(t.date.toDate ? t.date.toDate() : t.date, 'HH:mm') : '--:--'}
+                          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] tabular-nums leading-none mb-1.5">
+                            {t.date ? format(t.date, 'HH:mm') : '--:--'}
                           </p>
-                          <h4 className="font-black text-sm uppercase tracking-widest leading-none">{t.category}</h4>
+                          <h4 className="font-black text-base uppercase tracking-widest leading-none text-white">{t.category || (t.type === 'income' ? 'VENDA' : 'GERAL')}</h4>
                         </div>
                       </div>
                       <div className={cn(
-                        "w-8 h-8 rounded-lg flex items-center justify-center bg-white/5 border border-white/5",
-                        t.paymentMethod === 'Pix' ? "text-cyan-500" : 
-                        t.paymentMethod === 'Dinheiro' ? "text-green-500" : 
-                        t.paymentMethod === 'Fiado' ? "text-orange-500" : "text-blue-500"
+                        "w-10 h-10 rounded-xl flex items-center justify-center bg-white/5 border border-white/10 shadow-inner",
+                        t.paymentMethod === 'Pix' ? "text-cyan-400" : 
+                        t.paymentMethod === 'Dinheiro' ? "text-emerald-400" : 
+                        t.paymentMethod === 'Fiado' ? "text-orange-400" : "text-blue-400"
                       )}>
-                        {t.paymentMethod === 'Pix' ? <QrCode className="w-4 h-4" /> : 
-                         t.paymentMethod === 'Dinheiro' ? <Banknote className="w-4 h-4" /> : 
-                         t.paymentMethod === 'Fiado' ? <Users className="w-4 h-4" /> : 
-                         <CreditCard className="w-4 h-4" />}
+                        {getPaymentMethodIcon(t.paymentMethod)}
                       </div>
                     </div>
                     
-                    <div className="flex justify-between items-end gap-4">
+                    <div className="flex justify-between items-end gap-4 pl-16">
                       <div className="flex-1">
-                        <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest line-clamp-1">{t.description || 'Sem descrição'}</p>
-                        {t.subCategory && <p className="text-[8px] text-primary/60 uppercase font-black tracking-widest mt-0.5">{t.subCategory}</p>}
+                        <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest line-clamp-2 leading-relaxed">{t.description || 'Sem observações'}</p>
+                        {t.subCategory && (
+                          <div className="flex items-center gap-1.5 mt-2">
+                            <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                            <p className="text-[9px] text-primary font-black tracking-widest uppercase">{t.subCategory}</p>
+                          </div>
+                        )}
                       </div>
                       <div className="text-right flex flex-col items-end">
                         <p className={cn(
-                          "font-mono font-black text-lg leading-none tabular-nums",
-                          ((t.type === 'income' ? t.amount : -t.amount) || 0) >= 0 ? 'text-green-500' : 'text-red-500'
+                          "font-mono font-black text-xl leading-none tabular-nums tracking-tighter",
+                          t.type === 'income' ? 'text-green-500' : 'text-red-500'
                         )}>
-                          {((t.type === 'income' ? t.amount : -t.amount) || 0) >= 0 ? '+' : '-'} R$ {Math.abs(t.amount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          {t.type === 'income' ? '+' : '-'} R$ {Math.abs(t.amount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </p>
                         {t.type === 'income' && (t.feeAmount || 0) > 0 && (
-                          <p className="text-[8px] text-muted-foreground uppercase font-bold tracking-widest mt-1">
-                            Líq: R$ {(t.netAmount || (t.amount - (t.feeAmount || 0))).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          <p className="text-[9px] text-red-400/70 uppercase font-black tracking-widest mt-2 bg-red-500/5 px-2 py-0.5 rounded border border-red-500/10">
+                            TAXA: R$ {t.feeAmount.toFixed(2)}
                           </p>
                         )}
                       </div>

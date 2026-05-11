@@ -9,12 +9,13 @@ import { startOfDay, endOfDay, subDays, format, differenceInDays, addDays } from
 import { DateRangePicker } from './DateRangePicker';
 import { ptBR } from 'date-fns/locale';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-import { Loader2, TrendingUp, TrendingDown, DollarSign, BarChart3, Calendar, Activity, Sparkles, ArrowUpRight, ArrowDownRight, Minus, PackageMinus, MessageSquare, Send } from 'lucide-react';
+import { Loader2, TrendingUp, TrendingDown, DollarSign, BarChart3, Calendar, Activity, Sparkles, ArrowUpRight, ArrowDownRight, Minus, PackageMinus, MessageSquare, Send, Info, Clock, ShoppingBag, Receipt, Zap, Users, QrCode, CreditCard, Banknote } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle, DialogHeader, DialogFooter } from './ui/dialog';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { toast } from 'sonner';
 import { cn, getShiftInterval, getShiftDate } from '../lib/utils';
+import { Calendar as CalendarUI } from './ui/calendar';
 import { geminiService } from '../services/geminiService';
 import Markdown from 'react-markdown';
 
@@ -46,6 +47,7 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
   const [selectedDayTransactions, setSelectedDayTransactions] = useState<any[]>([]);
   const [isDayModalOpen, setIsDayModalOpen] = useState(false);
   const [selectedDayLabel, setSelectedDayLabel] = useState('');
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [loadingTransactions, setLoadingTransactions] = useState(false);
 
   const [dateRange, setDateRange] = useState<{from: Date, to: Date}>({
@@ -177,9 +179,16 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
     const qExp = query(collection(db, 'expenses'), where('date', '>=', Timestamp.fromDate(overallStart)), where('date', '<=', Timestamp.fromDate(overallEnd)));
 
     const fetchAllData = async () => {
-      const [transSnapshot, expSnapshot] = await Promise.all([getDocs(qTrans), getDocs(qExp)]);
+      const qPurchases = query(collection(db, 'purchases'), where('date', '>=', Timestamp.fromDate(overallStart)), where('date', '<=', Timestamp.fromDate(overallEnd)));
+      const [transSnapshot, expSnapshot, purchaseSnapshot] = await Promise.all([
+        getDocs(qTrans), 
+        getDocs(qExp),
+        getDocs(qPurchases)
+      ]);
+      
       const allTransactions = transSnapshot.docs.map(doc => doc.data() as Transaction);
       const allExpenses = expSnapshot.docs.map(doc => ({ ...doc.data() as Transaction, id: doc.id }));
+      const allPurchases = purchaseSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
 
       return daysArray.map(targetDate => {
         const midDay = new Date(targetDate);
@@ -193,6 +202,10 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
         const dayExpenses = allExpenses.filter(t => {
           const tDate = t.date?.toDate ? t.date.toDate() : new Date(t.date as any);
           return tDate >= start && tDate <= end;
+        });
+        const dayPurchases = allPurchases.filter((p: any) => {
+          const pDate = p.date?.toDate ? p.date.toDate() : new Date(p.date as any);
+          return pDate >= start && pDate <= end;
         });
 
         let rawIncome = 0;
@@ -210,7 +223,11 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
         const totalSalesValue = dayTransactions.filter(t => t.type === 'income').reduce((s, t) => s + (t.amount || 0), 0);
         const cost = dayTransactions.filter(t => t.type === 'income').reduce((s, t) => s + (t.cost || 0), 0);
         const expenseFromTrans = dayTransactions.filter(t => t.type === 'expense').reduce((s, t) => s + (t.amount || 0), 0);
-        const totalDayExpense = expenseFromTrans + dayExpenses.reduce((s, t) => s + (t.amount || 0), 0) + paymentFees;
+        const manualExpenses = dayExpenses.reduce((s, t) => s + (t.amount || 0), 0);
+        const purchasesTotal = dayPurchases.reduce((s, p: any) => s + (p.totalAmount || 0), 0);
+        
+        // Saída unificada: CMV + Despesas Manuais + Compras + Taxas + Despesas em Transações
+        const totalDayOutflow = cost + manualExpenses + purchasesTotal + paymentFees + expenseFromTrans;
 
         return {
           date: targetDate,
@@ -218,10 +235,10 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
           fullDate: format(targetDate, 'dd/MM'),
           income: rawIncome,
           totalSalesValue,
-          expense: totalDayExpense,
+          expense: totalDayOutflow,
           cost,
           grossProfit: totalSalesValue - cost,
-          profit: totalSalesValue - cost - totalDayExpense,
+          profit: totalSalesValue - totalDayOutflow,
           grossMarginPct: totalSalesValue > 0 ? ((totalSalesValue - cost) / totalSalesValue) * 100 : 0
         };
       });
@@ -263,7 +280,7 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
         
         setExtraData({
           popularProducts: Object.values(productMap).sort((a, b) => b.qty - a.qty).slice(0, 10),
-          topCustomers: Object.values(customerMap).sort((a, b) => b.total - a.total).slice(0, 5),
+          topCustomers: Object.values(customerMap).sort((a, b) => b.total - a.total).slice(0, 10),
           hourlyStats: Object.entries(hourMap).map(([h, count]) => ({ hour: `${h}h`, count })).sort((a, b) => b.count - a.count)
         });
       } catch (error) { console.error("Error in deep analysis:", error); }
@@ -332,15 +349,10 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
     });
   };
 
-  const handleChartClick = async (data: any) => {
-    if (!data || !data.activePayload) return;
-    const dayInfo = data.activePayload[0].payload;
-    setSelectedDayLabel(dayInfo.fullDate);
-    setIsDayModalOpen(true);
+  const fetchDayDetails = async (date: Date) => {
     setLoadingTransactions(true);
-
     try {
-      const midDay = new Date(dayInfo.date);
+      const midDay = new Date(date);
       midDay.setHours(12, 0, 0, 0);
       const { start, end } = getShiftInterval(midDay);
 
@@ -354,12 +366,30 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
         where('date', '>=', Timestamp.fromDate(start)),
         where('date', '<=', Timestamp.fromDate(end))
       );
+      const qPurchases = query(
+        collection(db, 'purchases'),
+        where('date', '>=', Timestamp.fromDate(start)),
+        where('date', '<=', Timestamp.fromDate(end))
+      );
 
-      const [snap, snapExp] = await Promise.all([getDocs(q), getDocs(qExp)]);
+      const [snap, snapExp, snapPur] = await Promise.all([
+        getDocs(q), 
+        getDocs(qExp),
+        getDocs(qPurchases)
+      ]);
+
       const trans = snap.docs.map(doc => ({ ...doc.data(), id: doc.id }));
       const exps = snapExp.docs.map(doc => ({ ...doc.data(), id: doc.id, type: 'expense' }));
+      const purs = snapPur.docs.map(doc => ({ 
+        ...doc.data(), 
+        id: doc.id, 
+        type: 'expense', 
+        category: 'Compra de Estoque',
+        description: `Compra: ${(doc.data() as any).supplierName || 'Fornecedor'}`,
+        amount: (doc.data() as any).totalAmount 
+      }));
       
-      setSelectedDayTransactions([...trans, ...exps].sort((a: any, b: any) => {
+      setSelectedDayTransactions([...trans, ...exps, ...purs].sort((a: any, b: any) => {
         const dateA = a.date?.toDate ? a.date.toDate() : new Date(a.date);
         const dateB = b.date?.toDate ? b.date.toDate() : new Date(b.date);
         return dateB.getTime() - dateA.getTime();
@@ -370,6 +400,38 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
     } finally {
       setLoadingTransactions(false);
     }
+  };
+
+  const dayModalSummary = React.useMemo(() => {
+    return selectedDayTransactions.reduce((acc, t) => {
+      const amount = Number(t.amount) || 0;
+      if (t.type === 'income') {
+        if (t.isFiado) acc.fiado += amount;
+        else acc.income += amount;
+        acc.cmv += (Number(t.cost) || 0);
+      } else {
+        acc.expense += amount;
+      }
+      return acc;
+    }, { income: 0, fiado: 0, expense: 0, cmv: 0 });
+  }, [selectedDayTransactions]);
+
+  const handleChartClick = async (data: any) => {
+    if (!data || !data.activePayload) return;
+    const dayInfo = data.activePayload[0].payload;
+    const dateObj = dayInfo.date;
+    setSelectedDate(dateObj);
+    setSelectedDayLabel(format(dateObj, 'dd/MM/yyyy'));
+    setIsDayModalOpen(true);
+    await fetchDayDetails(dateObj);
+  };
+
+  const handleDayClick = async (date: Date | undefined) => {
+    if (!date) return;
+    setSelectedDate(date);
+    setSelectedDayLabel(format(date, 'dd/MM/yyyy'));
+    setIsDayModalOpen(true);
+    await fetchDayDetails(date);
   };
 
   useEffect(() => {
@@ -457,34 +519,37 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
       )}
 
       {/* Performance Banner */}
-      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard 
           title="Entradas Caixa" 
           value={stats.income} 
-          icon={<TrendingUp className="w-6 h-6 text-green-500" />} 
+          icon={<TrendingUp className="w-8 h-8" />} 
           variant="green"
           onClick={() => setActiveTab('finances')}
+          subtext="REALIZADO"
         />
         <StatCard 
           title="Despesa Geral" 
           value={stats.expense} 
-          icon={<TrendingDown className="w-6 h-6 text-red-500" />} 
+          icon={<TrendingDown className="w-8 h-8" />} 
           variant="red"
           onClick={() => setActiveTab('finances')}
+          subtext="CUSTO + TAXAS"
         />
         <StatCard 
-          title="Lucro Líquido" 
+          title="Lucro Operacional" 
           value={stats.profit} 
-          icon={<DollarSign className="w-6 h-6 text-primary" />} 
+          icon={<DollarSign className="w-8 h-8" />} 
           variant="blue"
           onClick={() => setActiveTab('finances')}
+          subtext="LÍQUIDO"
         />
         <StatCard 
           title="Proj. Mensal (30d)" 
           value={stats.projectedProfit30d} 
-          icon={<TrendingUp className="w-6 h-6 text-purple-500" />} 
-          variant="purple"
-          subtext="ESTIMADO"
+          icon={<Zap className="w-8 h-8" />} 
+          variant="indigo"
+          subtext="ESTIMATIVA"
         />
       </div>
 
@@ -549,43 +614,43 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <Card className="border-border bg-card/50 rounded-2xl overflow-hidden">
-          <CardHeader className="border-b border-border pb-4">
+        <Card className="border-white/10 bg-[#0b1224] rounded-[40px] overflow-hidden shadow-2xl">
+          <CardHeader className="border-b border-white/5 pb-4 px-8 pt-8">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-green-500/10 text-green-500">
-                <TrendingUp className="w-5 h-5" />
+              <div className="p-3 rounded-2xl bg-green-500/10 text-green-500 border border-green-500/20">
+                <TrendingUp className="w-6 h-6" />
               </div>
               <div>
-                <CardTitle className="text-sm font-bold uppercase tracking-wider">Top Margem de Lucro</CardTitle>
-                <p className="text-[10px] text-muted-foreground tracking-widest uppercase font-semibold">Produtos mais Rentáveis</p>
+                <CardTitle className="text-lg font-black uppercase tracking-tighter text-white">Top Margem de Lucro</CardTitle>
+                <p className="text-[10px] text-muted-foreground tracking-widest uppercase font-bold">Produtos mais Rentáveis</p>
               </div>
             </div>
           </CardHeader>
-          <CardContent className="pt-4 p-0">
+          <CardContent className="p-0">
             <Table>
               <TableHeader>
-                <TableRow className="border-border hover:bg-transparent">
-                  <TableHead className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground pl-6">Produto</TableHead>
+                <TableRow className="border-white/5 hover:bg-transparent">
+                  <TableHead className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground pl-8">Produto</TableHead>
                   <TableHead className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground text-right">Preço</TableHead>
-                  <TableHead className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground text-right pr-6">Margem</TableHead>
+                  <TableHead className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground text-right pr-8">Margem</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {topProducts.map((p: any) => (
-                  <TableRow key={p.id} className="border-border hover:bg-white/5 transition-colors">
-                    <TableCell className="pl-6">
-                      <p className="text-xs font-bold uppercase">{p.name}</p>
-                      <p className="text-[10px] text-muted-foreground font-mono">ESTOQUE: {p.stock}</p>
+                  <TableRow key={p.id} className="border-white/5 hover:bg-white/5 transition-colors">
+                    <TableCell className="pl-8 py-4">
+                      <p className="text-xs font-black uppercase text-white">{p.name}</p>
+                      <p className="text-[10px] text-muted-foreground font-mono uppercase">Estoque: {p.stock}</p>
                     </TableCell>
-                    <TableCell className="text-right font-mono text-xs">
+                    <TableCell className="text-right font-mono text-xs text-white">
                       R$ {(p.price || 0).toFixed(2)}
                     </TableCell>
-                    <TableCell className="text-right pr-6">
-                      <div className="flex flex-col items-end gap-1">
-                        <span className="inline-flex items-center px-2 py-1 rounded bg-green-500/10 text-green-500 font-black text-xs">
-                          R$ {(p.unitProfit || 0).toFixed(2)}
+                    <TableCell className="text-right pr-8">
+                      <div className="flex flex-col items-end">
+                        <span className="text-green-500 font-black text-sm tabular-nums">
+                          +{p.margin.toFixed(0)}%
                         </span>
-                        <span className="text-[9px] font-bold text-muted-foreground">{p.margin.toFixed(0)}% MARGEM</span>
+                        <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Margem Real</span>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -595,23 +660,23 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
           </CardContent>
         </Card>
 
-        <Card className="border-border bg-card/50 rounded-2xl overflow-hidden">
-          <CardHeader className="border-b border-border pb-4">
+        <Card className="border-white/10 bg-[#0b1224] rounded-[40px] overflow-hidden shadow-2xl">
+          <CardHeader className="border-b border-white/5 pb-4 px-8 pt-8">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-primary/10 text-primary">
-                <BarChart3 className="w-5 h-5" />
+              <div className="p-3 rounded-2xl bg-primary/10 text-primary border border-primary/20">
+                <BarChart3 className="w-6 h-6" />
               </div>
               <div>
-                <CardTitle className="text-sm font-bold uppercase tracking-wider">Performance Semanal</CardTitle>
-                <p className="text-[10px] text-muted-foreground tracking-widest uppercase font-semibold">Entradas vs Saídas</p>
+                <CardTitle className="text-lg font-black uppercase tracking-tighter text-white">Performance Semanal</CardTitle>
+                <p className="text-[10px] text-muted-foreground tracking-widest uppercase font-bold">Entradas vs Saídas por Expediente</p>
               </div>
             </div>
           </CardHeader>
-          <CardContent className="pt-8">
-            <div className="h-72 w-full min-h-[300px]">
-              <ResponsiveContainer width="100%" height="100%" minHeight={300}>
+          <CardContent className="p-8">
+            <div className="h-[400px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={dailyData} onClick={handleChartClick}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1f2937" />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1f2937" opacity={0.5} />
                   <XAxis 
                     dataKey="name" 
                     axisLine={false} 
@@ -626,29 +691,175 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
                   />
                   <Tooltip 
                     cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                    formatter={(value: number) => `R$ ${Number(value).toFixed(2)}`}
-                    contentStyle={{ 
-                      backgroundColor: '#111827', 
-                      border: '1px solid #1f2937', 
-                      borderRadius: '12px',
-                      fontSize: '12px',
-                      fontWeight: 'bold',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em'
+                    content={({ active, payload, label }) => {
+                      if (active && payload && payload.length) {
+                        return (
+                          <div className="bg-[#0b1224] border border-white/10 p-4 rounded-2xl shadow-2xl backdrop-blur-xl">
+                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2 pb-2 border-b border-white/5">{label}</p>
+                            <div className="space-y-2">
+                              {payload.map((entry: any, index: number) => (
+                                <div key={index} className="flex items-center justify-between gap-8">
+                                  <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: entry.color }}>{entry.name}</span>
+                                  <span className="text-xs font-black tabular-nums" style={{ color: entry.color }}>
+                                    R$ {Number(entry.value).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
                     }}
                   />
-                  <Bar dataKey="totalSalesValue" fill="#3b82f6" radius={[4, 4, 0, 0]} name="VENDAS TOTAIS" />
-                  <Bar dataKey="income" fill="#22c55e" radius={[4, 4, 0, 0]} name="ENTRADAS REAIS" />
-                  <Bar dataKey="expense" fill="#ef4444" radius={[4, 4, 0, 0]} name="SAÍDAS" />
+                  <Bar dataKey="totalSalesValue" fill="#3b82f6" radius={[6, 6, 0, 0]} name="VENDAS TOTAIS" />
+                  <Bar dataKey="income" fill="#22c55e" radius={[6, 6, 0, 0]} name="ENTRADAS REAIS" />
+                  <Bar dataKey="expense" fill="#ef4444" radius={[6, 6, 0, 0]} name="SAÍDAS" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
-            <p className="text-[9px] text-center text-muted-foreground uppercase tracking-widest mt-4 font-bold opacity-50">
+            <p className="text-[9px] text-center text-muted-foreground uppercase tracking-widest mt-6 font-bold opacity-50">
               Clique em uma barra para ver o detalhamento do dia
             </p>
           </CardContent>
         </Card>
+
+        <Card className="border-white/10 bg-[#0b1224] rounded-[40px] overflow-hidden shadow-2xl">
+          <CardHeader className="border-b border-white/5 pb-4 px-8 pt-8">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-2xl bg-primary/10 text-primary border border-primary/20">
+                <Calendar className="w-6 h-6" />
+              </div>
+              <div>
+                <CardTitle className="text-lg font-black uppercase tracking-tighter text-white">Inspeção por Dia</CardTitle>
+                <p className="text-[10px] text-muted-foreground tracking-widest uppercase font-bold">Clique em uma data para ver transações</p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-8 flex flex-col items-center justify-center">
+            <CalendarUI
+              mode="single"
+              selected={selectedDate}
+              onSelect={handleDayClick}
+              locale={ptBR}
+              className="rounded-3xl border border-white/5 p-4 bg-black/20"
+            />
+            <div className="mt-8 p-4 bg-primary/5 rounded-2xl border border-primary/10 w-full">
+               <div className="flex items-center gap-3">
+                  <Info className="w-4 h-4 text-primary" />
+                  <p className="text-[10px] font-bold text-primary/80 uppercase tracking-widest leading-relaxed">
+                    Selecione um dia no calendário para auditar todas as entradas, saídas e fiados registrados naquele turno.
+                  </p>
+               </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Top 10 Clientes Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+        <Card className="lg:col-span-2 border-white/10 bg-[#0b1224] rounded-[40px] overflow-hidden shadow-2xl">
+          <CardHeader className="border-b border-white/5 pb-4 px-8 pt-8">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-2xl bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                <Users className="w-6 h-6" />
+              </div>
+              <div>
+                <CardTitle className="text-lg font-black uppercase tracking-tighter text-white">Top 10 Clientes (Volume)</CardTitle>
+                <p className="text-[10px] text-muted-foreground tracking-widest uppercase font-bold">Maiores Consumidores do Período</p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-8">
+            <div className="h-[400px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart 
+                  layout="vertical" 
+                  data={extraData.topCustomers}
+                  margin={{ left: 40, right: 40 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#1f2937" opacity={0.5} />
+                  <XAxis type="number" hide />
+                  <YAxis 
+                    dataKey="name" 
+                    type="category" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    width={100}
+                    tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 'bold' }}
+                    tickFormatter={(val) => val.length > 12 ? val.substring(0, 12) + '...' : val}
+                  />
+                  <Tooltip 
+                    cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-[#0b1224] border border-white/10 p-4 rounded-2xl shadow-2xl backdrop-blur-xl">
+                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2 pb-2 border-b border-white/5">{data.name}</p>
+                            <div className="space-y-1">
+                              <p className="text-xs font-black text-amber-500 tabular-nums">
+                                TOTAL: R$ {data.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </p>
+                              <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">
+                                {data.visits} VISITAS REGISTRADAS
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Bar dataKey="total" radius={[0, 6, 6, 0]} barSize={30}>
+                    {extraData.topCustomers.map((entry: any, index: number) => (
+                      <Cell key={`cell-${index}`} fill={index === 0 ? '#f59e0b' : '#3b82f6'} opacity={1 - (index * 0.07)} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-white/10 bg-[#0b1224] rounded-[40px] overflow-hidden shadow-2xl">
+          <CardHeader className="border-b border-white/5 pb-4 px-8 pt-8">
+            <CardTitle className="text-sm font-black uppercase tracking-widest text-white">Ranking de Fidelidade</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="divide-y divide-white/5">
+              {extraData.topCustomers && extraData.topCustomers.length === 0 ? (
+                <div className="p-12 text-center opacity-30">
+                  <p className="text-[10px] font-bold uppercase tracking-widest">Sem dados de clientes</p>
+                </div>
+              ) : (
+                extraData.topCustomers?.map((customer: any, idx: number) => (
+                  <div key={idx} className="flex items-center justify-between p-6 hover:bg-white/5 transition-all">
+                    <div className="flex items-center gap-4">
+                      <div className={cn(
+                        "w-8 h-8 rounded-lg flex items-center justify-center font-black text-xs",
+                        idx === 0 ? "bg-amber-500 text-black shadow-[0_0_15px_rgba(245,158,11,0.5)]" : 
+                        idx === 1 ? "bg-slate-300 text-black" :
+                        idx === 2 ? "bg-amber-700 text-white" : "bg-white/10 text-muted-foreground"
+                      )}>
+                        {idx + 1}
+                      </div>
+                      <div>
+                        <p className="text-xs font-black uppercase text-white truncate max-w-[120px]">{customer.name}</p>
+                        <p className="text-[9px] text-muted-foreground font-bold uppercase tracking-widest">{customer.visits} Expedientes</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-black text-white tabular-nums">R$ {customer.total.toFixed(2)}</p>
+                      <p className="text-[8px] font-bold text-amber-500 uppercase tracking-[0.2em]">Acumulado</p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
 
       <Card className="border-border bg-card/50 rounded-2xl overflow-hidden mt-8">
         <CardHeader className="border-b border-border pb-4 bg-white/5 flex flex-row items-center justify-between">
@@ -881,134 +1092,232 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
       </Dialog>
 
       <Dialog open={isDayModalOpen} onOpenChange={setIsDayModalOpen}>
-        <DialogContent className="max-w-4xl bg-[#0a0a0a] border-primary/20 p-0 overflow-hidden flex flex-col h-[80vh]">
-          <DialogHeader className="p-6 border-b border-white/5 bg-primary/5">
+        <DialogContent className="max-w-4xl bg-[#0b1224] border-white/10 p-0 overflow-hidden flex flex-col h-[85vh] rounded-[40px] shadow-[0_0_50px_rgba(0,0,0,0.5)]">
+          <DialogHeader className="p-8 border-b border-white/5 bg-white/[0.02]">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center border border-primary/30">
-                  <Calendar className="w-5 h-5 text-primary" />
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 shadow-[0_0_20px_rgba(59,130,246,0.15)]">
+                  <Calendar className="w-6 h-6 text-primary" />
                 </div>
                 <div>
-                  <DialogTitle className="text-sm font-black uppercase tracking-[0.2em] text-primary">Detalhamento do Dia {selectedDayLabel}</DialogTitle>
-                  <p className="text-[10px] font-bold text-primary/60 uppercase tracking-widest mt-0.5">Todas as transações do expediente</p>
+                  <DialogTitle className="text-xl font-black uppercase tracking-tighter text-white">Inspeção de Turno</DialogTitle>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] mt-1">{selectedDayLabel} — AUDITORIA OPERACIONAL</p>
                 </div>
               </div>
-              <Badge variant="outline" className="border-primary/30 text-primary font-black px-4 py-1.5 rounded-lg uppercase tracking-tighter">
-                {selectedDayTransactions.length} REGISTROS
-              </Badge>
+              <div className="flex items-center gap-3">
+                <Badge variant="outline" className="bg-primary/5 border-primary/20 text-primary font-black px-4 py-2 rounded-xl uppercase tracking-widest text-[10px]">
+                  {selectedDayTransactions.length} REGISTROS ENCONTRADOS
+                </Badge>
+              </div>
             </div>
           </DialogHeader>
 
           <div className="flex-1 overflow-y-auto p-0 scrollbar-hide">
             {loadingTransactions ? (
               <div className="h-full flex flex-col items-center justify-center gap-4">
-                <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Buscando transações...</p>
+                <Loader2 className="w-10 h-10 animate-spin text-primary opacity-50" />
+                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-primary animate-pulse">Sincronizando Ledger...</p>
               </div>
             ) : selectedDayTransactions.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center gap-4 opacity-50">
-                <Activity className="w-12 h-12 text-muted-foreground" />
-                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Nenhuma transação encontrada neste dia.</p>
+              <div className="h-full flex flex-col items-center justify-center gap-6 opacity-30">
+                <Activity className="w-20 h-20 text-muted-foreground" />
+                <p className="text-sm font-black uppercase tracking-widest text-muted-foreground">Nenhum dado capturado neste expediente</p>
               </div>
             ) : (
               <Table>
-                <TableHeader className="bg-white/5 sticky top-0 z-10">
-                  <TableRow className="border-white/10">
-                    <TableHead className="text-[10px] font-black uppercase tracking-widest pl-6">Hora</TableHead>
-                    <TableHead className="text-[10px] font-black uppercase tracking-widest">Tipo</TableHead>
-                    <TableHead className="text-[10px] font-black uppercase tracking-widest">Descrição / Cliente</TableHead>
-                    <TableHead className="text-[10px] font-black uppercase tracking-widest text-right">Valor</TableHead>
-                    <TableHead className="text-[10px] font-black uppercase tracking-widest text-right pr-6">Método</TableHead>
+                <TableHeader className="bg-[#0b1224] sticky top-0 z-10">
+                  <TableRow className="border-white/10 hover:bg-transparent">
+                    <TableHead className="text-[10px] font-black uppercase tracking-widest pl-8 h-14">Horário</TableHead>
+                    <TableHead className="text-[10px] font-black uppercase tracking-widest h-14">Classificação</TableHead>
+                    <TableHead className="text-[10px] font-black uppercase tracking-widest h-14">Detalhes da Operação</TableHead>
+                    <TableHead className="text-[10px] font-black uppercase tracking-widest text-right h-14">Valor Nominal</TableHead>
+                    <TableHead className="text-[10px] font-black uppercase tracking-widest text-right pr-8 h-14">Método</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {selectedDayTransactions.map((t: any) => (
-                    <TableRow key={t.id} className="border-white/5 hover:bg-white/5 transition-colors group">
-                      <TableCell className="pl-6 font-mono text-[11px] text-muted-foreground">
-                        {t.date?.toDate ? format(t.date.toDate(), 'HH:mm') : '--:--'}
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={cn(
-                          "text-[9px] font-black uppercase px-2 py-0.5 border-none",
-                          t.type === 'income' ? (t.isFiado ? "bg-orange-500/20 text-orange-500" : "bg-green-500/20 text-green-500") : "bg-red-500/20 text-red-500"
+                  {selectedDayTransactions.map((t: any) => {
+                    const isIncome = t.type === 'income';
+                    const isFiado = t.isFiado;
+                    const method = t.paymentMethod?.toLowerCase() || 'dinheiro';
+                    
+                    return (
+                      <TableRow key={t.id} className="border-white/5 hover:bg-white/[0.03] transition-all group">
+                        <TableCell className="pl-8 py-5">
+                          <div className="flex items-center gap-2 text-muted-foreground group-hover:text-white transition-colors">
+                            <Clock className="w-3 h-3" />
+                            <span className="font-mono text-[11px] font-bold">
+                              {t.date?.toDate ? format(t.date.toDate(), 'HH:mm') : '--:--'}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex">
+                            <Badge className={cn(
+                              "text-[9px] font-black uppercase px-2.5 py-1 border-none rounded-lg",
+                              isIncome ? (isFiado ? "bg-orange-500/20 text-orange-400" : "bg-emerald-500/20 text-emerald-400") : "bg-red-500/20 text-red-400"
+                            )}>
+                              {isIncome ? (isFiado ? 'FIADO' : 'VENDA REAL') : 'SAÍDA/DESPESA'}
+                            </Badge>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-0.5">
+                            <div className="flex items-center gap-2">
+                              {isIncome ? <ShoppingBag className="w-3.5 h-3.5 text-muted-foreground" /> : <TrendingDown className="w-3.5 h-3.5 text-red-500" />}
+                              <span className={cn(
+                                "text-[11px] font-black uppercase tracking-tight",
+                                isIncome ? "text-white" : "text-red-400"
+                              )}>
+                                {t.customerName || t.description || t.category || 'Operação Balcão'}
+                              </span>
+                            </div>
+                            {(t.category || t.subCategory) && t.type === 'expense' && (
+                              <div className="flex items-center gap-2 pl-5">
+                                <span className="text-[9px] font-bold text-muted-foreground/60 uppercase tracking-widest">
+                                  {t.category} {t.subCategory ? `› ${t.subCategory}` : ''}
+                                </span>
+                              </div>
+                            )}
+                            {t.items && (
+                              <div className="flex items-center gap-2 pl-5">
+                                <span className="text-[9px] font-bold text-muted-foreground/50 uppercase tracking-widest">
+                                  {t.items.length} itens processados
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className={cn(
+                          "text-right font-mono text-sm font-black tabular-nums",
+                          isIncome ? (isFiado ? "text-orange-500" : "text-emerald-500") : "text-red-500"
                         )}>
-                          {t.type === 'income' ? (t.isFiado ? 'FIADO' : 'VENDA') : 'DESPESA'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <span className="text-xs font-bold uppercase truncate max-w-[200px]">{t.customerName || t.description || t.category || 'Venda Balcão'}</span>
-                          {t.items && <span className="text-[9px] text-muted-foreground uppercase">{t.items.length} itens</span>}
-                        </div>
-                      </TableCell>
-                      <TableCell className={cn(
-                        "text-right font-mono text-xs font-bold",
-                        t.type === 'income' ? "text-green-500" : "text-red-500"
-                      )}>
-                        {t.type === 'income' ? '+' : '-'} R$ {t.amount.toFixed(2)}
-                      </TableCell>
-                      <TableCell className="text-right pr-6 text-[10px] font-bold uppercase text-muted-foreground">
-                        {t.paymentMethod || 'Dinheiro'}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                          {isIncome ? '+' : '-'} R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </TableCell>
+                        <TableCell className="text-right pr-8">
+                          <div className="flex items-center justify-end gap-2">
+                            {method.includes('pix') && <QrCode className="w-3 h-3 text-cyan-400" />}
+                            {method.includes('cartao') || method.includes('crédito') || method.includes('débito') ? <CreditCard className="w-3 h-3 text-indigo-400" /> : null}
+                            {method.includes('dinheiro') && <Banknote className="w-3 h-3 text-emerald-400" />}
+                            <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">
+                              {t.paymentMethod || 'Espécie'}
+                            </span>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
+
             )}
           </div>
-          <DialogFooter className="p-4 bg-white/5 border-t border-white/5">
-             <Button variant="ghost" className="text-[10px] font-black uppercase tracking-widest" onClick={() => setIsDayModalOpen(false)}>
-               Fechar Detalhes
-             </Button>
-          </DialogFooter>
+          <div className="p-8 bg-white/[0.02] border-t border-white/5 grid grid-cols-1 md:grid-cols-4 gap-6">
+             <div className="space-y-1">
+               <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Entradas (Real)</p>
+               <p className="text-xl font-black text-green-500 tabular-nums">R$ {dayModalSummary.income.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+             </div>
+             <div className="space-y-1">
+               <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Fiados (Pendente)</p>
+               <p className="text-xl font-black text-orange-500 tabular-nums">R$ {dayModalSummary.fiado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+             </div>
+             <div className="space-y-1">
+               <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Saídas (Desp + CMV)</p>
+               <p className="text-xl font-black text-red-500 tabular-nums">R$ {(dayModalSummary.expense + dayModalSummary.cmv).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+             </div>
+             <div className="flex flex-col justify-center items-end">
+               <div className="text-right mb-2">
+                 <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Saldo do Turno</p>
+                 <p className={cn(
+                   "text-2xl font-black tabular-nums",
+                   (dayModalSummary.income - dayModalSummary.expense - dayModalSummary.cmv) >= 0 ? "text-primary" : "text-red-500"
+                 )}>
+                   R$ {(dayModalSummary.income - dayModalSummary.expense - dayModalSummary.cmv).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                 </p>
+               </div>
+               <Button 
+                 className="bg-white/10 hover:bg-white/20 text-white font-black uppercase tracking-widest text-[10px] h-10 px-6 rounded-xl transition-all active:scale-95 w-full" 
+                 onClick={() => setIsDayModalOpen(false)}
+               >
+                 Fechar Auditoria
+               </Button>
+             </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
   );
 }
 
-function StatCard({ title, value, icon, variant, onClick, subtext }: { title: string, value: number, icon: React.ReactNode, variant: 'green' | 'red' | 'blue' | 'orange' | 'purple', onClick?: () => void, subtext?: string }) {
+function StatCard({ title, value, icon, variant, onClick, subtext }: { title: string, value: number, icon: React.ReactNode, variant: 'green' | 'red' | 'blue' | 'orange' | 'indigo', onClick?: () => void, subtext?: string }) {
   const variantStyles = {
-    green: "from-green-500/5 shadow-[0_0_20px_rgba(34,197,94,0.1)] text-green-500",
-    red: "from-red-500/5 shadow-[0_0_20px_rgba(239,68,68,0.1)] text-red-500",
-    blue: "from-primary/5 shadow-[0_0_20px_rgba(var(--primary),0.1)] text-primary",
-    orange: "from-orange-500/5 shadow-[0_0_20px_rgba(249,115,22,0.1)] text-orange-500",
-    purple: "from-purple-500/5 shadow-[0_0_20px_rgba(168,85,247,0.1)] text-purple-500"
+    green: {
+      bg: "bg-green-500/10",
+      border: "border-green-500/20",
+      text: "text-green-500",
+      glow: "shadow-[0_0_30px_rgba(34,197,94,0.2)]",
+      gradient: "from-green-500/10"
+    },
+    red: {
+      bg: "bg-red-500/10",
+      border: "border-red-500/20",
+      text: "text-red-500",
+      glow: "shadow-[0_0_30px_rgba(239,68,68,0.2)]",
+      gradient: "from-red-500/10"
+    },
+    blue: {
+      bg: "bg-blue-500/10",
+      border: "border-blue-500/20",
+      text: "text-blue-500",
+      glow: "shadow-[0_0_30px_rgba(59,130,246,0.2)]",
+      gradient: "from-blue-500/10"
+    },
+    orange: {
+      bg: "bg-orange-500/10",
+      border: "border-orange-500/20",
+      text: "text-orange-500",
+      glow: "shadow-[0_0_30px_rgba(249,115,22,0.2)]",
+      gradient: "from-orange-500/10"
+    },
+    indigo: {
+      bg: "bg-indigo-500/10",
+      border: "border-indigo-500/20",
+      text: "text-indigo-500",
+      glow: "shadow-[0_0_30px_rgba(99,102,241,0.2)]",
+      gradient: "from-indigo-500/10"
+    }
   };
+
+  const style = variantStyles[variant];
 
   return (
     <Card 
       className={cn(
-        "bg-card/30 border-border/50 overflow-hidden relative group transition-all",
-        onClick && "cursor-pointer active:scale-95"
+        "bg-[#0b1224] border-white/10 overflow-hidden relative group transition-all rounded-[40px] h-[180px] shadow-2xl",
+        onClick && "cursor-pointer active:scale-95 hover:border-white/20"
       )}
       onClick={onClick}
     >
-      <div className={cn("absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity", variantStyles[variant].split(' ')[0])} />
-      <CardContent className="p-6 flex items-center gap-5 relative z-10">
-        <div className={cn(
-          "w-12 h-12 rounded-2xl flex items-center justify-center border transition-transform group-hover:scale-110",
-          variant === 'green' ? "bg-green-500/10 border-green-500/20" : 
-          variant === 'red' ? "bg-red-500/10 border-red-500/20" : 
-          variant === 'orange' ? "bg-orange-500/10 border-orange-500/20" :
-          variant === 'purple' ? "bg-purple-500/10 border-purple-500/20" :
-          "bg-primary/10 border-primary/20",
-          variantStyles[variant].split(' ')[1]
-        )}>
-          {icon}
+      <div className={cn("absolute inset-0 bg-gradient-to-br via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity", style.gradient)} />
+      <CardContent className="p-8 h-full flex flex-col justify-between relative z-10">
+        <div className="flex items-start justify-between">
+          <div className={cn(
+            "w-14 h-14 rounded-2xl flex items-center justify-center border transition-transform group-hover:scale-110",
+            style.bg, style.border, style.text, style.glow
+          )}>
+            {icon}
+          </div>
+          {subtext && (
+            <div className="text-right">
+              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest opacity-50">{subtext}</p>
+            </div>
+          )}
         </div>
+        
         <div>
           <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-1">{title}</p>
-          <div className="flex items-baseline gap-2">
-            <h3 className={cn("text-2xl font-black leading-none", variantStyles[variant].split(' ').slice(2).join(' '))}>
-              R$ {value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </h3>
-            {subtext && (
-              <span className={cn("text-xs font-bold", variantStyles[variant].split(' ').slice(2).join(' '))}>
-                {subtext}
-              </span>
-            )}
-          </div>
+          <h3 className={cn("text-3xl font-black leading-none tracking-tighter tabular-nums", style.text)}>
+            R$ {value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+          </h3>
         </div>
       </CardContent>
     </Card>
