@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Calendar as CalendarUI } from './ui/calendar';
-import { Plus, TrendingUp, TrendingDown, Receipt, Calendar, ArrowUpRight, ArrowDownRight, Filter, X, Users, ChevronRight, Settings2, Trash2, Info, CreditCard, Banknote, Smartphone, Wallet, QrCode, Zap, MoreHorizontal } from 'lucide-react';
+import { Plus, TrendingUp, TrendingDown, Receipt, Calendar, ArrowUpRight, ArrowDownRight, Filter, X, Users, ChevronRight, Settings2, Trash2, Info, CreditCard, Banknote, Smartphone, Wallet, QrCode, Zap, MoreHorizontal, Search, Package, Target } from 'lucide-react';
 import { Badge } from './ui/badge';
 import { toast } from 'sonner';
 import { format, isToday, isThisWeek, isThisMonth, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
@@ -36,44 +36,85 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
   const { data: rawPurchases } = useFetchCollection<any>('purchases', {
     constraints: React.useMemo(() => [orderBy('date', 'desc'), limit(100)], [])
   });
-  const { data: recurringExpenses } = useFetchCollection<RecurringExpense>('recurring_expenses');
-  const { data: installmentExpenses } = useFetchCollection<InstallmentExpense>('installment_expenses');
+  const { data: rawRecurring } = useFetchCollection<RecurringExpense>('recurring_expenses');
+  const { data: rawInstallments } = useFetchCollection<InstallmentExpense>('installment_expenses');
   const { data: customers } = useFetchCollection<Customer>('customers');
-  const { data: expenseCategories } = useFetchCollection<ExpenseCategory>('expense_categories');
+  const { data: rawCategories } = useFetchCollection<ExpenseCategory>('expense_categories');
+
+  const recurringExpenses = React.useMemo(() => rawRecurring.filter(r => r.status !== 'deleted'), [rawRecurring]);
+  const installmentExpenses = React.useMemo(() => rawInstallments.filter(i => i.status !== 'deleted'), [rawInstallments]);
+  const expenseCategories = React.useMemo(() => rawCategories.filter(c => (c as any).status !== 'deleted'), [rawCategories]);
 
   const transactions = React.useMemo(() => {
-    const merged = [...rawTransactions, ...rawExpenses.map(e => ({ ...e, type: 'expense' as const }))];
-    return merged.sort((a, b) => {
-      const dateA = a.date?.toDate ? a.date.toDate().getTime() : 0;
-      const dateB = b.date?.toDate ? b.date.toDate().getTime() : 0;
-      return dateB - dateA;
-    }).slice(0, 500);
-  }, [rawTransactions, rawExpenses]);
+    // Robust date to timestamp conversion
+    const getTs = (d: any) => {
+      if (!d) return 0;
+      if (d.toDate) return d.toDate().getTime();
+      if (d instanceof Date) return d.getTime();
+      if (typeof d === 'string' || typeof d === 'number') return new Date(d).getTime();
+      return 0;
+    };
+
+    const income = rawTransactions
+      .filter(t => t.status !== 'deleted')
+      .map(t => ({ ...t, type: t.type || 'income' }));
+      
+    const combined = [
+      ...rawTransactions.map(t => ({ ...t, source: 'transactions' })),
+      ...rawExpenses.map(t => ({ ...t, source: 'expenses' })),
+      ...rawPurchases.map(p => ({
+        id: p.id,
+        date: p.date,
+        amount: p.totalAmount,
+        type: 'expense' as const,
+        category: 'Compra de Estoque',
+        description: `Compra: ${p.supplierName || 'Fornecedor'}`,
+        paymentMethod: p.paymentMethod || 'Dinheiro',
+        purchaseId: p.id,
+        source: 'purchases',
+        status: p.status
+      }))
+    ];
+
+    return combined
+      .filter(t => (t as any).status !== 'deleted')
+      .map(t => {
+        const date = t.date?.toDate ? t.date.toDate() : (t.date instanceof Date ? t.date : new Date(t.date));
+        return { ...t, date };
+      })
+      .sort((a, b) => b.date.getTime() - a.date.getTime());
+  }, [rawTransactions, rawExpenses, rawPurchases]);
 
   const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense'>('all');
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [isFiadoModalOpen, setIsFiadoModalOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [relatedOrder, setRelatedOrder] = useState<Order | null>(null);
-  const [relatedPurchase, setRelatedPurchase] = useState<Purchase | null>(null);
+  const [relatedPurchase, setRelatedPurchase] = useState<any | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   
-  // Recurring Editing states
-  const [editingRecurring, setEditingRecurring] = useState<RecurringExpense | null>(null);
-  const [isEditingRecurringModalOpen, setIsEditingRecurringModalOpen] = useState(false);
-  const [editRecAmount, setEditRecAmount] = useState('');
-  const [editRecDescription, setEditRecDescription] = useState('');
-  const [editRecDueDate, setEditRecDueDate] = useState('');
-
-  // Date filter states
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month' | 'custom'>('today');
   const [startDate, setStartDate] = useState<Date>();
   const [endDate, setEndDate] = useState<Date>();
 
-  // Advanced filters
   const [methodFilter, setMethodFilter] = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+
+  const handleDeleteTransaction = async (e: React.MouseEvent, id: string, source: string) => {
+    e.stopPropagation();
+    if (!confirm('Tem certeza que deseja excluir este registro?')) return;
+    try {
+      await updateDoc(doc(db, source === 'transactions' ? 'transactions' : source === 'purchases' ? 'purchases' : 'expenses', id), {
+        status: 'deleted',
+        deletedAt: serverTimestamp(),
+        deletedBy: user.uid
+      });
+      toast.success('Registro excluído com sucesso');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, source);
+    }
+  };
 
   useEffect(() => {
     if (selectedTransaction?.orderId) {
@@ -102,7 +143,7 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
         try {
           const purchaseDoc = await getDoc(doc(db, 'purchases', selectedTransaction.purchaseId!));
           if (purchaseDoc.exists()) {
-            setRelatedPurchase({ ...purchaseDoc.data(), id: purchaseDoc.id } as Purchase);
+            setRelatedPurchase({ ...purchaseDoc.data(), id: purchaseDoc.id });
           }
         } catch (error) {
           console.error("Error fetching related purchase details:", error);
@@ -114,7 +155,6 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
     }
   }, [selectedTransaction]);
   
-  // Form states
   const [amount, setAmount] = useState('');
   const [expenseDate, setExpenseDate] = useState(getShiftDate());
   const [category, setCategory] = useState('');
@@ -125,10 +165,8 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
   const [installmentsCount, setInstallmentsCount] = useState('3');
   const [dueDate, setDueDate] = useState('5');
 
-  // Metas states
   const [metasView, setMetasView] = useState<'daily' | 'weekly' | 'monthly'>('monthly');
 
-  // Category Management State
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [newCatName, setNewCatName] = useState('');
   const [newSubName, setNewSubName] = useState('');
@@ -155,16 +193,10 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
         const count = parseInt(installmentsCount);
         const installmentValue = total / count;
         
-        // Register the "entrada" (down payment) as a transaction if paid now
-        // The user example says they pay R$310 now and 3x R$230 later.
-        // I will simplify and just create an InstallmentExpense.
-        // Actually, the user says "pagamos só R$310,00 de entrada e pagaremos mais 3 parcelas de R$230,00"
-        // This means Total is 310 + 3*230 = 1000.
-        
         await addDoc(collection(db, 'installment_expenses'), {
           description,
           totalAmount: total,
-          remainingAmount: total - (total / count), // Assuming first installment is paid now or handled by transaction
+          remainingAmount: total - (total / count),
           installmentsCount: count,
           remainingInstallments: count - 1,
           installmentValue: installmentValue,
@@ -175,7 +207,6 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
           active: true
         });
         
-        // Record the immediate payment
         await addDoc(collection(db, 'expenses'), {
           categoryId: category,
           subCategory,
@@ -187,11 +218,10 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
         
         toast.success('Compra parcelada registrada');
       } else {
-        // Write to 'expenses' collection to match user's Firestore structure
         await addDoc(collection(db, 'expenses'), {
           categoryId: category,
           subCategory,
-          category: selectedCat?.name || category, // Legacy support
+          category: selectedCat?.name || category,
           amount: parseFloat(amount),
           description,
           date: new Date(expenseDate + "T12:00:00")
@@ -212,94 +242,16 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
     }
   };
 
-  const handleEditRecurringClick = (exp: RecurringExpense) => {
-    setEditingRecurring(exp);
-    setEditRecAmount((exp.amount || 0).toString());
-    setEditRecDescription(exp.description || '');
-    setEditRecDueDate((exp.dueDate || 1).toString());
-    setIsEditingRecurringModalOpen(true);
-  };
-
-  const handleUpdateRecurring = async () => {
-    if (!editingRecurring || !editRecAmount || !editRecDescription) return;
-    setIsSaving(true);
-    try {
-      await updateDoc(doc(db, 'recurring_expenses', editingRecurring.id), {
-        description: editRecDescription,
-        amount: parseFloat(editRecAmount),
-        dueDate: parseInt(editRecDueDate),
-        updatedAt: serverTimestamp()
-      });
-      toast.success('Despesa recorrente atualizada');
-      setIsEditingRecurringModalOpen(false);
-      setEditingRecurring(null);
-    } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, 'recurring_expenses');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleDeleteRecurring = async (id: string) => {
-    try {
-      await deleteDoc(doc(db, 'recurring_expenses', id));
-      toast.success('Despesa recorrente removida');
-    } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, 'recurring_expenses');
-    }
-  };
-
-  const handleCreateCategory = async () => {
-    if (!newCatName) return;
-    try {
-      await addDoc(collection(db, 'expense_categories'), {
-        name: newCatName,
-        subcategories: [],
-        createdAt: serverTimestamp()
-      });
-      setNewCatName('');
-      toast.success('Categoria criada');
-    } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, 'expense_categories');
-    }
-  };
-
-  const handleAddSubcategory = async (catId: string) => {
-    if (!newSubName) return;
-    try {
-      const cat = expenseCategories.find(c => c.id === catId);
-      if (!cat) return;
-      
-      const subcategories = [...(cat.subcategories || []), newSubName];
-      await updateDoc(doc(db, 'expense_categories', catId), {
-        subcategories
-      });
-
-      setNewSubName('');
-      toast.success('Subcategoria adicionada');
-    } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, 'expense_categories');
-    }
-  };
-
   const filteredTransactions = React.useMemo(() => {
     return transactions.filter(t => {
-      // Basic type filter
       if (typeFilter !== 'all' && t.type !== typeFilter) return false;
-      
-      // Method filter
       if (methodFilter !== 'all' && t.paymentMethod !== methodFilter) return false;
-      
-      // Category filter
       if (categoryFilter !== 'all' && t.category !== categoryFilter) return false;
-
-      // Search query
       if (searchQuery && !t.description?.toLowerCase().includes(searchQuery.toLowerCase()) && !t.category?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
 
-      const tDate = t.date?.toDate ? t.date.toDate() : (t.date instanceof Date ? t.date : new Date(t.date));
-      if (!tDate || isNaN(tDate.getTime())) return true;
+      const tDate = t.date;
+      if (!tDate) return true;
 
-      // Date filtering
       if (dateFilter === 'today') {
         const { start, end } = getShiftInterval();
         return isWithinInterval(tDate, { start, end });
@@ -313,12 +265,11 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
     });
   }, [transactions, typeFilter, dateFilter, startDate, endDate, methodFilter, categoryFilter, searchQuery]);
 
-  // Group transactions by shift date
   const groupedTransactions = React.useMemo(() => {
-    const groups: { [key: string]: Transaction[] } = {};
+    const groups: { [key: string]: any[] } = {};
     filteredTransactions.forEach(t => {
       const shiftDate = getShiftDate(t.date);
-      const dateKey = shiftDate ? format(shiftDate, 'yyyy-MM-dd') : 'Data Indefinida';
+      const dateKey = shiftDate ? `Expediente ${format(new Date(shiftDate + 'T12:00:00'), 'dd/MM/yyyy')}` : 'Data Indefinida';
       if (!groups[dateKey]) groups[dateKey] = [];
       groups[dateKey].push(t);
     });
@@ -327,152 +278,45 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
   }, [filteredTransactions]);
 
   const incomeTransactions = filteredTransactions.filter(t => t.type === 'income' && !t.isFiado);
-  
-  // Total Bruto (Vendas em dinheiro/cartão/pix)
   const totalGrossIncome = incomeTransactions.reduce((sum, t) => sum + (t.amount || 0), 0);
-  
-  // Total de Taxas (Cartão/Pix)
-  const totalFees = incomeTransactions.reduce((sum, t) => sum + (t.feeAmount || 0), 0);
-  
-  // Total Líquido de Vendas (Recebido - após taxas)
-  const totalNetIncome = incomeTransactions.reduce((sum, t) => {
-    const net = t.netAmount !== undefined ? t.netAmount : (t.amount - (t.feeAmount || 0));
-    return sum + net;
+  const totalFees = incomeTransactions.reduce((sum, t) => {
+    if (t.feeAmount !== undefined && t.feeAmount > 0) return sum + t.feeAmount;
+    return sum + calculateNet(t.amount, t.paymentMethod).feeAmount;
   }, 0);
-  
-  // Total de Custo de Mercadoria (COGS)
+  const totalNetIncome = incomeTransactions.reduce((sum, t) => {
+    const fee = t.feeAmount !== undefined && t.feeAmount > 0 ? t.feeAmount : calculateNet(t.amount, t.paymentMethod).feeAmount;
+    return sum + (t.amount - fee);
+  }, 0);
   const totalCostOfGoods = incomeTransactions.reduce((sum, t) => sum + (t.cost || 0), 0);
-  
-  // Total de Despesas Operacionais (Saídas manuais)
-  const totalExpense = filteredTransactions
-    .filter(t => t.type === 'expense')
-    .reduce((sum, t) => sum + (t.amount || 0), 0);
-
-  // Lucro Líquido Real = (NetIncome - CostOfGoods - totalExpense)
+  const totalExpense = filteredTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + (t.amount || 0), 0);
   const realNetProfit = totalNetIncome - totalCostOfGoods - totalExpense;
-
-  // For backward compatibility or specific UI needs
-  const totalIncome = totalGrossIncome;
-
   const totalFiado = customers.reduce((sum, c) => sum + Math.abs(Math.min(0, c.balance || 0)), 0);
 
-  const previousMetrics = React.useMemo(() => {
-    let prevStart: Date;
-    let prevEnd: Date;
-    const { start, end } = getShiftInterval();
-
-    if (dateFilter === 'today') {
-      prevStart = new Date(start);
-      prevStart.setDate(prevStart.getDate() - 1);
-      prevEnd = new Date(end);
-      prevEnd.setDate(prevEnd.getDate() - 1);
-    } else if (dateFilter === 'week') {
-      prevStart = new Date(start);
-      prevStart.setDate(prevStart.getDate() - 7);
-      prevEnd = new Date(end);
-      prevEnd.setDate(prevEnd.getDate() - 7);
-    } else if (dateFilter === 'month') {
-      prevStart = new Date(start);
-      prevStart.setMonth(prevStart.getMonth() - 1);
-      prevEnd = new Date(end);
-      prevEnd.setMonth(prevEnd.getMonth() - 1);
-    } else {
-      return null;
-    }
-
-    const prevIncome = rawTransactions
-      .filter(t => t.type === 'income' && !(t as any).isFiado)
-      .filter(t => {
-        const tDate = t.date?.toDate ? t.date.toDate() : (t.date instanceof Date ? t.date : new Date(t.date));
-        return isWithinInterval(tDate, { start: prevStart, end: prevEnd });
-      })
-      .reduce((sum, t) => sum + (t.amount || 0), 0);
-
-    const prevExpense = rawTransactions
-      .filter(t => t.type === 'expense')
-      .filter(t => {
-        const tDate = t.date?.toDate ? t.date.toDate() : (t.date instanceof Date ? t.date : new Date(t.date));
-        return isWithinInterval(tDate, { start: prevStart, end: prevEnd });
-      })
-      .reduce((sum, t) => sum + (t.amount || 0), 0);
-
-    return { income: prevIncome, expense: prevExpense };
-  }, [rawTransactions, dateFilter]);
-
-  const calculateTrend = (current: number, previous: number | undefined) => {
-    if (!previous || previous === 0) return null;
-    const diff = ((current - previous) / previous) * 100;
-    return {
-      value: Math.abs(diff).toFixed(1),
-      isUp: diff > 0,
-      label: `${diff > 0 ? '+' : ''}${diff.toFixed(1)}%`
-    };
-  };
-
-  const incomeTrend = calculateTrend(totalIncome, previousMetrics?.income);
-  const expenseTrend = calculateTrend(totalExpense, previousMetrics?.expense);
-
-  // Metas Logic
-  const daysInMonth = (month: number, year: number) => new Date(year, month + 1, 0).getDate();
-  const now = new Date();
-  const currentMonthDays = daysInMonth(now.getMonth(), now.getFullYear());
-  
-  const incomeMetaProgress = React.useMemo(() => {
-    const { start: todayStart, end: todayEnd } = getShiftInterval();
-    const today = rawTransactions.filter(t => t.type === 'income' && !(t as any).isFiado && isWithinInterval(t.date?.toDate ? t.date.toDate() : new Date(0), { start: todayStart, end: todayEnd })).reduce((acc, t) => acc + (t.amount || 0), 0);
-    const week = rawTransactions.filter(t => t.type === 'income' && !(t as any).isFiado && isThisWeek(t.date?.toDate ? t.date.toDate() : new Date(0), { weekStartsOn: 0 })).reduce((acc, t) => acc + (t.amount || 0), 0);
-    const month = rawTransactions.filter(t => t.type === 'income' && !(t as any).isFiado && isThisMonth(t.date?.toDate ? t.date.toDate() : new Date(0))).reduce((acc, t) => acc + (t.amount || 0), 0);
-    return { today, week, month };
-  }, [rawTransactions]);
-
-  const variableCostsMonth = React.useMemo(() => {
-    const directPurchases = rawPurchases
-      .filter(p => isThisMonth(p.date?.toDate ? p.date.toDate() : new Date(0)))
-      .reduce((sum, p) => sum + (p.totalAmount || 0), 0);
-    
-    const otherVariableExpenses = transactions
-      .filter(t => 
-        t.type === 'expense' && 
-        t.category !== 'Compra de Estoque' && 
-        t.category !== 'Suprimentos' &&
-        isThisMonth(t.date?.toDate ? t.date.toDate() : new Date(0))
-      )
-      .reduce((sum, t) => sum + (t.amount || 0), 0);
-      
-    return otherVariableExpenses + directPurchases;
-  }, [transactions, rawPurchases]);
-
-  const monthlyObligations = React.useMemo(() => {
+  // Financial Health Calculation
+  const totalFixedCosts = React.useMemo(() => {
     const recurring = recurringExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
     const installments = installmentExpenses.reduce((sum, e) => sum + (e.installmentValue || 0), 0);
-    return recurring + installments + variableCostsMonth;
-  }, [recurringExpenses, installmentExpenses, variableCostsMonth]);
+    const monthlyTotal = recurring + installments;
 
-  const dailyGoal = monthlyObligations / currentMonthDays;
-  const weeklyGoal = (monthlyObligations / currentMonthDays) * 7;
-
-  const currentMetaAmount = metasView === 'daily' ? dailyGoal : metasView === 'weekly' ? weeklyGoal : monthlyObligations;
-  const currentIncomeInView = metasView === 'daily' ? incomeMetaProgress.today : metasView === 'weekly' ? incomeMetaProgress.week : incomeMetaProgress.month;
-  const metaProgressPercent = Math.min(100, (currentIncomeInView / currentMetaAmount) * 100);
-
-  const getFilterLabel = () => {
-    switch (dateFilter) {
-      case 'today': return 'Hoje';
-      case 'week': return 'Nesta Semana';
-      case 'month': return 'Neste Mês';
-      case 'custom': return 'Período Personalizado';
-      default: return 'Últimas transações';
+    // Scale based on selected period
+    if (dateFilter === 'today') return monthlyTotal / 30;
+    if (dateFilter === 'week') return (monthlyTotal / 30) * 7;
+    if (dateFilter === 'custom' && startDate && endDate) {
+      const days = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
+      return (monthlyTotal / 30) * days;
     }
-  };
+    return monthlyTotal; // Default to month
+  }, [recurringExpenses, installmentExpenses, dateFilter, startDate, endDate]);
+
+  const totalNeeded = totalFixedCosts + totalExpense + totalFees;
+  const breakEvenProgress = totalGrossIncome > 0 ? Math.min(100, (totalGrossIncome / totalNeeded) * 100) : 0;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
-      {/* Financial Health - Metrics Banner (Command Center Style) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-        {/* Faturamento Bruto */}
         <Card 
           className={cn(
-            "bg-card/30 border-border/50 overflow-hidden relative group cursor-pointer transition-all rounded-[40px] h-[180px] hover:border-green-500/30",
+            "bg-[#0b1224] border-white/10 overflow-hidden relative group cursor-pointer transition-all rounded-[40px] h-[180px] hover:border-green-500/30",
             typeFilter === 'income' && "ring-2 ring-green-500/50 bg-green-500/10"
           )}
           onClick={() => setTypeFilter(typeFilter === 'income' ? 'all' : 'income')}
@@ -483,29 +327,25 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
               <div className="w-14 h-14 rounded-2xl bg-green-500/10 flex items-center justify-center border border-green-500/20 shadow-[0_0_20px_rgba(34,197,94,0.15)] group-hover:scale-110 transition-transform">
                 <TrendingUp className="w-7 h-7 text-green-500" />
               </div>
-              {incomeTrend && (
-                <Badge className={cn(
-                  "font-mono font-black text-[10px] px-3 py-1 rounded-full border shadow-sm",
-                  incomeTrend.isUp ? "bg-green-500/10 text-green-500 border-green-500/20" : "bg-red-500/10 text-red-500 border-red-500/20"
-                )}>
-                  {incomeTrend.isUp ? <TrendingUp className="w-3 h-3 mr-1 inline" /> : <TrendingDown className="w-3 h-3 mr-1 inline" />}
-                  {incomeTrend.label}
-                </Badge>
-              )}
+              <div className="text-right">
+                <p className="text-[10px] font-bold text-green-500/50 uppercase tracking-widest">Margem Bruta</p>
+                <p className="text-sm font-black text-green-500 font-mono">
+                  {totalGrossIncome > 0 ? ((totalNetIncome / totalGrossIncome) * 100).toFixed(1) : 0}%
+                </p>
+              </div>
             </div>
             <div>
               <p className="text-[10px] font-black tracking-[0.3em] uppercase text-muted-foreground mb-2 leading-none">Faturamento Bruto</p>
               <h3 className="text-3xl font-black text-white leading-none font-mono tracking-tighter tabular-nums">
-                R$ {totalGrossIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                R$ {(totalGrossIncome || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </h3>
             </div>
           </CardContent>
         </Card>
-        
-        {/* Total Saídas */}
+
         <Card 
           className={cn(
-            "bg-card/30 border-border/50 overflow-hidden relative group cursor-pointer transition-all rounded-[40px] h-[180px] hover:border-red-500/30",
+            "bg-[#0b1224] border-white/10 overflow-hidden relative group cursor-pointer transition-all rounded-[40px] h-[180px] hover:border-red-500/30",
             typeFilter === 'expense' && "ring-2 ring-red-500/50 bg-red-500/10"
           )}
           onClick={() => setTypeFilter(typeFilter === 'expense' ? 'all' : 'expense')}
@@ -516,15 +356,12 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
               <div className="w-14 h-14 rounded-2xl bg-red-500/10 flex items-center justify-center border border-red-500/20 shadow-[0_0_20px_rgba(239,68,68,0.15)] group-hover:scale-110 transition-transform">
                 <TrendingDown className="w-7 h-7 text-red-500" />
               </div>
-              {expenseTrend && (
-                <Badge className={cn(
-                  "font-mono font-black text-[10px] px-3 py-1 rounded-full border shadow-sm",
-                  expenseTrend.isUp ? "bg-red-500/10 text-red-500 border-red-500/20" : "bg-green-500/10 text-green-500 border-green-500/20"
-                )}>
-                  {expenseTrend.isUp ? <TrendingUp className="w-3 h-3 mr-1 inline" /> : <TrendingDown className="w-3 h-3 mr-1 inline" />}
-                  {expenseTrend.label}
-                </Badge>
-              )}
+              <div className="text-right">
+                <p className="text-[10px] font-bold text-red-500/50 uppercase tracking-widest">CMV + Taxas</p>
+                <p className="text-sm font-black text-red-500 font-mono">
+                  R$ {(totalCostOfGoods + totalFees).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
             </div>
             <div>
               <p className="text-[10px] font-black tracking-[0.3em] uppercase text-muted-foreground mb-2 leading-none">Total de Saídas</p>
@@ -535,17 +372,18 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
           </CardContent>
         </Card>
 
-        {/* Lucro Líquido Real */}
         <Card className="bg-primary/90 border-primary overflow-hidden relative group rounded-[40px] h-[180px] shadow-2xl shadow-primary/20">
-          <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent opacity-50" />
           <CardContent className="p-8 h-full flex flex-col justify-between relative z-10">
             <div className="flex items-start justify-between">
               <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center border border-white/20 shadow-[0_0_20px_rgba(255,255,255,0.1)]">
                 <Zap className="w-7 h-7 text-white" />
               </div>
-              <Badge className="bg-white/20 text-white border-white/30 font-black text-[10px] uppercase tracking-widest px-3 py-1 rounded-full">
-                Resultado Final
-              </Badge>
+              <div className="text-right">
+                <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest">Margem Líquida</p>
+                <p className="text-sm font-black text-white font-mono">
+                  {totalGrossIncome > 0 ? ((realNetProfit / totalGrossIncome) * 100).toFixed(1) : 0}%
+                </p>
+              </div>
             </div>
             <div>
               <p className="text-[10px] font-black tracking-[0.3em] uppercase text-white/70 mb-2 leading-none">Lucro Líquido Real</p>
@@ -556,7 +394,6 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
           </CardContent>
         </Card>
 
-        {/* Fiado Pendente */}
         <Card 
           className="bg-card/30 border-border/50 overflow-hidden relative group cursor-pointer transition-all rounded-[40px] h-[180px] hover:border-orange-500/30"
           onClick={() => setIsFiadoModalOpen(true)}
@@ -567,9 +404,12 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
               <div className="w-14 h-14 rounded-2xl bg-orange-500/10 flex items-center justify-center border border-orange-500/20 shadow-[0_0_20px_rgba(249,115,22,0.15)] group-hover:scale-110 transition-transform">
                 <Users className="w-7 h-7 text-orange-500" />
               </div>
-              <Badge className="bg-orange-500/10 text-orange-500 border-orange-500/20 font-black text-[10px] uppercase tracking-widest px-3 py-1 rounded-full animate-pulse">
-                A Receber
-              </Badge>
+              <div className="text-right">
+                <p className="text-[10px] font-bold text-orange-500/50 uppercase tracking-widest">Taxas Operacionais</p>
+                <p className="text-sm font-black text-orange-500 font-mono">
+                  R$ {totalFees.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
             </div>
             <div>
               <p className="text-[10px] font-black tracking-[0.3em] uppercase text-muted-foreground mb-2 leading-none">Fiado Pendente</p>
@@ -581,179 +421,75 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
         </Card>
       </div>
 
-      {/* Metas / Objectives Section */}
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-500 border border-blue-500/20 shadow-[0_0_20px_rgba(59,130,246,0.1)]">
-              <TrendingUp className="w-6 h-6" />
+      {/* Health Indicator Section */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+        <Card className="md:col-span-2 bg-[#0b1224] border-white/10 rounded-[40px] overflow-hidden relative group">
+          <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent" />
+          <CardContent className="p-8 relative z-10">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20">
+                  <Target className="w-6 h-6 text-primary" />
+                </div>
+                <div>
+                  <h4 className="font-black uppercase tracking-widest text-sm">Ponto de Equilíbrio & Saúde</h4>
+                  <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">Meta de faturamento vs Custos Fixos</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-2xl font-black font-mono text-white">{breakEvenProgress.toFixed(1)}%</span>
+                <p className="text-[9px] font-black text-primary uppercase tracking-tighter">ALCANÇADO</p>
+              </div>
             </div>
+            
+            <div className="space-y-4">
+              <div className="h-4 bg-white/5 rounded-full overflow-hidden border border-white/5">
+                <div 
+                  className="h-full bg-gradient-to-r from-primary to-blue-500 transition-all duration-1000 ease-out"
+                  style={{ width: `${breakEvenProgress}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-[10px] font-black uppercase tracking-widest">
+                <div className="space-y-1">
+                  <p className="text-muted-foreground">Custos Fixos (Recorrência)</p>
+                  <p className="text-white font-mono">R$ {totalFixedCosts.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                </div>
+                <div className="text-center space-y-1">
+                  <p className="text-muted-foreground">Outras Saídas</p>
+                  <p className="text-white font-mono">R$ {(totalExpense + totalFees).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                </div>
+                <div className="text-right space-y-1">
+                  <p className="text-muted-foreground">Faturamento Necessário</p>
+                  <p className="text-primary font-mono font-black">R$ {totalNeeded.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-[#0b1224] border-white/10 rounded-[40px] overflow-hidden flex flex-col justify-center p-8 relative">
+          <div className="space-y-6">
             <div>
-              <h3 className="font-black uppercase tracking-widest text-xl leading-tight">Gestão de Objetivos Financeiros</h3>
-              <p className="text-[10px] text-muted-foreground tracking-[0.2em] uppercase font-bold">Monitoramento de Ponto de Equilíbrio Operacional</p>
+              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Status de Operação</p>
+              <div className="flex items-center gap-2">
+                <div className={cn(
+                  "w-2 h-2 rounded-full animate-pulse",
+                  realNetProfit > 0 ? "bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]" : "bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]"
+                )} />
+                <span className="font-black uppercase tracking-tighter text-lg">
+                  {realNetProfit > 0 ? 'OPERAÇÃO LUCRATIVA' : 'OPERAÇÃO EM DÉFICIT'}
+                </span>
+              </div>
+            </div>
+            <div className="pt-4 border-t border-white/5">
+              <p className="text-[9px] text-muted-foreground leading-relaxed uppercase font-bold tracking-tight">
+                {realNetProfit > 0 
+                  ? "Sua operação está gerando valor líquido positivo após todas as deduções de taxas, CMV e custos fixos."
+                  : "O faturamento atual ainda não cobre a soma de custos fixos, variáveis e taxas operacionais."}
+              </p>
             </div>
           </div>
-          
-          <div className="flex bg-white/5 p-1 rounded-xl border border-border/50">
-            {(['daily', 'weekly', 'monthly'] as const).map((view) => (
-              <button
-                key={view}
-                onClick={() => setMetasView(view)}
-                className={cn(
-                  "px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
-                  metasView === view ? "bg-primary text-white shadow-[0_0_15px_rgba(59,130,246,0.3)]" : "text-muted-foreground hover:text-white"
-                )}
-              >
-                {view === 'daily' ? 'Diário' : view === 'weekly' ? 'Semanal' : 'Mensal'}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="bg-card/40 border-border/50 overflow-hidden relative group flex flex-col justify-center min-h-[300px] rounded-[40px]">
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent opacity-50" />
-            <CardContent className="p-8 relative z-10 flex flex-col items-center text-center">
-              <p className="text-[10px] font-black tracking-[0.3em] uppercase text-primary mb-2">
-                Objetivo {metasView === 'daily' ? 'Diário' : metasView === 'weekly' ? 'Semanal' : 'Mensal'}
-              </p>
-              
-              <div className="mb-8">
-                <h3 className="text-5xl font-black text-white tabular-nums tracking-tighter mb-2 font-mono">
-                  R$ {currentMetaAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </h3>
-                <div className="flex items-center justify-center gap-2 text-muted-foreground px-4 py-1 bg-white/5 rounded-full border border-white/5">
-                  <Settings2 className="w-3 h-3" />
-                  <span className="text-[9px] font-black uppercase tracking-widest">Baseado em Custos Atuais</span>
-                </div>
-              </div>
-
-              <div className="w-full space-y-4">
-                <div className="flex justify-between items-end mb-1">
-                  <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Progresso Realizado</p>
-                  <p className="text-xl font-black text-primary tabular-nums font-mono">{metaProgressPercent.toFixed(1)}%</p>
-                </div>
-                <div className="h-6 bg-white/5 rounded-2xl overflow-hidden border border-white/5 p-1 relative">
-                  <div 
-                    className={cn(
-                      "h-full rounded-xl transition-all duration-1000 relative z-10",
-                      metaProgressPercent >= 100 ? "bg-green-500 shadow-[0_0_20px_rgba(34,197,94,0.4)]" : "bg-primary shadow-[0_0_20px_rgba(59,130,246,0.4)]"
-                    )} 
-                    style={{ width: `${metaProgressPercent}%` }} 
-                  >
-                    {metaProgressPercent > 15 && (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse" />
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="flex justify-between items-center bg-white/[0.03] p-3 rounded-xl border border-white/5">
-                   <div className="text-left">
-                     <p className="text-[8px] font-black text-muted-foreground uppercase tracking-widest leading-none mb-1">Alcançado</p>
-                     <p className="text-sm font-black text-white tabular-nums font-mono">R$ {currentIncomeInView.toLocaleString('pt-BR')}</p>
-                   </div>
-                   <div className="text-right">
-                     <p className="text-[8px] font-black text-muted-foreground uppercase tracking-widest leading-none mb-1">Faltam</p>
-                     <p className="text-sm font-black text-orange-500 tabular-nums font-mono">
-                       R$ {Math.max(0, currentMetaAmount - currentIncomeInView).toLocaleString('pt-BR')}
-                     </p>
-                   </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card/40 border-border/50 overflow-hidden rounded-[40px] md:col-span-2">
-             <CardContent className="p-8 h-full flex flex-col">
-               <div className="flex items-center justify-between mb-8 pb-6 border-b border-white/5">
-                 <div className="space-y-1">
-                    <p className="text-[10px] font-black tracking-[0.3em] uppercase text-muted-foreground">Composição de Custos Operacionais</p>
-                    <p className="text-[9px] text-muted-foreground/60 uppercase font-medium tracking-widest italic">Valores consolidados para o ciclo de faturamento vigente</p>
-                 </div>
-                 <div className="px-6 py-3 bg-white/5 rounded-2xl border border-white/10 text-right">
-                   <p className="text-[8px] font-black uppercase tracking-widest text-primary mb-1">Total de Saídas Projetadas (Mês)</p>
-                   <p className="text-3xl font-black text-white font-mono tabular-nums leading-none tracking-tighter">R$ {monthlyObligations.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                 </div>
-               </div>
-               
-               <div className="flex-1 space-y-4 overflow-y-auto custom-scrollbar pr-2 max-h-[400px]">
-                 {/* Fixed Costs Section */}
-                 <div className="space-y-3">
-                   <div className="flex items-center justify-between mb-3">
-                     <div className="flex items-center gap-2">
-                       <span className="w-2 h-2 rounded-full bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.5)]" />
-                       <span className="text-[10px] font-black uppercase tracking-[0.3em] text-orange-500">Obrigações Fixas</span>
-                     </div>
-                     <Badge variant="outline" className="text-[8px] font-black uppercase tracking-widest border-orange-500/20 text-orange-500 bg-orange-500/5">Recorrente</Badge>
-                   </div>
-                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {recurringExpenses.map(exp => (
-                      <div key={exp.id} className="flex justify-between items-center bg-white/[0.02] p-4 rounded-[40px] border border-white/5 hover:bg-white/[0.04] transition-all group hover:border-orange-500/20 px-8">
-                        <div className="flex flex-col">
-                          <span className="text-xs font-black text-white/90 uppercase tracking-tight group-hover:text-white">{exp.description}</span>
-                          <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-[0.2em] mt-1 italic">Vencimento: Dia {exp.dueDate}</span>
-                        </div>
-                        <span className="font-mono font-black text-sm text-white">R$ {exp.amount.toFixed(2)}</span>
-                      </div>
-                    ))}
-                   </div>
-                 </div>
-
-                 {/* Installments Section */}
-                 {installmentExpenses.length > 0 && (
-                   <div className="space-y-3 mt-8">
-                     <div className="flex items-center justify-between mb-3">
-                       <div className="flex items-center gap-2">
-                         <span className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
-                         <span className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-500">Contratos de Parcelamento</span>
-                       </div>
-                       <Badge variant="outline" className="text-[8px] font-black uppercase tracking-widest border-blue-500/20 text-blue-500 bg-blue-500/5">Ativos</Badge>
-                     </div>
-                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {installmentExpenses.map(exp => (
-                        <div key={exp.id} className="flex justify-between items-center bg-white/[0.02] p-4 rounded-[40px] border border-white/5 hover:bg-white/[0.04] transition-all group hover:border-blue-500/20 px-8">
-                          <div className="flex flex-col">
-                            <span className="text-xs font-black text-white/90 uppercase tracking-tight group-hover:text-white">{exp.description}</span>
-                            <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-[0.2em] mt-1 italic">Parcela {exp.installmentsCount - exp.remainingInstallments + 1}/{exp.installmentsCount}</span>
-                          </div>
-                          <span className="font-mono font-black text-sm text-white">R$ {exp.installmentValue.toFixed(2)}</span>
-                        </div>
-                      ))}
-                     </div>
-                   </div>
-                 )}
-
-                 {/* Variable Costs Section -> Supplier Purchases */}
-                 <div className="space-y-3 mt-8">
-                   <div className="flex items-center justify-between mb-3">
-                     <div className="flex items-center gap-2">
-                       <span className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]" />
-                       <span className="text-[10px] font-black uppercase tracking-[0.3em] text-green-500">Suprimentos & Fornecedores</span>
-                     </div>
-                     <Badge variant="outline" className="text-[8px] font-black uppercase tracking-widest border-green-500/20 text-green-500 bg-green-500/5">Variável</Badge>
-                   </div>
-                   <div className="flex justify-between items-center bg-green-500/5 p-5 rounded-[40px] border border-green-500/10 hover:bg-green-500/10 transition-all group">
-                     <div className="flex flex-col">
-                       <span className="text-sm font-black text-white/90 uppercase tracking-tight group-hover:text-white">Compras de Estoque Reais (Mês)</span>
-                       <p className="text-[9px] font-bold text-green-500/60 uppercase tracking-[0.1em] mt-1">Consolidado de todas as transações e notas de entrada</p>
-                     </div>
-                     <div className="text-right">
-                       <span className="font-mono font-black text-2xl text-green-500 tabular-nums">R$ {variableCostsMonth.toFixed(2)}</span>
-                     </div>
-                   </div>
-                 </div>
-
-                 {recurringExpenses.length === 0 && installmentExpenses.length === 0 && variableCostsMonth === 0 && (
-                   <div className="flex flex-col items-center justify-center py-16 opacity-30 grayscale">
-                     <Settings2 className="w-12 h-12 mb-3 animate-spin-slow" />
-                     <p className="text-[10px] text-muted-foreground uppercase font-black tracking-[0.3em]">Nenhuma obrigação detectada</p>
-                   </div>
-                 )}
-               </div>
-             </CardContent>
-          </Card>
-        </div>
+        </Card>
       </div>
 
       <Card className="bg-card/40 border-border/50 overflow-hidden rounded-[40px] shadow-2xl">
@@ -764,435 +500,147 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
             </div>
             <div>
               <h3 className="font-black uppercase tracking-widest text-lg leading-tight">Histórico de Transações</h3>
-              <p className="text-[10px] text-muted-foreground tracking-widest uppercase font-bold">Monitoramento de Fluxo {getFilterLabel()}</p>
             </div>
           </div>
-
           <div className="flex flex-wrap gap-3 w-full lg:flex-1 justify-end items-center">
-            {/* Search Bar */}
             <div className="relative w-full md:w-64">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input 
                 placeholder="BUSCAR..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-12 h-12 bg-white/5 border-white/10 rounded-[20px] text-[10px] font-black tracking-widest uppercase focus:ring-primary/50"
+                className="pl-12 h-12 bg-white/5 border-white/10 rounded-[20px] text-[10px] font-black tracking-widest uppercase"
               />
             </div>
-
-            {/* Category Filter */}
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-full md:w-[180px] h-12 px-6 rounded-[20px] gap-3 font-bold tracking-widest uppercase border-border hover:bg-white/5 text-[10px] bg-card/50">
-                <div className="flex items-center gap-2 truncate">
-                  <Receipt className="w-4 h-4 text-primary shrink-0" />
-                  <SelectValue placeholder="CATEGORIA" />
-                </div>
+              <SelectTrigger className="w-full md:w-[180px] h-12 px-6 rounded-[20px] bg-card/50">
+                <SelectValue placeholder="CATEGORIA" />
               </SelectTrigger>
               <SelectContent className="bg-[#0b1224] border-border text-white">
-                <SelectItem value="all" className="uppercase font-bold tracking-widest text-xs">TODAS CATEGORIAS</SelectItem>
-                <SelectItem value="Venda de Produtos" className="uppercase font-bold tracking-widest text-xs text-green-500">VENDA DE PRODUTOS</SelectItem>
-                <SelectItem value="Compra de Estoque" className="uppercase font-bold tracking-widest text-xs text-red-500">COMPRA DE ESTOQUE</SelectItem>
-                {expenseCategories.map(cat => (
-                  <SelectItem key={cat.id} value={cat.id} className="uppercase font-bold tracking-widest text-xs">
-                    {cat.name.toUpperCase()}
-                  </SelectItem>
-                ))}
+                <SelectItem value="all">TODAS</SelectItem>
+                {expenseCategories.map(cat => <SelectItem key={cat.id} value={cat.id}>{cat.name.toUpperCase()}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={dateFilter} onValueChange={(val: any) => setDateFilter(val)}>
+              <SelectTrigger className="w-full md:w-[160px] h-12 px-6 rounded-[20px] bg-card/50">
+                <SelectValue placeholder="PERÍODO" />
+              </SelectTrigger>
+              <SelectContent className="bg-[#0b1224] border-border text-white">
+                <SelectItem value="all">TUDO</SelectItem>
+                <SelectItem value="today">HOJE</SelectItem>
+                <SelectItem value="week">SEMANA</SelectItem>
+                <SelectItem value="month">MÊS</SelectItem>
+                <SelectItem value="custom">PERÍODO</SelectItem>
               </SelectContent>
             </Select>
 
-            {/* Payment Method Filter */}
-            <Select value={methodFilter} onValueChange={setMethodFilter}>
-              <SelectTrigger className="w-full md:w-[160px] h-14 px-6 rounded-[20px] gap-3 font-bold tracking-widest uppercase border-border hover:bg-white/5 text-[10px] bg-card/50">
-                <div className="flex items-center gap-2">
-                  <Settings2 className="w-4 h-4 text-primary" />
-                  <SelectValue placeholder="MÉTODO" />
-                </div>
-              </SelectTrigger>
-              <SelectContent className="bg-[#0b1224] border-border text-white">
-                <SelectItem value="all" className="uppercase font-bold tracking-widest text-xs">TODOS MÉTODOS</SelectItem>
-                <SelectItem value="Dinheiro" className="uppercase font-bold tracking-widest text-xs">DINHEIRO</SelectItem>
-                <SelectItem value="Pix" className="uppercase font-bold tracking-widest text-xs">PIX</SelectItem>
-                <SelectItem value="Cartão de Débito" className="uppercase font-bold tracking-widest text-xs">DÉBITO</SelectItem>
-                <SelectItem value="Cartão de Crédito" className="uppercase font-bold tracking-widest text-xs">CRÉDITO</SelectItem>
-                <SelectItem value="Fiado" className="uppercase font-bold tracking-widest text-xs text-orange-500">FIADO</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {/* Date Filter */}
-            <div className="flex items-center gap-2 w-full md:w-auto">
-              <Select value={dateFilter} onValueChange={(val: any) => {
-                setDateFilter(val);
-                if (val !== 'custom') {
-                  setStartDate(undefined);
-                  setEndDate(undefined);
-                }
-              }}>
-                <SelectTrigger className="w-full md:w-[160px] h-14 px-6 rounded-[20px] gap-3 font-bold tracking-widest uppercase border-border hover:bg-white/5 text-[10px] bg-card/50">
-                  <Filter className="w-4 h-4 text-primary" />
-                  <SelectValue placeholder="PERÍODO" />
-                </SelectTrigger>
-                <SelectContent className="bg-[#0b1224] border-border text-white">
-                  <SelectItem value="all" className="uppercase font-bold tracking-widest text-xs">TODOS</SelectItem>
-                  <SelectItem value="today" className="uppercase font-bold tracking-widest text-xs">HOJE</SelectItem>
-                  <SelectItem value="week" className="uppercase font-bold tracking-widest text-xs">SEMANA</SelectItem>
-                  <SelectItem value="month" className="uppercase font-bold tracking-widest text-xs">MÊS</SelectItem>
-                  <SelectItem value="custom" className="uppercase font-bold tracking-widest text-xs">PERSONALIZADO</SelectItem>
-                </SelectContent>
-              </Select>
-
-              {dateFilter === 'custom' && (
-                <div className="animate-in slide-in-from-left-2 duration-300">
-                  <DateRangePicker 
-                    onApply={(range) => {
-                      if (range) {
-                        setStartDate(range.from);
-                        setEndDate(range.to);
-                        toast.success('Filtro de data aplicado');
-                      }
-                    }}
-                    initialRange={startDate && endDate ? { from: startDate, to: endDate } : undefined}
-                    className="w-full md:min-w-[280px]"
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-
+            {dateFilter === 'custom' && (
+              <DateRangePicker 
+                onApply={(range) => {
+                  if (range) {
+                    setStartDate(range.from);
+                    setEndDate(range.to);
+                  }
+                }}
+                initialRange={startDate && endDate ? { from: startDate, to: endDate } : undefined}
+                className="w-full md:w-auto"
+              />
+            )}
             <Dialog open={isExpenseModalOpen} onOpenChange={setIsExpenseModalOpen}>
-              <DialogTrigger
-              nativeButton={true}
-              render={
-                <Button className="w-full md:w-auto h-12 px-8 rounded-[20px] gap-3 font-bold tracking-widest uppercase bg-red-600 hover:bg-red-700 shadow-lg shadow-red-600/20 text-[10px]">
-                  <Plus className="w-4 h-4" />
-                  Lançar Saída
-                </Button>
-                }
-            />
-
-              <DialogContent className="bg-[#0b1224] border-border max-w-lg text-white p-0 overflow-hidden flex flex-col max-h-[95vh] md:max-h-[90vh]">
-                <div className="p-6 md:p-8 border-b border-border/50 relative flex-shrink-0">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 md:w-14 md:h-14 rounded-xl md:rounded-2xl bg-red-500/10 flex items-center justify-center border border-red-500/20">
-                      <TrendingDown className="w-5 h-5 md:w-7 md:h-7 text-red-500" />
-                    </div>
-                    <div>
-                      <DialogTitle className="text-xl md:text-3xl font-black uppercase tracking-tighter leading-none mb-1">Nova Despesa</DialogTitle>
-                      <p className="text-[9px] md:text-[10px] font-bold tracking-widest uppercase text-red-500/60 flex items-center gap-2">
-                        <ArrowDownRight className="w-3 h-3" /> Registro de saída financeira
-                      </p>
-                    </div>
-                  </div>
-                  <button onClick={() => setIsExpenseModalOpen(false)} className="absolute right-6 top-6 text-muted-foreground hover:text-white transition-colors">
-                    <X className="w-5 h-5" />
-                  </button>
+              <DialogTrigger asChild>
+                <Button className="h-12 px-8 rounded-[20px] bg-red-600 hover:bg-red-700">Lançar Saída</Button>
+              </DialogTrigger>
+              <DialogContent className="bg-[#0b1224] text-white border-border">
+                <DialogHeader><DialogTitle>Nova Despesa</DialogTitle></DialogHeader>
+                <div className="space-y-4">
+                  <Input type="number" placeholder="Valor" value={amount} onChange={(e) => setAmount(e.target.value)} className="bg-background" />
+                  <Input placeholder="Descrição" value={description} onChange={(e) => setDescription(e.target.value)} className="bg-background" />
+                  <Button onClick={handleAddExpense} className="w-full bg-red-600">Salvar</Button>
                 </div>
-
-                <div className="p-6 md:p-8 space-y-6 md:space-y-8 overflow-y-auto custom-scrollbar flex-1">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Valor (R$)</label>
-                      <Input 
-                        type="number" 
-                        step="0.01" 
-                        className="h-12 bg-background border-border font-black"
-                        value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
-                        placeholder="0,00"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Data do Lançamento</label>
-                      <Input 
-                        type="date"
-                        className="h-12 bg-background border-border font-bold uppercase tracking-widest text-[10px]"
-                        value={expenseDate}
-                        onChange={(e) => setExpenseDate(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center ml-1">
-                      <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Categoria</label>
-                      <button 
-                        type="button"
-                        onClick={() => setIsCategoryModalOpen(true)}
-                        className="text-[9px] font-bold text-primary hover:underline uppercase tracking-widest"
-                      >
-                        Gerenciar
-                      </button>
-                    </div>
-                    <Select value={category} onValueChange={(val) => {
-                      setCategory(val);
-                      setSubCategory('');
-                    }}>
-                      <SelectTrigger className="h-12 bg-background border-border font-bold uppercase tracking-widest text-[10px]">
-                        <SelectValue placeholder="Selecionar" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-[#0b1224] border-border max-h-[250px]">
-                        {expenseCategories.length === 0 ? (
-                          <div className="px-2 py-4 text-center text-muted-foreground text-[10px] font-bold uppercase">
-                            Nenhuma categoria cadastrada
-                          </div>
-                        ) : (
-                          expenseCategories.map(cat => (
-                            <SelectItem key={cat.id} value={cat.id} className="uppercase font-bold tracking-widest text-xs">
-                              {cat.name}
-                            </SelectItem>
-                          ))
-                        )}
-                        {/* Legacy default categories if none exist */}
-                        {expenseCategories.length === 0 && (
-                          <>
-                            <SelectItem value="Suprimentos" className="uppercase font-bold tracking-widest text-xs">Suprimentos</SelectItem>
-                            <SelectItem value="Aluguel" className="uppercase font-bold tracking-widest text-xs">Aluguel</SelectItem>
-                            <SelectItem value="Utilidades" className="uppercase font-bold tracking-widest text-xs">Utilidades</SelectItem>
-                          </>
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {category && expenseCategories.find(c => c.id === category)?.subcategories?.length! > 0 && (
-                    <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
-                      <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Subcategoria (Opcional)</label>
-                      <Select value={subCategory} onValueChange={setSubCategory}>
-                        <SelectTrigger className="h-12 bg-background border-border font-bold uppercase tracking-widest text-[10px]">
-                          <SelectValue placeholder="Selecionar Subcategoria" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-[#0b1224] border-border">
-                          {expenseCategories.find(c => c.id === category)?.subcategories.map(sub => (
-                            <SelectItem key={sub} value={sub} className="uppercase font-bold tracking-widest text-xs">
-                              {sub}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Descrição</label>
-                    <Input 
-                      className="h-12 bg-background border-border"
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      placeholder="Ex: Reposição de Cerveja"
-                    />
-                  </div>
-
-                  <div className="pt-4 border-t border-border/50 space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="flex items-center justify-between bg-white/5 p-3 rounded-xl border border-border/50">
-                        <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground">Fixa Mensal?</label>
-                        <input 
-                          type="checkbox" 
-                          className="w-5 h-5 rounded border-border bg-background accent-primary"
-                          checked={isRecurring}
-                          onChange={(e) => {
-                            setIsRecurring(e.target.checked);
-                            if (e.target.checked) setIsInstallment(false);
-                          }}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between bg-white/5 p-3 rounded-xl border border-border/50">
-                        <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground">Parcelada?</label>
-                        <input 
-                          type="checkbox" 
-                          className="w-5 h-5 rounded border-border bg-background accent-primary"
-                          checked={isInstallment}
-                          onChange={(e) => {
-                            setIsInstallment(e.target.checked);
-                            if (e.target.checked) setIsRecurring(false);
-                          }}
-                        />
-                      </div>
-                    </div>
-                    
-                    {isRecurring && (
-                      <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
-                        <div className="p-4 bg-orange-500/5 border border-orange-500/20 rounded-xl space-y-1">
-                          <p className="text-[10px] font-black text-orange-500 uppercase tracking-widest flex items-center gap-2">
-                            <Info className="w-3 h-3" /> Definição de Custo Fixo
-                          </p>
-                          <p className="text-[9px] text-muted-foreground leading-tight uppercase font-bold tracking-tighter">
-                            Essencial e previsível. Ocorrem todo mês (Ex: Aluguel, Internet).
-                          </p>
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Dia do Vencimento</label>
-                          <Select value={dueDate} onValueChange={setDueDate}>
-                            <SelectTrigger className="h-12 bg-background border-border font-bold uppercase tracking-widest text-[10px]">
-                              <SelectValue placeholder="Selecionar Dia" />
-                            </SelectTrigger>
-                            <SelectContent className="bg-[#0b1224] border-border max-h-[200px]">
-                              {Array.from({ length: 31 }, (_, i) => (
-                                <SelectItem key={i + 1} value={(i + 1).toString()} className="font-mono">
-                                  DIA {String(i + 1).padStart(2, '0')}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-widest leading-tight">
-                            Esta despesa será listada automaticamente no relatório mensal.
-                          </p>
-                        </div>
-                      </div>
-                    )}
-
-                    {isInstallment && (
-                      <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Número de Parcelas</label>
-                          <Select value={installmentsCount} onValueChange={setInstallmentsCount}>
-                            <SelectTrigger className="h-12 bg-background border-border font-bold uppercase tracking-widest text-[10px]">
-                              <SelectValue placeholder="Selecionar Parcelas" />
-                            </SelectTrigger>
-                            <SelectContent className="bg-[#0b1224] border-border">
-                              {[2,3,4,5,6,10,12,24].map(n => (
-                                <SelectItem key={n} value={n.toString()} className="font-mono">{n} Parcelas</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="p-4 bg-primary/5 border border-primary/20 rounded-xl">
-                          <p className="text-[10px] font-bold text-primary uppercase tracking-widest mb-1 text-center">Simulação</p>
-                          <p className="text-sm font-black text-white text-center">
-                            {installmentsCount}x de R$ {(parseFloat(amount || '0') / parseInt(installmentsCount)).toFixed(2)}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <DialogFooter className="p-6 md:p-8 border-t border-border/50 bg-card flex-shrink-0">
-                  <Button variant="ghost" onClick={() => setIsExpenseModalOpen(false)} disabled={isSaving} className="font-bold uppercase tracking-widest text-xs">Cancelar</Button>
-                  <Button onClick={handleAddExpense} disabled={isSaving} className="h-12 px-8 bg-red-600 hover:bg-red-700 font-bold uppercase tracking-widest text-xs">
-                    {isSaving ? (
-                      <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        <span>Salvando...</span>
-                      </div>
-                    ) : 'Salvar Despesa'}
-                  </Button>
-                </DialogFooter>
               </DialogContent>
             </Dialog>
           </div>
         </div>
 
-        {/* Desktop Table View */}
-        <div className="hidden md:block">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader className="bg-white/5 sticky top-0 z-20">
-                <TableRow className="border-border hover:bg-transparent border-b">
-                  <TableHead className="text-[10px] font-black tracking-widest uppercase text-muted-foreground h-16 px-8">Hora</TableHead>
-                  <TableHead className="text-[10px] font-black tracking-widest uppercase text-muted-foreground h-16 px-8">Tipo</TableHead>
-                  <TableHead className="text-[10px] font-black tracking-widest uppercase text-muted-foreground h-16 px-8">Categoria</TableHead>
-                  <TableHead className="text-[10px] font-black tracking-widest uppercase text-muted-foreground h-16 px-8">Descrição / Método</TableHead>
-                  <TableHead className="text-right text-[10px] font-black tracking-widest uppercase text-muted-foreground h-16 px-8">Valor</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {Object.entries(groupedTransactions).map(([date, transactions]) => (
-                  <React.Fragment key={date}>
-                    <TableRow className="bg-primary/5 hover:bg-primary/5 border-y border-white/5">
-                      <TableCell colSpan={5} className="py-3 px-8">
-                        <div className="flex items-center gap-3">
-                          <div className="w-1.5 h-6 bg-primary rounded-full" />
-                          <span className="text-[11px] font-black uppercase tracking-[0.4em] text-primary">
-                            MOVIMENTAÇÃO DE {date}
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader className="bg-white/5">
+              <TableRow className="border-border">
+                <TableHead className="px-8 text-[10px] font-black uppercase text-muted-foreground">Data</TableHead>
+                <TableHead className="px-8 text-[10px] font-black uppercase text-muted-foreground">Tipo</TableHead>
+                <TableHead className="px-8 text-[10px] font-black uppercase text-muted-foreground">Descrição</TableHead>
+                <TableHead className="px-8 text-[10px] font-black uppercase text-muted-foreground text-right">Valor</TableHead>
+                <TableHead className="px-8 text-right text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody className="hidden md:table-row-group">
+              {groupedTransactions.map(([date, groupTransactions]) => (
+                <React.Fragment key={`group-${date}`}>
+                  <TableRow className="bg-white/[0.02] border-y border-white/5 pointer-events-none">
+                    <TableCell colSpan={5} className="py-2 px-8">
+                      <span className="text-[10px] font-black uppercase tracking-[0.3em] text-primary/60">
+                        {date}
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                  {groupTransactions.map((t) => (
+                    <TableRow 
+                      key={t.id} 
+                      className="border-border hover:bg-white/5 cursor-pointer group transition-colors"
+                      onClick={() => setSelectedTransaction(t)}
+                    >
+                      <TableCell className="px-8 text-xs font-mono font-bold text-muted-foreground">
+                        {format(t.date, 'HH:mm')}
+                      </TableCell>
+                      <TableCell className="px-8">
+                        <Badge variant="outline" className={cn(
+                          "text-[9px] font-black uppercase tracking-widest px-2 py-0.5 border-none",
+                          t.type === 'income' ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"
+                        )}>
+                          {t.type === 'income' ? 'Entrada' : 'Saída'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="px-8">
+                        <div className="flex flex-col">
+                          <span className="text-xs font-black uppercase tracking-wider text-white group-hover:text-primary transition-colors">
+                            {t.category || (t.type === 'income' ? 'Venda' : 'Geral')}
                           </span>
-                          <Badge variant="outline" className="ml-auto text-[9px] font-bold border-primary/20 text-primary uppercase tracking-widest">
-                            {transactions.length} LANÇAMENTOS
-                          </Badge>
+                          <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest line-clamp-1">
+                            {t.description || 'Sem descrição'}
+                          </span>
                         </div>
                       </TableCell>
-                    </TableRow>
-                    {transactions.map((t, idx) => (
-                      <TableRow 
-                        key={`${t.id}-${idx}`} 
-                        className="border-border hover:bg-white/5 transition-all cursor-pointer group h-20"
-                        onClick={() => setSelectedTransaction(t)}
-                      >
-                        <TableCell className="px-8 text-[10px] font-black text-muted-foreground uppercase tracking-widest group-hover:text-primary transition-colors tabular-nums">
-                          <div className="flex flex-col">
-                            <span className="text-white font-mono text-xs">{t.date ? format(t.date.toDate ? t.date.toDate() : t.date, 'HH:mm') : '--:--'}</span>
-                            <span className="opacity-40">{t.date ? format(t.date.toDate ? t.date.toDate() : t.date, 'dd/MM') : ''}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="px-8">
-                          <div className="flex items-center gap-3">
-                            <div className={cn(
-                              "w-10 h-10 rounded-xl flex items-center justify-center border transition-transform group-hover:scale-110",
-                              t.type === 'income' ? "bg-green-500/10 border-green-500/20 text-green-500" : "bg-red-500/10 border-red-500/20 text-red-500"
-                            )}>
-                              {t.type === 'income' ? <ArrowUpRight className="w-5 h-5" /> : <ArrowDownRight className="w-5 h-5" />}
-                            </div>
-                            <div className="flex flex-col">
-                              <span className={cn(
-                                "text-[10px] font-black uppercase tracking-widest leading-none mb-1",
-                                t.type === 'income' ? "text-green-500" : "text-red-500"
-                              )}>
-                                {t.type === 'income' ? 'Entrada' : 'Saída'}
-                              </span>
-                              <span className="text-xs font-bold uppercase tracking-tighter text-white/90">{t.category}</span>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="px-8">
-                           <div className="flex flex-col max-w-[300px]">
-                             <span className="truncate text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                               {t.description || 'Sem descrição'}
-                             </span>
-                             {t.subCategory && (
-                               <span className="text-[9px] text-primary/60 uppercase font-black tracking-widest mt-0.5">
-                                 {t.subCategory}
-                               </span>
-                             )}
-                           </div>
-                        </TableCell>
-                        <TableCell className="px-8">
-                           <div className="flex items-center gap-3 bg-white/5 py-2 px-4 rounded-2xl border border-white/5 w-fit">
-                             <div className={cn(
-                               "w-8 h-8 rounded-lg flex items-center justify-center",
-                               t.paymentMethod === 'Pix' ? "bg-cyan-500/20 text-cyan-500" : 
-                               t.paymentMethod === 'Dinheiro' ? "bg-green-500/20 text-green-500" : 
-                               t.paymentMethod === 'Crédito' || t.paymentMethod === 'Débito' || t.paymentMethod === 'Cartão' ? "bg-blue-500/20 text-blue-500" :
-                               t.paymentMethod === 'Fiado' ? "bg-orange-500/20 text-orange-500" : "bg-muted/20 text-muted-foreground"
-                             )}>
-                               {t.paymentMethod === 'Pix' ? <QrCode className="w-4 h-4" /> : 
-                                t.paymentMethod === 'Dinheiro' ? <Banknote className="w-4 h-4" /> : 
-                                t.paymentMethod === 'Fiado' ? <Users className="w-4 h-4" /> : 
-                                (t.paymentMethod === 'Crédito' || t.paymentMethod === 'Débito' || t.paymentMethod === 'Cartão') ? <CreditCard className="w-4 h-4" /> :
-                                <MoreHorizontal className="w-4 h-4" />}
-                             </div>
-                             <span className="text-[10px] font-black uppercase tracking-widest text-white/70">{t.paymentMethod || 'N/A'}</span>
-                           </div>
-                        </TableCell>
-                        <TableCell className={cn(
-                          "px-8 text-right font-mono font-black",
-                          ((t.type === 'income' ? t.amount : -t.amount) || 0) >= 0 ? 'text-green-500' : 'text-red-500'
-                        )}>
-                          <div className="flex flex-col items-end">
-                            <span className="text-xl tracking-tighter tabular-nums">
-                              {((t.type === 'income' ? t.amount : -t.amount) || 0) >= 0 ? '+' : '-'} R$ {Math.abs(t.amount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      <TableCell className={cn("px-8 text-right")}>
+                        <div className="flex flex-col items-end">
+                          <span className={cn(
+                            "text-sm font-mono font-black tabular-nums",
+                            t.type === 'income' ? 'text-green-500' : 'text-red-500'
+                          )}>
+                            {t.type === 'income' ? '+' : '-'} R$ {Math.abs(t.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                          {t.type === 'income' && t.paymentMethod && (
+                            <span className="text-[8px] text-muted-foreground font-bold uppercase tracking-widest mt-0.5">
+                              {t.paymentMethod} {t.feeAmount > 0 && `(-R$ ${t.feeAmount.toFixed(2)})`}
                             </span>
-                            {t.type === 'income' && (t.feeAmount || 0) > 0 && (
-                              <span className="text-[9px] text-muted-foreground uppercase tracking-[0.2em] mt-0.5 font-bold flex items-center gap-1">
-                                <Info className="w-3 h-3 opacity-50" />
-                                Líq: R$ {(t.netAmount || (t.amount - (t.feeAmount || 0))).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                              </span>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </React.Fragment>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="px-8 text-right">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={(e) => handleDeleteTransaction(e, t.id, (t as any).source)} 
+                          className="h-9 w-9 text-red-500/50 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </React.Fragment>
+              ))}
+            </TableBody>
+          </Table>
         </div>
 
         {/* Mobile Card View */}
@@ -1289,7 +737,7 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
       {/* Fiado Details Modal */}
       <Dialog open={isFiadoModalOpen} onOpenChange={setIsFiadoModalOpen}>
         <DialogContent className="bg-[#0b1224] border-border max-w-2xl text-white p-0 overflow-hidden flex flex-col max-h-[90vh]">
-          <div className="p-6 md:p-8 border-b border-border/50 relative flex-shrink-0">
+          <DialogHeader className="p-6 md:p-8 border-b border-border/50 relative flex-shrink-0">
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 rounded-2xl bg-orange-500/10 flex items-center justify-center border border-orange-500/20">
                 <Users className="w-7 h-7 text-orange-500" />
@@ -1301,10 +749,7 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
                 </p>
               </div>
             </div>
-            <button onClick={() => setIsFiadoModalOpen(false)} className="absolute right-6 top-6 text-muted-foreground hover:text-white transition-colors">
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+          </DialogHeader>
 
           <div className="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar">
             <div className="space-y-4">
@@ -1358,7 +803,7 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
       {/* Transaction Detail Modal */}
       <Dialog open={!!selectedTransaction} onOpenChange={(open) => !open && setSelectedTransaction(null)}>
         <DialogContent className="bg-[#0b1224] border-border max-w-lg text-white p-0 overflow-hidden flex flex-col max-h-[90vh]">
-          <div className="p-6 md:p-8 border-b border-border/50 relative flex-shrink-0">
+          <DialogHeader className="p-6 md:p-8 border-b border-border/50 relative flex-shrink-0">
             <div className="flex items-center gap-4">
               <div className={cn(
                 "w-14 h-14 rounded-2xl flex items-center justify-center border",
@@ -1376,10 +821,7 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
                 </p>
               </div>
             </div>
-            <button onClick={() => setSelectedTransaction(null)} className="absolute right-6 top-6 text-muted-foreground hover:text-white transition-colors">
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+          </DialogHeader>
 
           <div className="p-8 space-y-8 overflow-y-auto custom-scrollbar">
             <div className="grid grid-cols-2 gap-8">
@@ -1470,11 +912,23 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
                           R$ {(customer.balance || 0).toFixed(2)}
                         </p>
                       </div>
-                      <div>
-                        <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Gasto Total</p>
-                        <p className="font-mono font-bold text-sm text-primary">R$ {(customer.totalSpent || 0).toFixed(2)}</p>
+                        <div>
+                          <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Gasto Total</p>
+                          <p className="font-mono font-bold text-sm text-primary">R$ {(customer.totalSpent || 0).toFixed(2)}</p>
+                        </div>
                       </div>
                     </div>
+                    <Button 
+                      variant="outline" 
+                      className="w-full h-14 rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] border-orange-500/10 bg-orange-500/5 hover:bg-orange-500 hover:text-white transition-all mt-6 group"
+                      onClick={() => {
+                        setSelectedTransaction(null);
+                        setActiveTab('clients');
+                      }}
+                    >
+                      Ver Perfil Completo do Cliente
+                      <Users className="w-4 h-4 ml-2 group-hover:scale-110 transition-transform" />
+                    </Button>
                   </div>
                 </div>
               );
@@ -1553,15 +1007,15 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
                         <span className="text-[10px] font-black text-green-500 uppercase tracking-widest">Fornecedor: {relatedPurchase.supplierName}</span>
                       </div>
                       <Button 
-                        variant="ghost" 
-                        size="sm"
-                        className="text-[9px] font-black uppercase tracking-widest hover:bg-green-500/10 text-green-500"
+                        variant="default" 
+                        className="h-12 px-6 rounded-xl font-black uppercase tracking-widest text-[10px] bg-green-500 hover:bg-green-600 text-white shadow-lg shadow-green-500/20"
                         onClick={() => {
                           setSelectedTransaction(null);
                           setActiveTab('inventory');
                         }}
                       >
-                        Gerenciar Estoque
+                        Gerenciar no Estoque
+                        <Package className="w-4 h-4 ml-2" />
                       </Button>
                     </div>
                   </div>
@@ -1664,11 +1118,14 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
                         <p className="text-lg font-black text-white font-mono tabular-nums">R$ {expense.installmentValue.toFixed(2)}</p>
                         <p className="text-[10px] text-muted-foreground uppercase font-black tracking-tighter">Total: R$ {expense.totalAmount.toFixed(2)}</p>
                       </div>
-                      <Button variant="ghost" size="icon" onClick={async () => {
-                        if (confirm('Deseja cancelar este parcelamento?')) {
+                        <Button variant="ghost" size="icon" onClick={async () => {
+                        if (confirm('Deseja desativar este parcelamento?')) {
                           try {
-                            await deleteDoc(doc(db, 'installment_expenses', expense.id));
-                            toast.success('Parcelamento removido');
+                            await updateDoc(doc(db, 'installment_expenses', expense.id), { 
+                              active: false,
+                              status: 'deleted'
+                            });
+                            toast.success('Parcelamento desativado');
                           } catch (error) {
                             handleFirestoreError(error, OperationType.DELETE, 'installment_expenses');
                           }
@@ -1686,7 +1143,7 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
       {/* Category Management Modal */}
       <Dialog open={isCategoryModalOpen} onOpenChange={setIsCategoryModalOpen}>
         <DialogContent className="bg-[#0b1224] border-border max-w-2xl text-white p-0 overflow-hidden flex flex-col max-h-[90vh]">
-          <div className="p-6 md:p-8 border-b border-border/50 relative flex-shrink-0">
+          <DialogHeader className="p-6 md:p-8 border-b border-border/50 relative flex-shrink-0">
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20">
                 <Settings2 className="w-7 h-7 text-primary" />
@@ -1698,10 +1155,7 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
                 </p>
               </div>
             </div>
-            <button onClick={() => setIsCategoryModalOpen(false)} className="absolute right-6 top-6 text-muted-foreground hover:text-white transition-colors">
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+          </DialogHeader>
 
           <div className="p-6 md:p-8 space-y-8 overflow-y-auto custom-scrollbar">
             {/* New Category Form */}
@@ -1730,9 +1184,15 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
                       variant="ghost" 
                       size="icon" 
                       onClick={async () => {
-                        if (confirm('Excluir esta categoria e todas subcategorias?')) {
-                          await deleteDoc(doc(db, 'expense_categories', cat.id));
-                          toast.success('Categoria excluída');
+                        if (confirm('Deseja desativar esta categoria? (Ela será mantida no histórico como deletada)')) {
+                          try {
+                            await updateDoc(doc(db, 'expense_categories', cat.id), { 
+                              status: 'deleted'
+                            });
+                            toast.success('Categoria desativada');
+                          } catch (error) {
+                            handleFirestoreError(error, OperationType.DELETE, 'expense_categories');
+                          }
                         }
                       }}
                       className="text-red-500 hover:bg-red-500/10"
@@ -1788,7 +1248,7 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
       {/* Edit Recurring Modal */}
       <Dialog open={isEditingRecurringModalOpen} onOpenChange={setIsEditingRecurringModalOpen}>
         <DialogContent className="bg-[#0b1224] border-border max-w-lg text-white p-0 overflow-hidden flex flex-col">
-          <div className="p-8 border-b border-border/50 bg-primary/5">
+          <DialogHeader className="p-8 border-b border-border/50 bg-primary/5">
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20">
                 <Settings2 className="w-7 h-7 text-primary" />
@@ -1798,7 +1258,7 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
                 <p className="text-[10px] font-bold tracking-widest uppercase text-primary/60">Recorrência Mensal</p>
               </div>
             </div>
-          </div>
+          </DialogHeader>
 
           <div className="p-8 space-y-6">
             <div className="p-4 bg-orange-500/5 border border-orange-500/20 rounded-xl space-y-1">

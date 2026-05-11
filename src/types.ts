@@ -67,6 +67,7 @@ export interface RecurringExpense {
   categoryId: string;
   subCategory?: string;
   active: boolean;
+  status?: 'active' | 'deleted';
 }
 
 export interface Category {
@@ -143,6 +144,7 @@ export interface Transaction {
   paymentMethod?: string;
   isFiado?: boolean;
   isSaldo?: boolean;
+  status?: 'active' | 'deleted';
 }
 
 export interface PaymentFeeConfig {
@@ -165,6 +167,7 @@ export interface InstallmentExpense {
   subCategory?: string;
   createdAt: any;
   active: boolean;
+  status?: 'active' | 'deleted';
 }
 
 export interface UserProfile {
