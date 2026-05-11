@@ -43,6 +43,10 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
     topCustomers: [],
     hourlyStats: []
   });
+  const [selectedDayTransactions, setSelectedDayTransactions] = useState<any[]>([]);
+  const [isDayModalOpen, setIsDayModalOpen] = useState(false);
+  const [selectedDayLabel, setSelectedDayLabel] = useState('');
+  const [loadingTransactions, setLoadingTransactions] = useState(false);
 
   const [dateRange, setDateRange] = useState<{from: Date, to: Date}>({
     from: subDays(new Date(), 6),
@@ -328,6 +332,46 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
     });
   };
 
+  const handleChartClick = async (data: any) => {
+    if (!data || !data.activePayload) return;
+    const dayInfo = data.activePayload[0].payload;
+    setSelectedDayLabel(dayInfo.fullDate);
+    setIsDayModalOpen(true);
+    setLoadingTransactions(true);
+
+    try {
+      const midDay = new Date(dayInfo.date);
+      midDay.setHours(12, 0, 0, 0);
+      const { start, end } = getShiftInterval(midDay);
+
+      const q = query(
+        collection(db, 'transactions'),
+        where('date', '>=', Timestamp.fromDate(start)),
+        where('date', '<=', Timestamp.fromDate(end))
+      );
+      const qExp = query(
+        collection(db, 'expenses'),
+        where('date', '>=', Timestamp.fromDate(start)),
+        where('date', '<=', Timestamp.fromDate(end))
+      );
+
+      const [snap, snapExp] = await Promise.all([getDocs(q), getDocs(qExp)]);
+      const trans = snap.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+      const exps = snapExp.docs.map(doc => ({ ...doc.data(), id: doc.id, type: 'expense' }));
+      
+      setSelectedDayTransactions([...trans, ...exps].sort((a: any, b: any) => {
+        const dateA = a.date?.toDate ? a.date.toDate() : new Date(a.date);
+        const dateB = b.date?.toDate ? b.date.toDate() : new Date(b.date);
+        return dateB.getTime() - dateA.getTime();
+      }));
+    } catch (error) {
+      console.error("Error fetching day transactions:", error);
+      toast.error("Erro ao carregar transações do dia");
+    } finally {
+      setLoadingTransactions(false);
+    }
+  };
+
   useEffect(() => {
     fetchDailyDataByRange(dateRange);
   }, [dateRange]);
@@ -512,8 +556,8 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
                 <TrendingUp className="w-5 h-5" />
               </div>
               <div>
-                <CardTitle className="text-sm font-bold uppercase tracking-wider">Top Rentabilidade</CardTitle>
-                <p className="text-[10px] text-muted-foreground tracking-widest uppercase font-semibold">Maior Lucro Unitário</p>
+                <CardTitle className="text-sm font-bold uppercase tracking-wider">Top Margem de Lucro</CardTitle>
+                <p className="text-[10px] text-muted-foreground tracking-widest uppercase font-semibold">Produtos mais Rentáveis</p>
               </div>
             </div>
           </CardHeader>
@@ -523,7 +567,7 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
                 <TableRow className="border-border hover:bg-transparent">
                   <TableHead className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground pl-6">Produto</TableHead>
                   <TableHead className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground text-right">Preço</TableHead>
-                  <TableHead className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground text-right pr-6">Lucro Unit.</TableHead>
+                  <TableHead className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground text-right pr-6">Margem</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -566,7 +610,7 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
           <CardContent className="pt-8">
             <div className="h-72 w-full min-h-[300px]">
               <ResponsiveContainer width="100%" height="100%" minHeight={300}>
-                <BarChart data={dailyData}>
+                <BarChart data={dailyData} onClick={handleChartClick}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1f2937" />
                   <XAxis 
                     dataKey="name" 
@@ -582,7 +626,7 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
                   />
                   <Tooltip 
                     cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                    formatter={(value: number) => `R$ ${value.toFixed(2)}`}
+                    formatter={(value: number) => `R$ ${Number(value).toFixed(2)}`}
                     contentStyle={{ 
                       backgroundColor: '#111827', 
                       border: '1px solid #1f2937', 
@@ -599,6 +643,9 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
                 </BarChart>
               </ResponsiveContainer>
             </div>
+            <p className="text-[9px] text-center text-muted-foreground uppercase tracking-widest mt-4 font-bold opacity-50">
+              Clique em uma barra para ver o detalhamento do dia
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -830,6 +877,90 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
               </button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isDayModalOpen} onOpenChange={setIsDayModalOpen}>
+        <DialogContent className="max-w-4xl bg-[#0a0a0a] border-primary/20 p-0 overflow-hidden flex flex-col h-[80vh]">
+          <DialogHeader className="p-6 border-b border-white/5 bg-primary/5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center border border-primary/30">
+                  <Calendar className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <DialogTitle className="text-sm font-black uppercase tracking-[0.2em] text-primary">Detalhamento do Dia {selectedDayLabel}</DialogTitle>
+                  <p className="text-[10px] font-bold text-primary/60 uppercase tracking-widest mt-0.5">Todas as transações do expediente</p>
+                </div>
+              </div>
+              <Badge variant="outline" className="border-primary/30 text-primary font-black px-4 py-1.5 rounded-lg uppercase tracking-tighter">
+                {selectedDayTransactions.length} REGISTROS
+              </Badge>
+            </div>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto p-0 scrollbar-hide">
+            {loadingTransactions ? (
+              <div className="h-full flex flex-col items-center justify-center gap-4">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Buscando transações...</p>
+              </div>
+            ) : selectedDayTransactions.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center gap-4 opacity-50">
+                <Activity className="w-12 h-12 text-muted-foreground" />
+                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Nenhuma transação encontrada neste dia.</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader className="bg-white/5 sticky top-0 z-10">
+                  <TableRow className="border-white/10">
+                    <TableHead className="text-[10px] font-black uppercase tracking-widest pl-6">Hora</TableHead>
+                    <TableHead className="text-[10px] font-black uppercase tracking-widest">Tipo</TableHead>
+                    <TableHead className="text-[10px] font-black uppercase tracking-widest">Descrição / Cliente</TableHead>
+                    <TableHead className="text-[10px] font-black uppercase tracking-widest text-right">Valor</TableHead>
+                    <TableHead className="text-[10px] font-black uppercase tracking-widest text-right pr-6">Método</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {selectedDayTransactions.map((t: any) => (
+                    <TableRow key={t.id} className="border-white/5 hover:bg-white/5 transition-colors group">
+                      <TableCell className="pl-6 font-mono text-[11px] text-muted-foreground">
+                        {t.date?.toDate ? format(t.date.toDate(), 'HH:mm') : '--:--'}
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={cn(
+                          "text-[9px] font-black uppercase px-2 py-0.5 border-none",
+                          t.type === 'income' ? (t.isFiado ? "bg-orange-500/20 text-orange-500" : "bg-green-500/20 text-green-500") : "bg-red-500/20 text-red-500"
+                        )}>
+                          {t.type === 'income' ? (t.isFiado ? 'FIADO' : 'VENDA') : 'DESPESA'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="text-xs font-bold uppercase truncate max-w-[200px]">{t.customerName || t.description || t.category || 'Venda Balcão'}</span>
+                          {t.items && <span className="text-[9px] text-muted-foreground uppercase">{t.items.length} itens</span>}
+                        </div>
+                      </TableCell>
+                      <TableCell className={cn(
+                        "text-right font-mono text-xs font-bold",
+                        t.type === 'income' ? "text-green-500" : "text-red-500"
+                      )}>
+                        {t.type === 'income' ? '+' : '-'} R$ {t.amount.toFixed(2)}
+                      </TableCell>
+                      <TableCell className="text-right pr-6 text-[10px] font-bold uppercase text-muted-foreground">
+                        {t.paymentMethod || 'Dinheiro'}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+          <DialogFooter className="p-4 bg-white/5 border-t border-white/5">
+             <Button variant="ghost" className="text-[10px] font-black uppercase tracking-widest" onClick={() => setIsDayModalOpen(false)}>
+               Fechar Detalhes
+             </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
