@@ -484,8 +484,12 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
       const total = order.totalAmount - checkoutDiscount + checkoutAdjustment;
       setCheckoutAmount(total);
       setCheckoutPayments([{ method: 'DINHEIRO', amount: total }]);
+      const shiftDate = order.createdAt 
+        ? getShiftDate((order.createdAt as any).toDate ? (order.createdAt as any).toDate() : new Date(order.createdAt as any))
+        : getShiftDate();
+      setCheckoutDate(shiftDate);
     }
-  }, [order.totalAmount, checkoutDiscount, checkoutAdjustment, isCheckoutOpen]);
+  }, [order.totalAmount, checkoutDiscount, checkoutAdjustment, isCheckoutOpen, order.createdAt]);
 
   useEffect(() => {
     if (isCheckoutOpen) {
@@ -718,7 +722,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
       await updateDoc(doc(db, 'open_orders', order.id), {
         status: 'closed',
         closedAt: serverTimestamp(),
-        closedShiftDate: getShiftDate(),
+        closedShiftDate: checkoutDate,
         totalAmount: finalAmount,
         payments: checkoutPayments.map(p => ({ ...p, date: new Date() })),
         customerId: targetCustomerId === 'none' ? '' : targetCustomerId
@@ -779,7 +783,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                       stockReduction: 0,
                       mlReduction: 0,
                       originalStock: ingProduct.stock || 0,
-                      originalVol: ingProduct.currentBottleVolume !== undefined ? ingProduct.currentBottleVolume : (ingProduct.volumePerUnit || 0),
+                      originalVol: ingProduct.currentBottleVolume !== undefined ? ingProduct.currentBottleVolume : 0,
                       volPerUnit: ingProduct.volumePerUnit || 0,
                       isDoseControl: !!ingProduct.isDoseControl
                     };
@@ -800,7 +804,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                     stockReduction: 0,
                     mlReduction: 0,
                     originalStock: bottle.stock || 0,
-                    originalVol: bottle.currentBottleVolume !== undefined ? bottle.currentBottleVolume : (bottle.volumePerUnit || 0),
+                    originalVol: bottle.currentBottleVolume !== undefined ? bottle.currentBottleVolume : 0,
                     volPerUnit: bottle.volumePerUnit || 0,
                     isDoseControl: true
                   };
@@ -814,7 +818,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                   stockReduction: 0,
                   mlReduction: 0,
                   originalStock: product.stock || 0,
-                  originalVol: product.currentBottleVolume !== undefined ? product.currentBottleVolume : (product.volumePerUnit || 0),
+                  originalVol: product.currentBottleVolume !== undefined ? product.currentBottleVolume : 0,
                   volPerUnit: product.volumePerUnit || 0,
                   isDoseControl: true
                 };
@@ -1301,7 +1305,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                                         {product.linkedProductId ? (
                                           (() => {
                                             const linkedBottle = products.find(p => p.id === product.linkedProductId);
-                                            const possibleDoses = linkedBottle ? Math.floor(((linkedBottle.stock || 0) * (linkedBottle.volumePerUnit || 0) + (linkedBottle.currentBottleVolume !== undefined ? linkedBottle.currentBottleVolume : (linkedBottle.volumePerUnit || 0))) / (product.doseSize || 1)) : 0;
+                                            const possibleDoses = linkedBottle ? Math.floor(((linkedBottle.stock || 0) * (linkedBottle.volumePerUnit || 0) + (linkedBottle.currentBottleVolume !== undefined ? linkedBottle.currentBottleVolume : 0)) / (product.doseSize || 1)) : 0;
                                             return <>{possibleDoses} DOSES</>;
                                           })()
                                         ) : (
@@ -1464,7 +1468,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                                               {product.linkedProductId ? (
                                                 (() => {
                                                   const linkedBottle = products.find(p => p.id === product.linkedProductId);
-                                                  const possibleDoses = linkedBottle ? Math.floor(((linkedBottle.stock || 0) * (linkedBottle.volumePerUnit || 0) + (linkedBottle.currentBottleVolume !== undefined ? linkedBottle.currentBottleVolume : (linkedBottle.volumePerUnit || 0))) / (product.doseSize || 1)) : 0;
+                                                  const possibleDoses = linkedBottle ? Math.floor(((linkedBottle.stock || 0) * (linkedBottle.volumePerUnit || 0) + (linkedBottle.currentBottleVolume !== undefined ? linkedBottle.currentBottleVolume : 0)) / (product.doseSize || 1)) : 0;
                                                   return <>{possibleDoses} DOSES</>;
                                                 })()
                                               ) : (

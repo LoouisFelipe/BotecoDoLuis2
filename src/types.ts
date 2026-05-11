@@ -138,6 +138,7 @@ export interface Transaction {
   description?: string;
   date: any;
   orderId?: string;
+  purchaseId?: string;
   customerId?: string;
   paymentMethod?: string;
   isFiado?: boolean;

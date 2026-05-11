@@ -19,7 +19,7 @@ export const calculateAvailableDoses = (product: Product, products: Product[]): 
     
     const stock = bottle.stock || 0;
     const volPerUnit = bottle.volumePerUnit || 0;
-    const currentVol = bottle.currentBottleVolume !== undefined ? bottle.currentBottleVolume : volPerUnit;
+    const currentVol = bottle.currentBottleVolume !== undefined ? bottle.currentBottleVolume : 0;
     const doseSize = product.doseSize || 1;
 
     // Cálculo: (Estoque Fechado * Volume da Garrafa + Volume da Garrafa Aberta) / Tamanho da Dose
@@ -29,8 +29,8 @@ export const calculateAvailableDoses = (product: Product, products: Product[]): 
   // Se for uma GARRAFA sendo vendida por dose (ela mesma é o controle)
   const stock = product.stock || 0;
   const volPerUnit = product.volumePerUnit || 0;
-  const currentVol = product.currentBottleVolume !== undefined ? product.currentBottleVolume : volPerUnit;
-  const doseSize = 50; // Padrão se não especificado para a garrafa em si
+  const currentVol = product.currentBottleVolume !== undefined ? product.currentBottleVolume : 0;
+  const doseSize = product.doseSize || 50; // Padrão se não especificado para a garrafa em si
 
   return Math.floor(((stock * volPerUnit) + currentVol) / doseSize);
 };

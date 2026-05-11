@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogTitle, DialogHeader, DialogFooter } from '
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { toast } from 'sonner';
-import { cn, getShiftInterval } from '../lib/utils';
+import { cn, getShiftInterval, getShiftDate } from '../lib/utils';
 import { geminiService } from '../services/geminiService';
 import Markdown from 'react-markdown';
 
@@ -122,8 +122,8 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
         5. Distribuição por Horário (Pico):
         ${extraData.hourlyStats.length > 0 ? JSON.stringify(extraData.hourlyStats) : 'Dados de horário indisponíveis.'}
 
-        6. Produtos com Maior Margem (Estoque):
-        ${JSON.stringify(topProducts.map(p => ({ name: p.name, margin: p.margin })))}
+        6. Produtos Mais Rentáveis (Base de Estoque):
+        ${JSON.stringify(topProducts.map(p => ({ name: p.name, lucro_unitario: p.unitProfit, margem_pct: p.margin })))}
         
         Forneça uma análise estratégica "fina", com o tom de um Co-CEO (Boteco do Luis). 
         Se houver dados, identifique o cliente "vendedor do mês" (mais gastou), o produto "queridinho" e o horário de "rush".
@@ -161,8 +161,13 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
 
     const daysArray = Array.from({ length: daysCount }, (_, i) => addDays(range.from, i));
 
-    const overallStart = getShiftInterval(range.from).start;
-    const overallEnd = getShiftInterval(range.to).end;
+    const midDayFrom = new Date(range.from);
+    midDayFrom.setHours(12, 0, 0, 0);
+    const midDayTo = new Date(range.to);
+    midDayTo.setHours(12, 0, 0, 0);
+
+    const overallStart = getShiftInterval(midDayFrom).start;
+    const overallEnd = getShiftInterval(midDayTo).end;
 
     const qTrans = query(collection(db, 'transactions'), where('date', '>=', Timestamp.fromDate(overallStart)), where('date', '<=', Timestamp.fromDate(overallEnd)));
     const qExp = query(collection(db, 'expenses'), where('date', '>=', Timestamp.fromDate(overallStart)), where('date', '<=', Timestamp.fromDate(overallEnd)));
@@ -173,7 +178,9 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
       const allExpenses = expSnapshot.docs.map(doc => ({ ...doc.data() as Transaction, id: doc.id }));
 
       return daysArray.map(targetDate => {
-        const { start, end } = getShiftInterval(targetDate);
+        const midDay = new Date(targetDate);
+        midDay.setHours(12, 0, 0, 0);
+        const { start, end } = getShiftInterval(midDay);
         
         const dayTransactions = allTransactions.filter(t => {
           const tDate = t.date?.toDate ? t.date.toDate() : new Date(t.date as any);
@@ -218,11 +225,13 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
 
     const fetchDeepAnalysisData = async () => {
       try {
+        const fromStr = getShiftDate(midDayFrom);
+        const toStr = getShiftDate(midDayTo);
         const qOrders = query(
           collection(db, 'open_orders'), 
           where('status', '==', 'closed'), 
-          where('closedAt', '>=', Timestamp.fromDate(startOfDay(range.from))), 
-          where('closedAt', '<=', Timestamp.fromDate(endOfDay(range.to)))
+          where('closedShiftDate', '>=', fromStr), 
+          where('closedShiftDate', '<=', toStr)
         );
         const orderSnap = await getDocs(qOrders);
         const orders = orderSnap.docs.map(doc => doc.data());
@@ -261,13 +270,26 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
         const prodSnapshot = await getDocs(collection(db, 'products'));
         const products = prodSnapshot.docs.map(doc => ({ ...doc.data() as Product, id: doc.id }));
         const sorted = products
-          .filter(p => (p.cost || 0) > 0)
-          .map(p => ({
-            ...p,
-            margin: ((p.price - p.cost) / p.cost) * 100,
-            potentialProfit: (p.price - p.cost) * (p.stock || 0)
-          }))
-          .sort((a, b) => b.margin - a.margin)
+          .map(p => {
+             let realCost = p.cost || 0;
+             if (p.isDoseControl && p.linkedProductId && p.doseSize) {
+                const parent = products.find(parentP => parentP.id === p.linkedProductId);
+                if (parent && parent.volumePerUnit && parent.cost) {
+                   realCost = (parent.cost / parent.volumePerUnit) * p.doseSize;
+                }
+             }
+             const unitProfit = p.price - realCost;
+             const margin = realCost > 0 ? (unitProfit / realCost) * 100 : (unitProfit > 0 ? 100 : 0);
+             return {
+                ...p,
+                realCost,
+                margin,
+                unitProfit,
+                potentialProfit: unitProfit * (p.stock || 0)
+             };
+          })
+          .filter(p => p.unitProfit > 0)
+          .sort((a, b) => b.unitProfit - a.unitProfit)
           .slice(0, 5);
         setTopProducts(sorted);
         const sortedByValue = products
@@ -490,8 +512,8 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
                 <TrendingUp className="w-5 h-5" />
               </div>
               <div>
-                <CardTitle className="text-sm font-bold uppercase tracking-wider">Top Margem de Lucro</CardTitle>
-                <p className="text-[10px] text-muted-foreground tracking-widest uppercase font-semibold">Produtos mais rentáveis</p>
+                <CardTitle className="text-sm font-bold uppercase tracking-wider">Top Rentabilidade</CardTitle>
+                <p className="text-[10px] text-muted-foreground tracking-widest uppercase font-semibold">Maior Lucro Unitário</p>
               </div>
             </div>
           </CardHeader>
@@ -501,11 +523,11 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
                 <TableRow className="border-border hover:bg-transparent">
                   <TableHead className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground pl-6">Produto</TableHead>
                   <TableHead className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground text-right">Preço</TableHead>
-                  <TableHead className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground text-right pr-6">Margem</TableHead>
+                  <TableHead className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground text-right pr-6">Lucro Unit.</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {topProducts.map((p, idx) => (
+                {topProducts.map((p: any) => (
                   <TableRow key={p.id} className="border-border hover:bg-white/5 transition-colors">
                     <TableCell className="pl-6">
                       <p className="text-xs font-bold uppercase">{p.name}</p>
@@ -515,9 +537,12 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
                       R$ {(p.price || 0).toFixed(2)}
                     </TableCell>
                     <TableCell className="text-right pr-6">
-                      <span className="inline-flex items-center px-2 py-1 rounded bg-green-500/10 text-green-500 font-black text-xs">
-                        {p.margin.toFixed(0)}%
-                      </span>
+                      <div className="flex flex-col items-end gap-1">
+                        <span className="inline-flex items-center px-2 py-1 rounded bg-green-500/10 text-green-500 font-black text-xs">
+                          R$ {(p.unitProfit || 0).toFixed(2)}
+                        </span>
+                        <span className="text-[9px] font-bold text-muted-foreground">{p.margin.toFixed(0)}% MARGEM</span>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -557,6 +582,7 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
                   />
                   <Tooltip 
                     cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                    formatter={(value: number) => `R$ ${value.toFixed(2)}`}
                     contentStyle={{ 
                       backgroundColor: '#111827', 
                       border: '1px solid #1f2937', 

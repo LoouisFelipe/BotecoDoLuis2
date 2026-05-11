@@ -173,7 +173,7 @@ export function ProductForm({
       linkedProductId: isDoseControl ? linkedProductId : '',
       doseSize: isDoseControl ? Math.max(0, parseFloat(doseSize) || 0) : 0,
       currentBottleVolume: isDoseControl && !linkedProductId 
-        ? (currentBottleVolume !== '' ? Math.max(0, parseFloat(currentBottleVolume)) : (editingProduct?.currentBottleVolume ?? parseFloat(volumePerUnit) ?? 0))
+        ? (currentBottleVolume !== '' ? Math.max(0, parseFloat(currentBottleVolume)) : (editingProduct?.currentBottleVolume ?? 0))
         : 0
     };
 
@@ -439,41 +439,27 @@ export function ProductForm({
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
                       <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Formato de Venda</label>
-                      <Select value={productUnit} onValueChange={setProductUnit}>
-                        <SelectTrigger className="h-14 bg-black/40 border-white/10 rounded-2xl font-mono text-[10px] font-black uppercase tracking-widest">
-                          <SelectValue placeholder="Modelo de Venda" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-[#05070a] border-white/10">
-                          {isDoseControl && linkedProductId ? (
-                            <>
-                              <SelectItem value="Degustação (20ml)">Degustação (20ml)</SelectItem>
-                              <SelectItem value="Shot Standard (30ml)">Shot Standard (30ml)</SelectItem>
-                              <SelectItem value="Dose Curta (40ml)">Dose Curta (40ml)</SelectItem>
-                              <SelectItem value="Dose Simples (50ml)">Dose Simples (50ml)</SelectItem>
-                              <SelectItem value="Dose Generosa (60ml)">Dose Generosa (60ml)</SelectItem>
-                              <SelectItem value="Shot Duplo (70ml)">Shot Duplo (70ml)</SelectItem>
-                              <SelectItem value="Dose Dupla (100ml)">Dose Dupla (100ml)</SelectItem>
-                              <SelectItem value="Copo Americano (190ml)">Copo Americano (190ml)</SelectItem>
-                              <SelectItem value="Long Drink (250ml)">Long Drink (250ml)</SelectItem>
-                              <SelectItem value="Dose (Personalizada)">Outro Formato</SelectItem>
-                            </>
-                          ) : (
-                            <>
-                              <SelectGroup>
-                                <SelectLabel className="text-[10px] font-black uppercase tracking-widest text-muted-foreground px-2 py-1.5">Geral</SelectLabel>
-                                <SelectItem value="Por Unidade">Por Unidade / Lata</SelectItem>
-                                <SelectItem value="Garrafa / Inteiro">Garrafa Completa</SelectItem>
-                                <SelectItem value="Por Peso (Kg/g)">Por Peso</SelectItem>
-                              </SelectGroup>
-                              <SelectGroup>
-                                <SelectLabel className="text-[10px] font-black uppercase tracking-widest text-muted-foreground px-2 py-1.5">Outros</SelectLabel>
-                                <SelectItem value="Por Porção (Pratos)">Por Porção</SelectItem>
-                                <SelectItem value="Serviço / Valor Aberto">Serviço Especial</SelectItem>
-                              </SelectGroup>
-                            </>
-                          )}
-                        </SelectContent>
-                      </Select>
+                      <div className="h-14">
+                        <Combobox 
+                          options={
+                            isDoseControl && linkedProductId 
+                              ? Array.from(new Set(
+                                  products.filter(p => p.isDoseControl && p.linkedProductId).map(p => p.unit).filter(Boolean).length > 0 
+                                    ? products.filter(p => p.isDoseControl && p.linkedProductId).map(p => p.unit).filter(Boolean)
+                                    : ["Dose Simples (50ml)", "Copo Americano (190ml)"]
+                                ))
+                              : Array.from(new Set(
+                                  products.filter(p => !p.isDoseControl || !p.linkedProductId).map(p => p.unit).filter(Boolean).length > 0
+                                    ? products.filter(p => !p.isDoseControl || !p.linkedProductId).map(p => p.unit).filter(Boolean)
+                                    : ["Por Unidade", "Garrafa Completa"]
+                                ))
+                          }
+                          value={productUnit}
+                          onSelect={setProductUnit}
+                          placeholder="Modelo de Venda"
+                          allowCustom={true}
+                        />
+                      </div>
                     </div>
                     
                     <div className="space-y-2">

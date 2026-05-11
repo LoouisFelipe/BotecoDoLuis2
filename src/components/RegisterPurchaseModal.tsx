@@ -136,7 +136,7 @@ export function RegisterPurchaseModal({ suppliers }: { suppliers: Supplier[] }) 
       }
 
       // 2. Add to 'purchases' log
-      await addDoc(collection(db, 'purchases'), {
+      const purchaseRef = await addDoc(collection(db, 'purchases'), {
         supplierId: finalSupplierId,
         supplierName: finalSupplierName,
         items: purchaseItems,
@@ -153,6 +153,7 @@ export function RegisterPurchaseModal({ suppliers }: { suppliers: Supplier[] }) 
         description: `Compra do fornecedor: ${finalSupplierName}`,
         date: firestoreTimestamp,
         shiftDate,
+        purchaseId: purchaseRef.id,
         isPaid: true
       });
 

@@ -35,13 +35,8 @@ export function Customers({ user }: { user: UserProfile }) {
   const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [selectedCustomerForHistory, setSelectedCustomerForHistory] = useState<Customer | null>(null);
-  const [customerHistory, setCustomerHistory] = useState<Order[]>([]);
-  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isPayModalOpen, setIsPayModalOpen] = useState(false);
-  const [selectedCustomerForPay, setSelectedCustomerForPay] = useState<Customer | null>(null);
-  const [payAmount, setPayAmount] = useState('');
   const [payMethod, setPayMethod] = useState('DINHEIRO');
+  const [customerTimeline, setCustomerTimeline] = useState<any[]>([]);
   const [letterFilter, setLetterFilter] = useState('TODOS');
   const [balanceFilter, setBalanceFilter] = useState<'all' | 'debt' | 'credit'>('all');
 
@@ -101,14 +96,49 @@ export function Customers({ user }: { user: UserProfile }) {
     setIsHistoryOpen(true);
     setIsLoadingHistory(true);
     try {
-      const q = query(
+      // 1. Fetch Orders
+      const ordersQuery = query(
         collection(db, 'open_orders'), 
         where('customerId', '==', customer.id),
         where('status', '==', 'closed'),
         orderBy('closedAt', 'desc')
       );
-      const snapshot = await getDocs(q);
-      setCustomerHistory(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order)));
+      
+      // 2. Fetch Payments (Transactions)
+      const paymentsQuery = query(
+        collection(db, 'transactions'),
+        where('customerId', '==', customer.id),
+        where('category', '==', 'Recebimento Fiado'),
+        orderBy('date', 'desc')
+      );
+
+      const [ordersSnap, paymentsSnap] = await Promise.all([
+        getDocs(ordersQuery),
+        getDocs(paymentsQuery)
+      ]);
+
+      const orders = ordersSnap.docs.map(doc => ({ 
+        id: doc.id, 
+        ...doc.data(),
+        timelineType: 'order',
+        timestamp: doc.data().closedAt
+      }));
+
+      const payments = paymentsSnap.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        timelineType: 'payment',
+        timestamp: doc.data().date
+      }));
+
+      // Merge and sort
+      const merged = [...orders, ...payments].sort((a, b) => {
+        const timeA = a.timestamp?.toDate ? a.timestamp.toDate().getTime() : 0;
+        const timeB = b.timestamp?.toDate ? b.timestamp.toDate().getTime() : 0;
+        return timeB - timeA;
+      });
+
+      setCustomerTimeline(merged);
     } catch (error) {
       console.error("Error fetching history:", error);
       toast.error("Erro ao carregar histórico");
@@ -666,46 +696,85 @@ export function Customers({ user }: { user: UserProfile }) {
                 <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
                 <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Carregando histórico...</p>
               </div>
-            ) : customerHistory.length > 0 ? (
-              <div className="space-y-4 md:space-y-6">
-                {customerHistory.map((order) => (
-                  <div key={order.id} className="bg-[#111827]/50 border border-border/50 rounded-2xl overflow-hidden">
-                    <div className="p-4 md:p-6 border-b border-border/50 flex items-center justify-between bg-white/5">
-                      <div className="flex items-center gap-3 md:gap-4">
-                        <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-white/5 flex items-center justify-center border border-white/5">
-                          <Receipt className="w-4 h-4 md:w-5 md:h-5 text-muted-foreground" />
+            ) : !isLoadingHistory && customerTimeline.length > 0 ? (
+              <div className="space-y-6">
+                {customerTimeline.map((item, idx) => (
+                  <div key={item.id} className="relative">
+                    {/* Timeline Connector */}
+                    {idx < customerTimeline.length - 1 && (
+                      <div className="absolute left-6 top-14 bottom-[-24px] w-0.5 bg-border/30" />
+                    )}
+
+                    <div className={cn(
+                      "rounded-[32px] border transition-all overflow-hidden",
+                      item.timelineType === 'order' ? "bg-white/[0.02] border-border/50" : "bg-green-500/5 border-green-500/20 shadow-[0_0_15px_rgba(34,197,94,0.05)]"
+                    )}>
+                      <div className="p-4 md:p-6 flex justify-between items-start">
+                        <div className="flex gap-4">
+                          <div className={cn(
+                            "w-12 h-12 rounded-2xl flex items-center justify-center border",
+                            item.timelineType === 'order' ? "bg-primary/10 border-primary/20 text-primary" : "bg-green-500/10 border-green-500/20 text-green-500"
+                          )}>
+                            {item.timelineType === 'order' ? <Receipt className="w-6 h-6" /> : <TrendingUp className="w-6 h-6" />}
+                          </div>
+                          <div>
+                            <p className="text-sm font-black uppercase tracking-tighter mb-0.5">
+                              {item.timelineType === 'order' ? 'Consumo de Bar' : 'Pagamento / Crédito'}
+                            </p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-[10px] font-black tracking-[0.2em] uppercase text-muted-foreground tabular-nums">
+                                {item.timestamp ? formatShiftDateTime(item.timestamp) : 'Data desconhecida'}
+                              </p>
+                              {item.timelineType === 'order' && (
+                                <Badge variant="outline" className="text-[8px] font-bold uppercase tracking-widest border-none bg-primary/10 text-primary px-2">
+                                  {item.items?.reduce((sum: number, i: any) => sum + i.quantity, 0) || 0} ITENS
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-xs md:text-sm font-black uppercase tracking-widest">
-                            {order.closedAt ? formatShiftDateTime(order.closedAt) : 'Data desconhecida'}
+                        <div className="text-right">
+                          <p className={cn(
+                            "text-xl font-black tracking-tighter tabular-nums",
+                            item.timelineType === 'order' ? "text-primary" : "text-green-500"
+                          )}>
+                            {item.timelineType === 'order' ? '-' : '+'} R$ {(item.totalAmount || item.amount || 0).toFixed(2)}
                           </p>
-                          <p className="text-[9px] md:text-[10px] font-bold tracking-widest uppercase text-muted-foreground">
-                            {order.items.reduce((sum, i) => sum + i.quantity, 0)} ITENS
+                          <p className="text-[9px] font-bold tracking-widest uppercase text-muted-foreground mt-1 italic">
+                            {item.paymentMethod || (item.payments?.[0]?.method) || 'N/A'}
                           </p>
                         </div>
                       </div>
-                      <p className="text-lg md:text-xl font-black text-primary tracking-tighter">R$ {order.totalAmount.toFixed(2)}</p>
-                    </div>
-                    <div className="p-4 md:p-6 space-y-3">
-                      {order.items.map((item, iIdx) => (
-                        <div key={`${order.id}-hist-${iIdx}`} className="flex justify-between items-center text-[10px] md:text-xs">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="text-muted-foreground font-bold">{item.quantity}x</span>
-                            <span className="font-bold uppercase tracking-wider truncate">{item.productName}</span>
-                          </div>
-                          <span className="font-mono text-muted-foreground flex-shrink-0 ml-2">R$ {item.subtotal.toFixed(2)}</span>
+
+                      {item.timelineType === 'order' && item.items && item.items.length > 0 && (
+                        <div className="px-6 pb-6 pt-2 space-y-2 border-t border-border/10 mt-2 bg-black/20">
+                          {item.items.map((subItem: any, iIdx: number) => (
+                            <div key={iIdx} className="flex justify-between items-center text-[10px] md:text-xs">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="text-muted-foreground font-bold">{subItem.quantity}x</span>
+                                <span className="font-bold uppercase tracking-wider truncate text-white/80">{subItem.productName}</span>
+                              </div>
+                              <span className="font-mono text-muted-foreground flex-shrink-0 ml-2">R$ {subItem.subtotal.toFixed(2)}</span>
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                      )}
+
+                      {item.timelineType === 'payment' && item.description && (
+                        <div className="px-6 pb-4 pt-2 border-t border-green-500/10 mt-2 bg-green-500/5">
+                          <p className="text-[10px] text-green-500/70 font-bold uppercase tracking-widest italic">{item.description}</p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
               </div>
-            ) : (
-              <div className="py-20 text-center">
+            ) : !isLoadingHistory ? (
+              <div className="py-20 text-center bg-white/[0.02] rounded-[40px] border border-dashed border-border/50">
                 <Receipt className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-10" />
-                <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Nenhum consumo registrado</p>
+                <p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Nenhuma atividade registrada</p>
               </div>
-            )}
+            ) : null}
           </div>
 
           <div className="p-6 md:p-8 border-t border-border/50 bg-[#0b1224] flex-shrink-0">
