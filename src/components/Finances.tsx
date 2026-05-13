@@ -1065,7 +1065,6 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
                       <Users className="w-4 h-4 ml-2 group-hover:scale-110 transition-transform" />
                     </Button>
                   </div>
-                </div>
               );
             })()}
 

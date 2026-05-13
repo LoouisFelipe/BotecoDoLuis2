@@ -859,7 +859,7 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
             </div>
           </CardContent>
         </Card>
-
+      </div>
 
       <Card className="border-border bg-card/50 rounded-2xl overflow-hidden mt-8">
         <CardHeader className="border-b border-border pb-4 bg-white/5 flex flex-row items-center justify-between">
@@ -1248,7 +1248,8 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
   );
 }
 
-function StatCard({ title, value, icon, variant, onClick, subtext }: { title: string, value: number, icon: React.ReactNode, variant: 'green' | 'red' | 'blue' | 'orange' | 'indigo', onClick?: () => void, subtext?: string }) {
+function StatCard(props: { title: string; value: number; icon: React.ReactNode; variant: 'green' | 'red' | 'blue' | 'orange' | 'indigo'; onClick?: () => void; subtext?: string; }) {
+  const { title, value, icon, variant, onClick, subtext } = props;
   const variantStyles = {
     green: {
       bg: "bg-green-500/10",

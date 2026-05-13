@@ -27,7 +27,7 @@ export default defineConfig(({mode}) => {
       }
     },
     server: {
-      hmr: false,
+      // HMR enabled by default in Vite, removing the disable flag
     },
   };
 });

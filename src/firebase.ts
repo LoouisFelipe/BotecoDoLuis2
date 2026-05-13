@@ -17,25 +17,25 @@ const firebaseConfig = {
   firestoreDatabaseId: import.meta.env.VITE_FIREBASE_DATABASE_ID || '(default)'
 };
 
-// Log para debug da inicialização (não exibe a API Key por segurança)
-console.log("🔥 Firebase Config Initializing with Project:", firebaseConfig.projectId);
+// Log aprimorado para depuração no navegador
+console.log("%c 🚀 CONEXÃO FIREBASE ", "background: #0070f3; color: white; font-weight: bold; padding: 4px; border-radius: 4px;");
+console.log("📍 Projeto:", firebaseConfig.projectId);
+console.log("🗄️ Database ID:", firebaseConfig.firestoreDatabaseId);
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 
-// Habilitar persistência offline (IndexedDB) para o Firestore
-enableIndexedDbPersistence(db).catch((err) => {
+// Habilitar persistência offline (IndexedDB) para o Firestore com forceOwnership
+// Isso garante que se houver múltiplas abas, a aba atual possa assumir o controle se necessário
+enableIndexedDbPersistence(db, { forceOwnership: true }).catch((err) => {
   if (err.code === 'failed-precondition') {
-    // Múltiplas abas abertas, persistência só funciona em uma.
-    console.warn("Múltiplas abas abertas. A persistência offline do Firestore funcionará apenas na aba principal.");
+    console.warn("⚠️ Persistência offline: Múltiplas abas abertas. Funcionando em modo limitado.");
   } else if (err.code === 'unimplemented') {
-    // Navegador não suporta a persistência.
-    console.warn("Este navegador não suporta persistência offline do Firestore.");
+    console.warn("⚠️ Este navegador não suporta persistência offline.");
   }
 });
 
-console.log("Firestore Initialized with Database ID:", firebaseConfig.firestoreDatabaseId);
 export const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
 
 // Connection test
@@ -43,13 +43,14 @@ async function testConnection() {
   try {
     // Try to fetch a non-existent doc just to check connectivity
     await getDocFromServer(doc(db, 'test', 'connection'));
+    console.log("✅ Firestore connection successful to database:", firebaseConfig.firestoreDatabaseId);
   } catch (error: any) {
     if (error.code === 'unavailable' || error.message?.includes('offline')) {
-      console.warn("Firebase Firestore está temporariamente offline ou ainda sendo provisionado. O sistema continuará usando os dados em cache (Modo Offline).");
+      console.warn(`⚠️ Firebase Firestore está OFFLINE ou o banco '${firebaseConfig.firestoreDatabaseId}' não foi encontrado.`);
     } else if (error.code === 'permission-denied') {
-      console.info("Conexão com Firebase estabelecida (Permissão negada é normal para este teste).");
+      console.info("✅ Conexão com Firebase estabelecida (Permissão negada é normal para o teste de conexão).");
     } else {
-      console.error("Erro de configuração do Firebase:", error);
+      console.error("❌ Erro de configuração do Firebase:", error);
     }
   }
 }
