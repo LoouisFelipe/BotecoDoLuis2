@@ -13,14 +13,16 @@ import { Calendar as CalendarUI } from './ui/calendar';
 import { Plus, TrendingUp, TrendingDown, Receipt, Calendar, ArrowUpRight, ArrowDownRight, Filter, X, Users, ChevronRight, Settings2, Trash2, Info, CreditCard, Banknote, Smartphone, Wallet, QrCode, Zap, MoreHorizontal, Search, Package, Target } from 'lucide-react';
 import { Badge } from './ui/badge';
 import { toast } from 'sonner';
-import { format, isToday, isThisWeek, isThisMonth, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
+import { isToday, isThisWeek, isThisMonth, isWithinInterval, startOfDay, endOfDay, addMonths } from 'date-fns';
+import { format } from '../lib/utils';
 import { ptBR } from 'date-fns/locale';
 import { handleFirestoreError, OperationType } from '../lib/firebase-utils';
-import { cn, getShiftInterval, formatShiftDateTime, getShiftDate } from '../lib/utils';
+import { cn, getShiftInterval, formatShiftDateTime, parseAsSaoPaulo, getSaoPauloDate, nowInSaoPaulo } from '../lib/utils';
 import { DateRangePicker } from './DateRangePicker';
 
-import { useFetchCollection } from '../hooks/useFetchCollection';
+import { useData } from '../contexts/DataContext';
 import { usePaymentFees } from '../hooks/usePaymentFees';
+import { useNavigate } from 'react-router-dom';
 
 const PAYMENT_METHODS = [
   { id: 'pix', label: 'Pix', icon: QrCode, color: 'text-cyan-400' },
@@ -30,43 +32,21 @@ const PAYMENT_METHODS = [
   { id: 'fiado', label: 'Fiado', icon: Users, color: 'text-orange-400' },
 ];
 
-export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveTab: (tab: string) => void }) {
+export function Finances({ user }: { user: UserProfile }) {
+  const navigate = useNavigate();
   const { calculateNet } = usePaymentFees();
-  const transConstraints = React.useMemo(() => [orderBy('date', 'desc'), limit(500)], []);
-  const expConstraints = React.useMemo(() => [orderBy('date', 'desc'), limit(500)], []);
-
-  const { data: rawTransactions } = useFetchCollection<Transaction>('transactions', {
-    constraints: transConstraints
-  });
-  const { data: rawExpenses } = useFetchCollection<Transaction>('expenses', {
-    constraints: expConstraints
-  });
-  const { data: rawPurchases } = useFetchCollection<any>('purchases', {
-    constraints: React.useMemo(() => [orderBy('date', 'desc'), limit(100)], [])
-  });
-  const { data: rawRecurring } = useFetchCollection<RecurringExpense>('recurring_expenses');
-  const { data: rawInstallments } = useFetchCollection<InstallmentExpense>('installment_expenses');
-  const { data: customers } = useFetchCollection<Customer>('customers');
-  const { data: rawCategories } = useFetchCollection<ExpenseCategory>('expense_categories');
-
-  const recurringExpenses = React.useMemo(() => rawRecurring.filter(r => r.status !== 'deleted'), [rawRecurring]);
-  const installmentExpenses = React.useMemo(() => rawInstallments.filter(i => i.status !== 'deleted'), [rawInstallments]);
-  const expenseCategories = React.useMemo(() => rawCategories.filter(c => (c as any).status !== 'deleted'), [rawCategories]);
+  const { 
+    customers, 
+    expenseCategories, 
+    transactions: rawTransactions,
+    expenses: rawExpenses,
+    purchases: rawPurchases,
+    recurringExpenses,
+    installmentExpenses,
+    loading 
+  } = useData();
 
   const transactions = React.useMemo(() => {
-    // Robust date to timestamp conversion
-    const getTs = (d: any) => {
-      if (!d) return 0;
-      if (d.toDate) return d.toDate().getTime();
-      if (d instanceof Date) return d.getTime();
-      if (typeof d === 'string' || typeof d === 'number') return new Date(d).getTime();
-      return 0;
-    };
-
-    const income = rawTransactions
-      .filter(t => t.status !== 'deleted')
-      .map(t => ({ ...t, type: t.type || 'income' }));
-      
     const combined = [
       ...rawTransactions.map(t => ({ ...t, source: 'transactions' })),
       ...rawExpenses.map(t => ({ ...t, source: 'expenses' })),
@@ -87,7 +67,7 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
     return combined
       .filter(t => (t as any).status !== 'deleted')
       .map(t => {
-        const date = t.date?.toDate ? t.date.toDate() : (t.date instanceof Date ? t.date : new Date(t.date));
+        const date = parseAsSaoPaulo(t.date);
         return { ...t, date };
       })
       .sort((a, b) => b.date.getTime() - a.date.getTime());
@@ -208,7 +188,7 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
           installmentsCount: count,
           remainingInstallments: count - 1,
           installmentValue: installmentValue,
-          nextDueDate: new Date(new Date().setMonth(new Date().getMonth() + 1)),
+          nextDueDate: addMonths(nowInSaoPaulo(), 1),
           categoryId: category,
           subCategory,
           createdAt: serverTimestamp(),
@@ -221,7 +201,7 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
           category: selectedCat?.name || category,
           amount: installmentValue,
           description: `${description} (Entrada/Parcela 1/${count})`,
-          date: new Date(expenseDate + "T12:00:00")
+          date: nowInSaoPaulo() // Always use São Paulo for current entry
         });
         
         toast.success('Compra parcelada registrada');
@@ -232,7 +212,7 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
           category: selectedCat?.name || category,
           amount: parseFloat(amount),
           description,
-          date: new Date(expenseDate + "T12:00:00")
+          date: parseAsSaoPaulo(expenseDate) // Use utility to parse the selected date correctly
         });
         toast.success('Despesa registrada');
       }
@@ -277,7 +257,7 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
     const groups: { [key: string]: any[] } = {};
     filteredTransactions.forEach(t => {
       const shiftDate = getShiftDate(t.date);
-      const dateKey = shiftDate ? `Expediente ${format(new Date(shiftDate + 'T12:00:00'), 'dd/MM/yyyy')}` : 'Data Indefinida';
+      const dateKey = shiftDate ? `Expediente ${format(parseAsSaoPaulo(shiftDate), 'dd/MM/yyyy')}` : 'Data Indefinida';
       if (!groups[dateKey]) groups[dateKey] = [];
       groups[dateKey].push(t);
     });
@@ -323,7 +303,7 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
   const trendStats = React.useMemo(() => {
     let prevStart: Date;
     let prevEnd: Date;
-    const now = new Date();
+    const now = nowInSaoPaulo();
 
     if (dateFilter === 'today') {
       prevStart = startOfDay(new Date(now.getTime() - 24 * 60 * 60 * 1000));
@@ -920,7 +900,7 @@ export function Finances({ user, setActiveTab }: { user: UserProfile, setActiveT
                           size="icon"
                           onClick={() => {
                             setIsFiadoModalOpen(false);
-                            setActiveTab('clients');
+                            navigate('/clients');
                           }}
                           className="hover:bg-orange-500/10 hover:text-orange-500"
                         >

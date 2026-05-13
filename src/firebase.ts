@@ -26,31 +26,26 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 
-// Habilitar persistência offline (IndexedDB) para o Firestore com forceOwnership
-// Isso garante que se houver múltiplas abas, a aba atual possa assumir o controle se necessário
-enableIndexedDbPersistence(db, { forceOwnership: true }).catch((err) => {
-  if (err.code === 'failed-precondition') {
-    console.warn("⚠️ Persistência offline: Múltiplas abas abertas. Funcionando em modo limitado.");
-  } else if (err.code === 'unimplemented') {
-    console.warn("⚠️ Este navegador não suporta persistência offline.");
-  }
-});
+// Habilitar persistência offline (IndexedDB) para o Firestore
+if (typeof window !== 'undefined') {
+  enableIndexedDbPersistence(db).catch((err) => {
+    if (err.code === 'failed-precondition') {
+      console.warn("⚠️ Persistência offline: Múltiplas abas abertas. Funcionando em modo compartilhado.");
+    } else if (err.code === 'unimplemented') {
+      console.warn("⚠️ Este navegador não suporta persistência offline.");
+    }
+  });
+}
 
 export const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
 
-// Connection test
+// Connection test - Silencioso para não poluir o console em produção
 async function testConnection() {
   try {
-    // Try to fetch a non-existent doc just to check connectivity
     await getDocFromServer(doc(db, 'test', 'connection'));
-    console.log("✅ Firestore connection successful to database:", firebaseConfig.firestoreDatabaseId);
   } catch (error: any) {
-    if (error.code === 'unavailable' || error.message?.includes('offline')) {
-      console.warn(`⚠️ Firebase Firestore está OFFLINE ou o banco '${firebaseConfig.firestoreDatabaseId}' não foi encontrado.`);
-    } else if (error.code === 'permission-denied') {
-      console.info("✅ Conexão com Firebase estabelecida (Permissão negada é normal para o teste de conexão).");
-    } else {
-      console.error("❌ Erro de configuração do Firebase:", error);
+    if (error.code === 'unavailable') {
+      console.warn(`[Firebase] Servidor indisponível. Verifique sua conexão.`);
     }
   }
 }

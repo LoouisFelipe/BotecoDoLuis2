@@ -6,7 +6,7 @@ import { Gamepad2, Plus, Search, Edit2, Trash2, History, TrendingUp, Trophy, X, 
 import { Input } from './ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from './ui/dialog';
 import { ConfirmDialog } from './ConfirmDialog';
-import { format } from 'date-fns';
+import { format } from '../lib/utils';
 import { useGameState } from '../hooks/useGameState';
 import { cn } from '../lib/utils';
 

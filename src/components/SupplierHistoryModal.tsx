@@ -4,7 +4,7 @@ import { useFetchCollection } from '../hooks/useFetchCollection';
 import { orderBy, where } from 'firebase/firestore';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-import { format } from 'date-fns';
+import { format } from '../lib/utils';
 import { ptBR } from 'date-fns/locale';
 import { ShoppingBag, Calendar, ArrowRight, Package, Activity } from 'lucide-react';
 import { Badge } from './ui/badge';

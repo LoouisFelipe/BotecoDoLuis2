@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { format } from 'date-fns';
+import { format } from '../lib/utils';
 import { ptBR } from 'date-fns/locale';
 import { Calendar as CalendarIcon, Check } from 'lucide-react';
 import { DateRange } from 'react-day-picker';

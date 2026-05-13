@@ -9,7 +9,7 @@ import { User, Shield, ShieldAlert, Mail, Calendar, UserCheck, UserCog, Users as
 import { toast } from 'sonner';
 import { useFetchCollection } from '../hooks/useFetchCollection';
 import { handleFirestoreError, OperationType } from '../lib/firebase-utils';
-import { format } from 'date-fns';
+import { format } from '../lib/utils';
 
 export function Users({ user: currentUser }: { user: UserProfile }) {
   const { data: users, loading } = useFetchCollection<UserProfile>('users');

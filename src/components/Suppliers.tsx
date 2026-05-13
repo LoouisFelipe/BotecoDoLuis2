@@ -11,22 +11,19 @@ import { Badge } from './ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from './ui/dialog';
 import { toast } from 'sonner';
 import { addDoc, updateDoc, doc, deleteDoc, serverTimestamp } from 'firebase/firestore';
-import { format } from 'date-fns';
+import { format } from '../lib/utils';
 import { ptBR } from 'date-fns/locale';
 import { handleFirestoreError, OperationType } from '../lib/firebase-utils';
 import { ConfirmDialog } from './ConfirmDialog';
 import { RegisterPurchaseModal } from './RegisterPurchaseModal';
 import { SupplierHistoryModal } from './SupplierHistoryModal';
 
+import { useData } from '../contexts/DataContext';
 import { useFetchCollection } from '../hooks/useFetchCollection';
 
 export function Suppliers({ user }: { user: UserProfile }) {
-  const supplierConstraints = React.useMemo(() => [orderBy('name', 'asc')], []);
+  const { suppliers, loading } = useData();
   
-  const { data: suppliers } = useFetchCollection<Supplier>('suppliers', {
-    constraints: supplierConstraints
-  });
-
   const { data: allPurchases } = useFetchCollection<Purchase>('purchases');
 
   const [search, setSearch] = useState('');

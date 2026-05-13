@@ -22,11 +22,12 @@ import { Combobox } from './ui/combobox';
 import { Textarea } from './ui/textarea';
 import { calculateAvailableDoses, isStockCritical } from '../lib/stock-utils';
 
-import { useFetchCollection } from '../hooks/useFetchCollection';
+import { useData } from '../contexts/DataContext';
+import { useNavigate } from 'react-router-dom';
 
-export function Inventory({ user, setActiveTab }: { user: UserProfile, setActiveTab: (tab: string) => void }) {
-  const { data: products } = useFetchCollection<Product>('products');
-  const { data: categories } = useFetchCollection<Category>('categories');
+export function Inventory({ user }: { user: UserProfile }) {
+  const navigate = useNavigate();
+  const { products, categories, loading } = useData();
   const [search, setSearch] = useState('');
   const [stockFilter, setStockFilter] = useState<'all' | 'critical'>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
@@ -137,7 +138,7 @@ export function Inventory({ user, setActiveTab }: { user: UserProfile, setActive
 
         <Card 
           className="bg-[#05070a]/60 border-white/5 rounded-[40px] overflow-hidden relative group cursor-pointer hover:bg-white/[0.04] hover:border-green-500/30"
-          onClick={() => setActiveTab('finances')}
+          onClick={() => navigate('/finances')}
         >
           <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
           <CardContent className="p-8 flex items-center gap-6 relative z-10">

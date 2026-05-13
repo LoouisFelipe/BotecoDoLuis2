@@ -10,27 +10,30 @@ import { Badge } from './ui/badge';
 import { Plus, Search, ShoppingCart, CheckCircle2, ChevronRight, LayoutGrid, List, Zap, Activity, Clock, TrendingUp, TrendingDown, Trash2, ShieldCheck, UserPlus, UserCheck, Menu, X, Receipt, Package, Calendar, Minus, Gamepad2, ArrowLeft, PlusCircle, Users, FlaskConical, Filter, DollarSign, CreditCard, Globe } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle, DialogTrigger, DialogFooter } from './ui/dialog';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
+import { format } from '../lib/utils';
 import { handleFirestoreError, OperationType } from '../lib/firebase-utils';
-import { cn, getShiftDate } from '../lib/utils';
+import { cn, getShiftDate, parseAsSaoPaulo, getSaoPauloDate } from '../lib/utils';
+import { useData } from '../contexts/DataContext';
 import { ConfirmDialog } from './ConfirmDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { calculateAvailableDoses } from '../lib/stock-utils';
 import { DateRangePicker } from './DateRangePicker';
+import { useNavigate } from 'react-router-dom';
 
 import { useFetchCollection } from '../hooks/useFetchCollection';
 import { usePaymentFees } from '../hooks/usePaymentFees';
+import { useCheckout } from '../hooks/useCheckout';
+import { MetricsBanner } from './dashboard/MetricsBanner';
+import { NewOrderDialog } from './dashboard/NewOrderDialog';
 
-export function Dashboard({ user, setActiveTab }: { user: UserProfile, setActiveTab: (tab: string) => void }) {
+export function Dashboard({ user }: { user: UserProfile }) {
+  const navigate = useNavigate();
   const orderConstraints = React.useMemo(() => [where('status', '==', 'open'), orderBy('createdAt', 'desc')], []);
   
   const { data: orders } = useFetchCollection<Order>('open_orders', {
     constraints: orderConstraints
   });
-  const { data: products } = useFetchCollection<Product>('products');
-  const { data: customers } = useFetchCollection<Customer>('customers');
-  const { data: categories } = useFetchCollection<Category>('categories');
-  const { data: gameModalities } = useFetchCollection<GameModality>('game_modalities');
+  const { products, customers, categories, gameModalities } = useData();
 
   const [search, setSearch] = useState('');
   const [isNewOrderOpen, setIsNewOrderOpen] = useState(false);
@@ -115,81 +118,10 @@ export function Dashboard({ user, setActiveTab }: { user: UserProfile, setActive
   return (
     <div className="space-y-8">
       {/* Digital Operations Dashboard - Metrics Banner */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-6">
-        <Card className="bg-card/30 border-border/50 overflow-hidden relative group cursor-pointer" onClick={() => setIsNewOrderOpen(true)}>
-          <div className="absolute inset-0 bg-gradient-to-br from-[#0070f3]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-          <CardContent className="p-4 md:p-6 flex items-center gap-4 md:gap-5 relative z-10">
-            <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-[#0070f3]/10 flex items-center justify-center border border-[#0070f3]/20 shadow-[0_0_20px_rgba(0,112,243,0.1)] group-hover:scale-110 transition-transform">
-              <PlusCircle className="w-5 h-5 md:w-6 md:h-6 text-[#0070f3]" />
-            </div>
-            <div>
-              <p className="text-[8px] md:text-[9px] font-black tracking-widest uppercase text-muted-foreground mb-1 leading-none">Ponto de Venda</p>
-              <h3 className="text-xs md:text-lg font-black text-white leading-none">NOVA COMANDA</h3>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-card/30 border-border/50 overflow-hidden relative group">
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-          <CardContent className="p-4 md:p-6 flex items-center gap-4 md:gap-5 relative z-10">
-            <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
-              <Clock className="w-5 h-5 md:w-6 md:h-6 text-blue-500" />
-            </div>
-            <div className="flex-1">
-              <p className="text-[8px] md:text-[9px] font-black tracking-widest uppercase text-muted-foreground mb-1 leading-none">Mesas Ativas</p>
-              <h3 className="text-lg md:text-2xl font-black text-white leading-none">{orders.length}</h3>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-card/30 border-border/50 overflow-hidden relative group cursor-pointer" onClick={() => setActiveTab('finances')}>
-          <div className="absolute inset-0 bg-gradient-to-br from-[#0070f3]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-          <CardContent className="p-4 md:p-6 flex items-center gap-4 md:gap-5 relative z-10">
-            <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-[#0070f3]/10 flex items-center justify-center border border-[#0070f3]/20">
-              <TrendingUp className="w-5 h-5 md:w-6 md:h-6 text-[#0070f3]" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[8px] md:text-[9px] font-black tracking-widest uppercase text-muted-foreground mb-1 leading-none">Valor em Aberto</p>
-              <h3 className="text-base md:text-2xl font-black text-[#0070f3] leading-none truncate font-mono tabular-nums">
-                R$ {orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </h3>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-card/30 border-border/50 overflow-hidden relative group">
-          <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-          <CardContent className="p-4 md:p-6 flex items-center gap-4 md:gap-5 relative z-10">
-            <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-green-500/10 flex items-center justify-center border border-green-500/20">
-              <Zap className="w-5 h-5 md:w-6 md:h-6 text-green-500" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[8px] md:text-[9px] font-black tracking-widest uppercase text-muted-foreground mb-1 leading-none">Ticket Médio</p>
-               <h3 className="text-base md:text-2xl font-black text-green-500 leading-none truncate font-mono tabular-nums">
-                R$ {orders.length > 0 ? (orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0) / orders.length).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '0,00'}
-              </h3>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-card/30 border-border/50 overflow-hidden relative group">
-          <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-          <CardContent className="p-4 md:p-6 flex items-center gap-4 md:gap-5 relative z-10">
-            <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20">
-              <Activity className="w-5 h-5 md:w-6 md:h-6 text-indigo-500" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[8px] md:text-[9px] font-black tracking-widest uppercase text-muted-foreground mb-1 leading-none">Lucro Projetado</p>
-              <h3 className="text-base md:text-2xl font-black text-indigo-500 leading-none truncate font-mono tabular-nums">
-                R$ {orders.reduce((sum, o) => {
-                  const orderCost = (o.items || []).reduce((cSum, i) => cSum + ((i.costPrice || 0) * i.quantity), 0);
-                  return sum + ((o.totalAmount || 0) - orderCost);
-                }, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </h3>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <MetricsBanner 
+        orders={orders} 
+        onNewOrder={() => setIsNewOrderOpen(true)} 
+      />
 
       <div className="flex flex-col md:flex-row justify-between items-center gap-4 md:gap-6">
         <div className="relative flex-1 w-full group">
@@ -237,157 +169,13 @@ export function Dashboard({ user, setActiveTab }: { user: UserProfile, setActive
             )}
           </div>
 
-          <Dialog open={isNewOrderOpen} onOpenChange={(open) => {
-            setIsNewOrderOpen(open);
-            if (!open) {
-              setNewCustomerName('');
-            }
-          }}>
-            <DialogTrigger nativeButton={true} render={
-              <Button className="h-16 px-8 bg-[#0070f3] hover:bg-[#0070f3]/90 text-white font-black uppercase tracking-widest rounded-2xl shadow-lg shadow-[#0070f3]/20 gap-2 hidden md:flex">
-                <Plus className="w-5 h-5" />
-                ABRIR COMANDA
-              </Button>
-            } />
-            {/* FAB for Mobile */}
-            <DialogTrigger nativeButton={true} render={
-              <button className="md:hidden fixed bottom-24 right-6 w-16 h-16 bg-[#0070f3] text-white rounded-full shadow-2xl flex items-center justify-center z-40 active:scale-95 transition-transform">
-                <Plus className="w-8 h-8" />
-              </button>
-            } />
-            <DialogContent className="bg-[#05070a] border-none max-w-2xl text-white p-0 overflow-hidden flex flex-col max-h-[90vh] shadow-2xl rounded-[40px]">
-              <div className="p-6 md:p-8 border-b border-white/5 relative flex-shrink-0 bg-[#05070a]">
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-2xl bg-[#0070f3]/10 flex items-center justify-center border border-[#0070f3]/20 shadow-lg">
-                    <UserPlus className="w-7 h-7 text-[#0070f3]" />
-                  </div>
-                  <div>
-                    <DialogTitle className="text-2xl md:text-3xl font-black uppercase tracking-tighter leading-none mb-1">Nova Comanda</DialogTitle>
-                    <p className="text-[10px] font-bold tracking-widest uppercase text-[#0070f3]/60 flex items-center gap-2">
-                      <Zap className="w-3 h-3" /> Inicie o atendimento operacional
-                    </p>
-                  </div>
-                </div>
-                <button onClick={() => setIsNewOrderOpen(false)} className="absolute right-6 top-6 text-muted-foreground hover:text-white transition-colors p-2 hover:bg-white/5 rounded-full">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar space-y-8">
-                <div className="space-y-3">
-                  <label className="text-[10px] font-black tracking-widest uppercase text-[#0070f3] ml-1">Para quem é esta comanda?</label>
-                  <div className="relative group">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-6 h-6 text-muted-foreground group-focus-within:text-[#0070f3] transition-colors" />
-                    <Input 
-                      placeholder="NOME DO CLIENTE, MESA OU BALCÃO..." 
-                      className="h-20 pl-14 bg-[#0d1117] border-white/5 focus:ring-[#0070f3]/20 focus:border-[#0070f3] text-xl md:text-2xl font-black rounded-2xl uppercase tracking-tight shadow-inner"
-                      value={newCustomerName}
-                      onChange={(e) => setNewCustomerName(e.target.value)}
-                      autoFocus
-                      autoComplete="off"
-                    />
-                  </div>
-                  <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest ml-1">Digite qualquer coisa e o sistema irá sugerir as melhores opções abaixo</p>
-                </div>
-
-                <div className="space-y-4">
-                  {newCustomerName.trim().length === 0 ? (
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                       {['MESA 01', 'MESA 02', 'MESA 03', 'BALCÃO'].map(sug => (
-                        <button 
-                          key={sug}
-                          onClick={() => handleCreateOrder(sug, 'table')}
-                          disabled={isCreatingOrder}
-                          className="py-6 px-4 bg-[#0d1117] hover:bg-[#161b22] border border-white/5 disabled:opacity-50 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-sm flex flex-col items-center gap-2"
-                        >
-                          <Package className="w-6 h-6 text-muted-foreground" />
-                          {sug}
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                      
-                      {/* 1. Mesa / Balcão Option */}
-                      <button 
-                        onClick={() => handleCreateOrder(newCustomerName, 'table')}
-                        disabled={isCreatingOrder}
-                        className="w-full p-4 bg-[#0d1117] hover:bg-[#161b22] border border-[#0070f3]/20 disabled:opacity-50 rounded-2xl text-left transition-all flex items-center justify-between group"
-                      >
-                        <div className="flex items-center gap-4">
-                           <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center">
-                             <Package className="w-5 h-5 text-white/50 group-hover:text-[#0070f3] transition-colors" />
-                           </div>
-                           <div>
-                             <p className="text-[10px] font-black uppercase tracking-widest text-[#0070f3] mb-1">Mesa / Balcão (Sem Cadastro)</p>
-                             <p className="text-lg font-black uppercase tracking-widest">{newCustomerName}</p>
-                           </div>
-                        </div>
-                        <Plus className="w-6 h-6 text-muted-foreground group-hover:text-white" />
-                      </button>
-
-                      {/* 2. Cliente Fiel (Matching ones) */}
-                      {customers
-                        .filter(c => c.name.toUpperCase().includes(newCustomerName.toUpperCase()))
-                        .map(customer => (
-                          <button 
-                            key={customer.id}
-                            onClick={() => handleCreateOrder(customer.name, 'customer', customer.id)}
-                            disabled={isCreatingOrder}
-                            className="w-full p-4 bg-[#0d1117] hover:bg-[#161b22] border border-green-500/20 disabled:opacity-50 rounded-2xl text-left transition-all flex items-center justify-between group"
-                          >
-                            <div className="flex items-center gap-4">
-                               <div className="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center">
-                                 <UserCheck className="w-5 h-5 text-green-500" />
-                               </div>
-                               <div>
-                                 <p className="text-[10px] font-black uppercase tracking-widest text-green-500 mb-1">Cliente Fiel Localizado</p>
-                                 <p className="text-lg font-black uppercase tracking-widest flex items-center gap-3">
-                                   {customer.name}
-                                   {(customer.balance || 0) < 0 && (
-                                     <span className="bg-red-500/20 text-red-500 px-2 py-0.5 rounded-md text-[10px]">DÉBITO R$ {Math.abs(customer.balance || 0).toFixed(2)}</span>
-                                   )}
-                                   {(customer.balance || 0) > 0 && (
-                                     <span className="bg-green-500/20 text-green-500 px-2 py-0.5 rounded-md text-[10px]">CRÉDITO R$ {(customer.balance || 0).toFixed(2)}</span>
-                                   )}
-                                 </p>
-                               </div>
-                            </div>
-                            <Plus className="w-6 h-6 text-muted-foreground group-hover:text-white" />
-                          </button>
-                        ))
-                      }
-
-                      {/* 3. New Customer Option (Only if exact match doesn't exist) */}
-                      {!customers.some(c => c.name.toUpperCase() === newCustomerName.toUpperCase()) && (
-                        <button 
-                          onClick={() => handleCreateOrder(newCustomerName, 'customer', '', true)}
-                          disabled={isCreatingOrder}
-                          className="w-full p-4 bg-[#0d1117] hover:bg-[#161b22] border border-amber-500/20 disabled:opacity-50 rounded-2xl text-left transition-all flex items-center justify-between group"
-                        >
-                          <div className="flex items-center gap-4">
-                             <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center">
-                               <UserPlus className="w-5 h-5 text-amber-500" />
-                             </div>
-                             <div>
-                               <p className="text-[10px] font-black uppercase tracking-widest text-amber-500 mb-1">Cadastrar e Abrir Comanda</p>
-                               <p className="text-lg font-black uppercase tracking-widest">{newCustomerName}</p>
-                             </div>
-                          </div>
-                          <Plus className="w-6 h-6 text-muted-foreground group-hover:text-white" />
-                        </button>
-                      )}
-
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <DialogFooter className="p-6 md:p-8 border-t border-white/5 bg-[#05070a] flex-row gap-4 flex-shrink-0">
-                <Button variant="ghost" onClick={() => setIsNewOrderOpen(false)} disabled={isCreatingOrder} className="flex-1 max-w-[200px] h-16 font-black uppercase tracking-widest text-muted-foreground hover:text-white rounded-2xl">Fechar</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          <NewOrderDialog 
+            isOpen={isNewOrderOpen}
+            onOpenChange={setIsNewOrderOpen}
+            customers={customers}
+            onCreateOrder={handleCreateOrder}
+            isCreating={isCreatingOrder}
+          />
 
           <div className="flex bg-[#0d1117] p-1.5 rounded-2xl border border-white/5">
             <Button 
@@ -441,6 +229,7 @@ export function Dashboard({ user, setActiveTab }: { user: UserProfile, setActive
 
 const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Customer[]; categories: Category[]; gameModalities: GameModality[]; viewMode: 'grid' | 'list'; user: UserProfile }> = ({ order, products, customers, categories, gameModalities, viewMode, user }) => {
   const { calculateNet } = usePaymentFees();
+  const { finalizeCheckout, isProcessing: isCheckoutProcessing } = useCheckout();
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
@@ -485,7 +274,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
       setCheckoutAmount(total);
       setCheckoutPayments([{ method: 'DINHEIRO', amount: total }]);
       const shiftDate = order.createdAt 
-        ? getShiftDate((order.createdAt as any).toDate ? (order.createdAt as any).toDate() : new Date(order.createdAt as any))
+        ? getShiftDate((order.createdAt as any).toDate ? (order.createdAt as any).toDate() : getSaoPauloDate(order.createdAt as any))
         : getShiftDate();
       setCheckoutDate(shiftDate);
     }
@@ -709,219 +498,22 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
       return;
     }
 
-    setIsProcessing(true);
-    try {
-      const finalAmount = checkoutAmount;
-      const targetCustomerId = checkoutCustomerId || order.customerId;
-      
-      // If finalAmount is negative, it means the bar owes the customer (credit)
-      // We'll treat the absolute value as something to be paid/credited
-      const totalPaid = checkoutPayments.reduce((sum, p) => sum + p.amount, 0);
-      const surplus = totalPaid - finalAmount;
+    const success = await finalizeCheckout(
+      order,
+      checkoutAmount,
+      checkoutPayments,
+      checkoutDate,
+      checkoutCustomerId,
+      checkoutDiscount,
+      checkoutAdjustment,
+      user,
+      products,
+      customers
+    );
 
-      await updateDoc(doc(db, 'open_orders', order.id), {
-        status: 'closed',
-        closedAt: serverTimestamp(),
-        closedShiftDate: checkoutDate,
-        totalAmount: finalAmount,
-        payments: checkoutPayments.map(p => ({ ...p, date: new Date() })),
-        customerId: targetCustomerId === 'none' ? '' : targetCustomerId
-      });
-      
-      if (targetCustomerId && targetCustomerId !== 'none') {
-        const customerRef = doc(db, 'customers', targetCustomerId);
-        const customer = customers.find(c => c.id === targetCustomerId);
-        if (customer) {
-          const fiadoAmount = checkoutPayments
-            .filter(p => p.method === 'FIADO')
-            .reduce((sum, p) => sum + p.amount, 0);
-          
-          const saldoUsedAmount = checkoutPayments
-            .filter(p => p.method === 'SALDO')
-            .reduce((sum, p) => sum + p.amount, 0);
-
-          // Surplus correctly captures the "bar owes customer" logic when finalAmount is negative
-          // If amount is -10 and user paid 0, surplus is 10 (Credit to customer)
-          // Also handle negative finalAmount directly in balance if it was fully unpaid or paid with credit methods
-          const balanceImpact = surplus - fiadoAmount - saldoUsedAmount;
-
-          await updateDoc(customerRef, {
-            totalSpent: (customer.totalSpent || 0) + finalAmount,
-            orderCount: (customer.orderCount || 0) + 1,
-            balance: (customer.balance || 0) + balanceImpact,
-            lastVisit: serverTimestamp()
-          });
-        }
-      }
-
-      // Calculate total cost and aggregate stock reductions
-      let totalCost = 0;
-      const inventoryUpdates: Record<string, {
-        stockReduction: number;
-        mlReduction: number;
-        originalStock: number;
-        originalVol: number;
-        volPerUnit: number;
-        isDoseControl: boolean;
-      }> = {};
-
-      for (const item of order.items) {
-        totalCost += (item.costPrice || 0) * item.quantity;
-
-        if (!item.productId.startsWith('manual_') && !item.productId.startsWith('game_')) {
-          const baseProductId = item.productId.split('_')[0];
-          const product = products.find(p => p.id === baseProductId);
-          
-          if (product) {
-            // RECIPE (Ficha Técnica) logic - Reduce stock of ingredients
-            if (product.ingredients && product.ingredients.length > 0) {
-              for (const ing of product.ingredients) {
-                const ingProduct = products.find(p => p.id === ing.productId);
-                if (ingProduct) {
-                  if (!inventoryUpdates[ing.productId]) {
-                    inventoryUpdates[ing.productId] = {
-                      stockReduction: 0,
-                      mlReduction: 0,
-                      originalStock: ingProduct.stock || 0,
-                      originalVol: ingProduct.currentBottleVolume !== undefined ? ingProduct.currentBottleVolume : 0,
-                      volPerUnit: ingProduct.volumePerUnit || 0,
-                      isDoseControl: !!ingProduct.isDoseControl
-                    };
-                  }
-                  inventoryUpdates[ing.productId].stockReduction += (ing.quantity * item.quantity);
-                }
-              }
-            }
-
-            if (product.isDoseControl && product.linkedProductId) {
-              // It's a DOSE
-              const bottleId = product.linkedProductId;
-              const bottle = products.find(p => p.id === bottleId);
-              
-              if (bottle) {
-                if (!inventoryUpdates[bottleId]) {
-                  inventoryUpdates[bottleId] = {
-                    stockReduction: 0,
-                    mlReduction: 0,
-                    originalStock: bottle.stock || 0,
-                    originalVol: bottle.currentBottleVolume !== undefined ? bottle.currentBottleVolume : 0,
-                    volPerUnit: bottle.volumePerUnit || 0,
-                    isDoseControl: true
-                  };
-                }
-                inventoryUpdates[bottleId].mlReduction += (product.doseSize || 0) * item.quantity;
-              }
-            } else if (product.isDoseControl && !product.linkedProductId) {
-              // It's a BASE BOTTLE
-              if (!inventoryUpdates[product.id]) {
-                inventoryUpdates[product.id] = {
-                  stockReduction: 0,
-                  mlReduction: 0,
-                  originalStock: product.stock || 0,
-                  originalVol: product.currentBottleVolume !== undefined ? product.currentBottleVolume : 0,
-                  volPerUnit: product.volumePerUnit || 0,
-                  isDoseControl: true
-                };
-              }
-              inventoryUpdates[product.id].stockReduction += item.quantity;
-            } else {
-              // NORMAL PRODUCT
-              if (!inventoryUpdates[product.id]) {
-                inventoryUpdates[product.id] = {
-                  stockReduction: 0,
-                  mlReduction: 0,
-                  originalStock: product.stock || 0,
-                  originalVol: 0,
-                  volPerUnit: 0,
-                  isDoseControl: false
-                };
-              }
-              inventoryUpdates[product.id].stockReduction += item.quantity;
-            }
-          }
-        }
-      }
-
-      // Apply aggregated inventory updates
-      for (const [productId, update] of Object.entries(inventoryUpdates)) {
-        const productRef = doc(db, 'products', productId);
-        
-        if (update.isDoseControl) {
-          let newCurrentVolume = update.originalVol - update.mlReduction;
-          let newStock = update.originalStock - update.stockReduction;
-
-          if (update.volPerUnit > 0) {
-            while (newCurrentVolume < 0 && newStock > 0) {
-              newStock -= 1;
-              newCurrentVolume += update.volPerUnit;
-            }
-          }
-
-          if (newCurrentVolume < 0) {
-            newCurrentVolume = 0;
-            newStock = 0;
-          }
-
-          await updateDoc(productRef, {
-            stock: Math.max(0, newStock),
-            currentBottleVolume: Math.max(0, newCurrentVolume)
-          });
-        } else {
-          await updateDoc(productRef, {
-            stock: Math.max(0, update.originalStock - update.stockReduction)
-          });
-        }
-      }
-
-      // Create game sessions for games played in this order
-      for (const item of order.items) {
-        if (item.productId.startsWith('game_')) {
-          const splitId = item.productId.split('_');
-          const modalityId = splitId[1];
-          const modalityName = item.productName.replace('[JOGO] ', '');
-          
-          await addDoc(collection(db, 'game_sessions'), {
-            modalityId,
-            modalityName,
-            amount: item.subtotal,
-            date: new Date(checkoutDate + 'T12:00:00'),
-            userId: user.uid,
-            userName: user.displayName || user.email,
-            orderId: order.id
-          });
-        }
-      }
-
-      // Create transactions for each payment
-      for (const payment of checkoutPayments) {
-        // Proportional cost for this payment
-        const paymentCost = finalAmount > 0 ? (payment.amount / finalAmount) * totalCost : 0;
-        const { netAmount, feeAmount } = calculateNet(payment.amount, payment.method);
-
-        await addDoc(collection(db, 'transactions'), {
-          type: 'income',
-          category: 'Vendas',
-          amount: payment.amount,
-          netAmount,
-          feeAmount,
-          cost: paymentCost,
-          description: `Comanda fechada: ${order.customerName} (${payment.method})${checkoutDiscount > 0 ? ` (Desc: R$ ${checkoutDiscount})` : ''}${checkoutAdjustment !== 0 ? ` (Ajuste: R$ ${checkoutAdjustment})` : ''}`,
-          date: new Date(checkoutDate + 'T12:00:00'),
-          orderId: order.id,
-          customerId: targetCustomerId === 'none' ? '' : targetCustomerId,
-          paymentMethod: payment.method,
-          isFiado: payment.method === 'FIADO',
-          isSaldo: payment.method === 'SALDO'
-        });
-      }
-
+    if (success) {
       setIsCheckoutOpen(false);
       setIsDetailOpen(false);
-      toast.success('Recebimento finalizado com sucesso');
-    } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `open_orders/${order.id}`);
-    } finally {
-      setIsProcessing(false);
     }
   };
 

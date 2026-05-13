@@ -5,7 +5,7 @@ import { GameModality, GameSession, UserProfile } from '../types';
 import { useFetchCollection } from './useFetchCollection';
 import { handleFirestoreError, OperationType } from '../lib/firebase-utils';
 import { toast } from 'sonner';
-import { startOfDay, endOfDay } from 'date-fns';
+import { getShiftInterval } from '../lib/utils';
 
 export function useGameState(user: UserProfile) {
   // --- Modalities Fetching ---
@@ -16,8 +16,7 @@ export function useGameState(user: UserProfile) {
 
   // --- Sessions Fetching (Today's activity) ---
   const sessionConstraints = useMemo(() => {
-    const todayStart = startOfDay(new Date());
-    const todayEnd = endOfDay(new Date());
+    const { start: todayStart, end: todayEnd } = getShiftInterval();
     return [
       where('date', '>=', Timestamp.fromDate(todayStart)),
       where('date', '<=', Timestamp.fromDate(todayEnd)),

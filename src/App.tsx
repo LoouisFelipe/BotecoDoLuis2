@@ -23,6 +23,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { cn } from './lib/utils';
 import { Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
 
+import { DataProvider } from './contexts/DataContext';
+
 export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'online' | 'offline' | 'syncing'>(!navigator.onLine ? 'offline' : 'online');
@@ -87,7 +89,8 @@ export default function App() {
     <ErrorBoundary>
       <AuthWrapper>
         {(user) => (
-          <div className="min-h-screen bg-background flex text-foreground relative overflow-x-hidden">
+          <DataProvider>
+            <div className="min-h-screen bg-background flex text-foreground relative overflow-x-hidden">
             {/* Sidebar Overlay for Mobile */}
             {isSidebarOpen && (
               <div 
@@ -260,10 +263,10 @@ export default function App() {
 
               <main className="flex-1 p-4 md:p-8 overflow-y-auto custom-scrollbar">
                 <Routes>
-                  <Route path="/" element={<Dashboard user={user} setActiveTab={setActiveTab} />} />
-                  <Route path="/inventory" element={<Inventory user={user} setActiveTab={setActiveTab} />} />
-                  <Route path="/finances" element={<Finances user={user} setActiveTab={setActiveTab} />} />
-                  <Route path="/reports" element={<Reports user={user} setActiveTab={setActiveTab} />} />
+                  <Route path="/" element={<Dashboard user={user} />} />
+                  <Route path="/inventory" element={<Inventory user={user} />} />
+                  <Route path="/finances" element={<Finances user={user} />} />
+                  <Route path="/reports" element={<Reports user={user} />} />
                   <Route path="/games" element={<Games user={user} />} />
                   <Route path="/clients" element={<Customers user={user} />} />
                   <Route path="/suppliers" element={<Suppliers user={user} />} />
@@ -279,6 +282,7 @@ export default function App() {
             </div>
             <Toaster position="top-right" />
           </div>
+          </DataProvider>
         )}
       </AuthWrapper>
     </ErrorBoundary>

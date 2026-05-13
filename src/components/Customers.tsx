@@ -15,19 +15,15 @@ import { handleFirestoreError, OperationType } from '../lib/firebase-utils';
 import { cn, formatShiftDateTime } from '../lib/utils';
 import { ConfirmDialog } from './ConfirmDialog';
 import { Badge } from './ui/badge';
-import { format } from 'date-fns';
+import { format } from '../lib/utils';
 import { Order } from '../types';
 
-import { useFetchCollection } from '../hooks/useFetchCollection';
+import { useData } from '../contexts/DataContext';
 import { usePaymentFees } from '../hooks/usePaymentFees';
 
 export function Customers({ user }: { user: UserProfile }) {
   const { calculateNet } = usePaymentFees();
-  const customerConstraints = React.useMemo(() => [orderBy('name', 'asc')], []);
-
-  const { data: customers } = useFetchCollection<Customer>('customers', {
-    constraints: customerConstraints
-  });
+  const { customers, loading } = useData();
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
@@ -133,8 +129,8 @@ export function Customers({ user }: { user: UserProfile }) {
 
       // Merge and sort
       const merged = [...orders, ...payments].sort((a, b) => {
-        const timeA = a.timestamp?.toDate ? a.timestamp.toDate().getTime() : 0;
-        const timeB = b.timestamp?.toDate ? b.timestamp.toDate().getTime() : 0;
+        const timeA = a.timestamp?.toDate ? a.timestamp.toDate().getTime() : (a.timestamp instanceof Date ? a.timestamp.getTime() : 0);
+        const timeB = b.timestamp?.toDate ? b.timestamp.toDate().getTime() : (b.timestamp instanceof Date ? b.timestamp.getTime() : 0);
         return timeB - timeA;
       });
 

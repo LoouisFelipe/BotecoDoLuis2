@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
-import { 
-  collection, 
-  onSnapshot, 
-  query, 
-  QueryConstraint, 
+import { useState, useEffect, useRef, useMemo } from 'react';
+import {
+  collection,
+  onSnapshot,
+  query,
+  QueryConstraint,
   FirestoreError,
   DocumentData
 } from 'firebase/firestore';
@@ -17,7 +17,7 @@ interface FetchCollectionOptions {
 }
 
 export function useFetchCollection<T = DocumentData>(
-  collectionName: string, 
+  collectionName: string,
   options: FetchCollectionOptions = {}
 ) {
   const [data, setData] = useState<T[]>([]);
@@ -25,15 +25,27 @@ export function useFetchCollection<T = DocumentData>(
   const [error, setError] = useState<FirestoreError | null>(null);
 
   const { enabled = true, constraints = [], onError } = options;
-  
+
   // Usamos ref para o callback de erro para evitar que mudanças na função triggerem o useEffect
   const onErrorRef = useRef(onError);
   useEffect(() => {
     onErrorRef.current = onError;
   }, [onError]);
 
-  // Estabilizamos as constraints usando stringify
-  const constraintsKey = JSON.stringify(constraints.map(c => c.type || 'unknown'));
+  // Estabilizamos as constraints para evitar loops infinitos se não forem memoizadas
+  // Nota: Firebase QueryConstraints não são serializáveis facilmente, então usamos o tamanho e o tipo como dica básica,
+  // mas recomendamos o uso de useMemo no chamador.
+  const constraintsKey = useMemo(() => {
+    try {
+      return constraints.map(c => {
+        // Tentativa de extrair info identificadora (não oficial do SDK, mas comum na estrutura interna)
+        const anyC = c as any;
+        return `${c.type}_${anyC._field?.segments?.join('.') || ''}_${anyC._op || ''}`;
+      }).join('|');
+    } catch (e) {
+      return constraints.length.toString();
+    }
+  }, [constraints]);
 
   useEffect(() => {
     if (!enabled) {
@@ -42,16 +54,18 @@ export function useFetchCollection<T = DocumentData>(
     }
 
     setLoading(true);
-    
+    let isMounted = true;
+
     try {
       const q = query(
-        collection(db, collectionName), 
+        collection(db, collectionName),
         ...constraints
       );
 
       const unsubscribe = onSnapshot(
-        q, 
+        q,
         (snapshot) => {
+          if (!isMounted) return;
           const results = snapshot.docs.map(doc => ({
             ...doc.data(),
             id: doc.id
@@ -61,20 +75,26 @@ export function useFetchCollection<T = DocumentData>(
           setError(null);
         },
         (err) => {
-          console.error(`Error fetching collection ${collectionName}:`, err);
+          if (!isMounted) return;
+          console.error(`[useFetchCollection] Error in ${collectionName}:`, err);
           setError(err);
           setLoading(false);
+
           if (onErrorRef.current) {
             onErrorRef.current(err);
           } else {
-            handleFirestoreError(err, OperationType.LIST, collectionName);
+            // Em vez de jogar o erro (crash), apenas logamos e deixamos o estado carregar o erro
+            // handleFirestoreError(err, OperationType.LIST, collectionName);
           }
         }
       );
 
-      return () => unsubscribe();
+      return () => {
+        isMounted = false;
+        unsubscribe();
+      };
     } catch (err) {
-      console.error(`Query construction error for ${collectionName}:`, err);
+      console.error(`[useFetchCollection] Query construction error:`, err);
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

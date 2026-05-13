@@ -5,7 +5,8 @@ import { Transaction, UserProfile, PaymentFeeConfig, Product } from '../types';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, AreaChart, Area } from 'recharts';
-import { startOfDay, endOfDay, subDays, format, differenceInDays, addDays } from 'date-fns';
+import { startOfDay, endOfDay, subDays, differenceInDays, addDays } from 'date-fns';
+import { format } from '../lib/utils';
 import { DateRangePicker } from './DateRangePicker';
 import { ptBR } from 'date-fns/locale';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
@@ -18,8 +19,15 @@ import { cn, getShiftInterval, getShiftDate } from '../lib/utils';
 import { Calendar as CalendarUI } from './ui/calendar';
 import { geminiService } from '../services/geminiService';
 import Markdown from 'react-markdown';
+import { useData } from '../contexts/DataContext';
+import { usePaymentFees } from '../hooks/usePaymentFees';
+import { parseAsSaoPaulo, getSaoPauloDate, nowInSaoPaulo } from '../lib/utils';
+import { useNavigate } from 'react-router-dom';
 
-export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTab: (tab: string) => void }) {
+export function Reports({ user }: { user: UserProfile }) {
+  const navigate = useNavigate();
+  const { fees: rates } = usePaymentFees();
+  const { products } = useData();
   const [loading, setLoading] = useState(true);
   const [dailyData, setDailyData] = useState<any[]>([]);
   const [topProducts, setTopProducts] = useState<any[]>([]);
@@ -51,8 +59,8 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
   const [loadingTransactions, setLoadingTransactions] = useState(false);
 
   const [dateRange, setDateRange] = useState<{from: Date, to: Date}>({
-    from: subDays(new Date(), 6),
-    to: new Date()
+    from: subDays(nowInSaoPaulo(), 6),
+    to: nowInSaoPaulo()
   });
 
   const handleSendMessage = async () => {
@@ -147,13 +155,6 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
 
   const fetchDailyDataByRange = async (range: {from: Date, to: Date}) => {
     setLoading(true);
-    
-    // Fetch Rates
-    let rates: PaymentFeeConfig = { credit_pct: 0, debit_pct: 0, pix_pct: 0 };
-    try {
-      const docSnap = await getDoc(doc(db, 'payment_fees', 'config_rates'));
-      if (docSnap.exists()) rates = docSnap.data() as PaymentFeeConfig;
-    } catch (err) { console.error('Error fetching rates', err); }
 
     const daysCount = differenceInDays(range.to, range.from) + 1;
     
@@ -196,15 +197,15 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
         const { start, end } = getShiftInterval(midDay);
         
         const dayTransactions = allTransactions.filter(t => {
-          const tDate = t.date?.toDate ? t.date.toDate() : new Date(t.date as any);
+          const tDate = parseAsSaoPaulo(t.date);
           return tDate >= start && tDate <= end;
         });
         const dayExpenses = allExpenses.filter(t => {
-          const tDate = t.date?.toDate ? t.date.toDate() : new Date(t.date as any);
+          const tDate = parseAsSaoPaulo(t.date);
           return tDate >= start && tDate <= end;
         });
         const dayPurchases = allPurchases.filter((p: any) => {
-          const pDate = p.date?.toDate ? p.date.toDate() : new Date(p.date as any);
+          const pDate = parseAsSaoPaulo(p.date);
           return pDate >= start && pDate <= end;
         });
 
@@ -273,7 +274,7 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
               productMap[pName].total += item.totalPrice || ((item.price || 0) * (item.quantity || 1)) || 0;
            });
            if (order.closedAt) {
-             const hour = order.closedAt.toDate ? order.closedAt.toDate().getHours() : new Date(order.closedAt).getHours();
+             const hour = parseAsSaoPaulo(order.closedAt).getHours();
              hourMap[hour] = (hourMap[hour] || 0) + 1;
            }
         });
@@ -288,8 +289,6 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
 
     const fetchTopProducts = async () => {
       try {
-        const prodSnapshot = await getDocs(collection(db, 'products'));
-        const products = prodSnapshot.docs.map(doc => ({ ...doc.data() as Product, id: doc.id }));
         const sorted = products
           .map(p => {
              let realCost = p.cost || 0;
@@ -390,8 +389,8 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
       }));
       
       setSelectedDayTransactions([...trans, ...exps, ...purs].sort((a: any, b: any) => {
-        const dateA = a.date?.toDate ? a.date.toDate() : new Date(a.date);
-        const dateB = b.date?.toDate ? b.date.toDate() : new Date(b.date);
+        const dateA = parseAsSaoPaulo(a.date);
+        const dateB = parseAsSaoPaulo(b.date);
         return dateB.getTime() - dateA.getTime();
       }));
     } catch (error) {
@@ -481,7 +480,7 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
       {monthlySummary && (
         <Card 
           className="bg-primary/20 border-primary/30 rounded-2xl overflow-hidden cursor-pointer relative group transition-all active:scale-[0.99]"
-          onClick={() => setActiveTab('finances')}
+          onClick={() => navigate('/finances')}
         >
           <div className="absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-transparent via-primary to-transparent opacity-50" />
           <CardHeader className="pb-3 md:pb-4 border-b border-primary/10 px-4 md:px-6">
@@ -525,7 +524,7 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
           value={stats.income} 
           icon={<TrendingUp className="w-8 h-8" />} 
           variant="green"
-          onClick={() => setActiveTab('finances')}
+          onClick={() => navigate('/finances')}
           subtext="REALIZADO"
         />
         <StatCard 
@@ -533,7 +532,7 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
           value={stats.expense} 
           icon={<TrendingDown className="w-8 h-8" />} 
           variant="red"
-          onClick={() => setActiveTab('finances')}
+          onClick={() => navigate('/finances')}
           subtext="CUSTO + TAXAS"
         />
         <StatCard 
@@ -541,7 +540,7 @@ export function Reports({ user, setActiveTab }: { user: UserProfile, setActiveTa
           value={stats.profit} 
           icon={<DollarSign className="w-8 h-8" />} 
           variant="blue"
-          onClick={() => setActiveTab('finances')}
+          onClick={() => navigate('/finances')}
           subtext="LÍQUIDO"
         />
         <StatCard 
