@@ -4,30 +4,31 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore, doc, getDocFromServer, enableIndexedDbPersistence } from 'firebase/firestore';
 import { getAnalytics } from 'firebase/analytics';
 
-// Tenta carregar a config das envs (Padrão para Produção)
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
-  // Atributo específico do ambiente AI Studio para o Firestore Enterprise
-  firestoreDatabaseId: import.meta.env.VITE_FIREBASE_DATABASE_ID || '(default)'
+// Helper to get environment variables (Vite or Node)
+const getEnv = (key: string) => {
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    return import.meta.env[key];
+  }
+  return process.env[key];
 };
 
-// Log aprimorado para depuração no navegador
-console.log("%c 🚀 CONEXÃO FIREBASE ", "background: #0070f3; color: white; font-weight: bold; padding: 4px; border-radius: 4px;");
-console.log("📍 Projeto:", firebaseConfig.projectId);
-console.log("🗄️ Database ID:", firebaseConfig.firestoreDatabaseId);
+const firebaseConfig = {
+  apiKey: getEnv('VITE_FIREBASE_API_KEY'),
+  authDomain: getEnv('VITE_FIREBASE_AUTH_DOMAIN'),
+  projectId: getEnv('VITE_FIREBASE_PROJECT_ID'),
+  storageBucket: getEnv('VITE_FIREBASE_STORAGE_BUCKET'),
+  messagingSenderId: getEnv('VITE_FIREBASE_MESSAGING_SENDER_ID'),
+  appId: getEnv('VITE_FIREBASE_APP_ID'),
+  measurementId: getEnv('VITE_FIREBASE_MEASUREMENT_ID'),
+  firestoreDatabaseId: getEnv('VITE_FIREBASE_DATABASE_ID') || '(default)'
+};
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 
-// Habilitar persistência offline (IndexedDB) para o Firestore
-if (typeof window !== 'undefined') {
+// Habilitar persistência offline (IndexedDB) para o Firestore - Apenas no Browser
+if (typeof window !== 'undefined' && typeof navigator !== 'undefined') {
   enableIndexedDbPersistence(db).catch((err) => {
     if (err.code === 'failed-precondition') {
       console.warn("⚠️ Persistência offline: Múltiplas abas abertas. Funcionando em modo compartilhado.");

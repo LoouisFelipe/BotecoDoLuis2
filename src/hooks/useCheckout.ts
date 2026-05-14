@@ -41,9 +41,9 @@ export function useCheckout() {
       batch.update(orderRef, {
         status: 'closed',
         closedAt: serverTimestamp(),
-        closedShiftDate: checkoutDate,
+        closedShiftDate: getShiftDate(),
         totalAmount: finalAmount,
-        payments: checkoutPayments.map(p => ({ ...p, date: nowInSaoPaulo() })),
+        payments: checkoutPayments.map(p => ({ ...p, date: serverTimestamp() })),
         customerId: targetCustomerId
       });
 
@@ -195,7 +195,8 @@ export function useCheckout() {
             modalityId,
             modalityName,
             amount: item.subtotal,
-            date: parseAsSaoPaulo(checkoutDate),
+            date: serverTimestamp(),
+            dataExpediente: getShiftDate(),
             userId: user.uid,
             userName: user.displayName || user.email,
             orderId: order.id
@@ -217,7 +218,8 @@ export function useCheckout() {
           feeAmount,
           cost: paymentCost,
           description: `Comanda fechada: ${order.customerName} (${payment.method})${checkoutDiscount > 0 ? ` (Desc: R$ ${checkoutDiscount})` : ''}${checkoutAdjustment !== 0 ? ` (Ajuste: R$ ${checkoutAdjustment})` : ''}`,
-          date: parseAsSaoPaulo(checkoutDate),
+          date: serverTimestamp(),
+          dataExpediente: getShiftDate(),
           orderId: order.id,
           customerId: targetCustomerId,
           paymentMethod: payment.method,

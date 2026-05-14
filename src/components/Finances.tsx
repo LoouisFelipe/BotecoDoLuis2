@@ -17,7 +17,7 @@ import { isToday, isThisWeek, isThisMonth, isWithinInterval, startOfDay, endOfDa
 import { format } from '../lib/utils';
 import { ptBR } from 'date-fns/locale';
 import { handleFirestoreError, OperationType } from '../lib/firebase-utils';
-import { cn, getShiftInterval, formatShiftDateTime, parseAsSaoPaulo, getSaoPauloDate, nowInSaoPaulo } from '../lib/utils';
+import { cn, getShiftInterval, formatShiftDateTime, parseAsSaoPaulo, getSaoPauloDate, nowInSaoPaulo, getShiftDate } from '../lib/utils';
 import { DateRangePicker } from './DateRangePicker';
 
 import { useData } from '../contexts/DataContext';
@@ -47,7 +47,7 @@ export function Finances({ user }: { user: UserProfile }) {
   } = useData();
 
   const transactions = React.useMemo(() => {
-    const combined = [
+    const combined: any[] = [
       ...rawTransactions.map(t => ({ ...t, source: 'transactions' })),
       ...rawExpenses.map(t => ({ ...t, source: 'expenses' })),
       ...rawPurchases.map(p => ({
@@ -159,6 +159,75 @@ export function Finances({ user }: { user: UserProfile }) {
   const [newCatName, setNewCatName] = useState('');
   const [newSubName, setNewSubName] = useState('');
 
+  // Missing States for Recurring
+  const [isEditingRecurringModalOpen, setIsEditingRecurringModalOpen] = useState(false);
+  const [editRecAmount, setEditRecAmount] = useState('');
+  const [editRecDueDate, setEditRecDueDate] = useState('');
+  const [editRecDescription, setEditRecDescription] = useState('');
+  const [editingRecId, setEditingRecId] = useState<string | null>(null);
+
+  const handleEditRecurringClick = (expense: any) => {
+    setEditingRecId(expense.id);
+    setEditRecAmount(expense.amount.toString());
+    setEditRecDueDate(expense.dueDate.toString());
+    setEditRecDescription(expense.description || '');
+    setIsEditingRecurringModalOpen(true);
+  };
+
+  const handleUpdateRecurring = async () => {
+    if (!editingRecId || !editRecAmount || !editRecDueDate) return;
+    setIsSaving(true);
+    try {
+      await updateDoc(doc(db, 'recurring_expenses', editingRecId), {
+        amount: parseFloat(editRecAmount),
+        dueDate: parseInt(editRecDueDate),
+        description: editRecDescription
+      });
+      toast.success('Custo atualizado');
+      setIsEditingRecurringModalOpen(false);
+    } catch (error) {
+      console.error(error);
+      toast.error('Erro ao atualizar custo');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteRecurring = async (id: string) => {
+    if (!confirm('Deseja excluir este custo fixo?')) return;
+    try {
+      await deleteDoc(doc(db, 'recurring_expenses', id));
+      toast.success('Custo removido');
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleCreateCategory = async () => {
+    if (!newCatName) return;
+    try {
+      await addDoc(collection(db, 'expense_categories'), { name: newCatName, subcategories: [] });
+      setNewCatName('');
+      toast.success('Categoria criada');
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleAddSubcategory = async (catId: string) => {
+    if (!newSubName) return;
+    try {
+      const cat = expenseCategories.find(c => c.id === catId);
+      if (cat) {
+        await updateDoc(doc(db, 'expense_categories', catId), { subcategories: [...(cat.subcategories || []), newSubName] });
+        setNewSubName('');
+        toast.success('Subcategoria adicionada');
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
   const handleAddExpense = async () => {
     if (!amount || !category) return;
     setIsSaving(true);
@@ -253,7 +322,7 @@ export function Finances({ user }: { user: UserProfile }) {
     });
   }, [transactions, typeFilter, dateFilter, startDate, endDate, methodFilter, categoryFilter, searchQuery]);
 
-  const groupedTransactions = React.useMemo(() => {
+  const groupedTransactions = React.useMemo<Array<[string, any[]]>>(() => {
     const groups: { [key: string]: any[] } = {};
     filteredTransactions.forEach(t => {
       const shiftDate = getShiftDate(t.date);
@@ -1038,7 +1107,7 @@ export function Finances({ user }: { user: UserProfile }) {
                       className="w-full h-14 rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] border-orange-500/10 bg-orange-500/5 hover:bg-orange-500 hover:text-white transition-all mt-6 group"
                       onClick={() => {
                         setSelectedTransaction(null);
-                        setActiveTab('clients');
+                        navigate('/clients');
                       }}
                     >
                       Ver Perfil Completo do Cliente
@@ -1125,7 +1194,7 @@ export function Finances({ user }: { user: UserProfile }) {
                         className="h-12 px-6 rounded-xl font-black uppercase tracking-widest text-[10px] bg-green-500 hover:bg-green-600 text-white shadow-lg shadow-green-500/20"
                         onClick={() => {
                           setSelectedTransaction(null);
-                          setActiveTab('inventory');
+                          navigate('/inventory');
                         }}
                       >
                         Gerenciar no Estoque

@@ -31,13 +31,13 @@ export function Reports({ user }: { user: UserProfile }) {
   const [loading, setLoading] = useState(true);
   const [dailyData, setDailyData] = useState<any[]>([]);
   const [topProducts, setTopProducts] = useState<any[]>([]);
-  const [stats, setStats] = useState({ 
-    income: 0, 
-    expense: 0, 
-    profit: 0, 
-    grossProfit: 0, 
+  const [stats, setStats] = useState({
+    income: 0,
+    expense: 0,
+    profit: 0,
+    grossProfit: 0,
     grossMarginPct: 0,
-    projectedProfit30d: 0 
+    projectedProfit30d: 0
   });
   const [abcData, setAbcData] = useState<any[]>([]);
   const [monthlySummary, setMonthlySummary] = useState<any | null>(null);
@@ -45,7 +45,7 @@ export function Reports({ user }: { user: UserProfile }) {
   const [analyzing, setAnalyzing] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatMessage, setChatMessage] = useState('');
-  const [chatHistory, setChatHistory] = useState<{role: 'user' | 'assistant', content: string}[]>([]);
+  const [chatHistory, setChatHistory] = useState<{ role: 'user' | 'assistant', content: string }[]>([]);
   const [sendingChat, setSendingChat] = useState(false);
   const [extraData, setExtraData] = useState<any>({
     popularProducts: [],
@@ -58,19 +58,19 @@ export function Reports({ user }: { user: UserProfile }) {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [loadingTransactions, setLoadingTransactions] = useState(false);
 
-  const [dateRange, setDateRange] = useState<{from: Date, to: Date}>({
+  const [dateRange, setDateRange] = useState<{ from: Date, to: Date }>({
     from: subDays(nowInSaoPaulo(), 6),
     to: nowInSaoPaulo()
   });
 
   const handleSendMessage = async () => {
     if (!chatMessage.trim() || sendingChat) return;
-    
+
     const userMsg = chatMessage;
     setChatMessage('');
     setChatHistory(prev => [...prev, { role: 'user', content: userMsg }]);
     setSendingChat(true);
-    
+
     try {
       const context = `
         Contexto do Bar (Últimos 7 dias):
@@ -85,9 +85,9 @@ export function Reports({ user }: { user: UserProfile }) {
         
         Nota: As vendas em "FIADO" abatem estoque e geram custo, mas não entram no "Entradas em Caixa" até serem pagas. Trate o lucro como "Lucro Operacional" e se o caixa estiver baixo vs vendas, alerte sobre a inadimplência/fiados.
       `;
-      
+
       const historyString = chatHistory.map(h => `${h.role === 'user' ? 'Usuário' : 'Co-CEO'}: ${h.content}`).join('\n');
-      
+
       const prompt = `
         ${context}
         
@@ -100,7 +100,7 @@ export function Reports({ user }: { user: UserProfile }) {
         
         Importante: Se houver registros de "Produto Desconhecido" nos dados, alerte o Luis sobre a necessidade urgente de categorizar corretamente os itens nas comandas para não perdermos o controle de rentabilidade e estoque.
       `;
-      
+
       const result = await geminiService.generalTask(prompt, "Você é o Orquestrador Mestre do Boteco do Luis. Sua missão é maximizar o lucro, a eficiência operacional e garantir a precisão total dos dados.");
       setChatHistory(prev => [...prev, { role: 'assistant', content: result }]);
     } catch (error) {
@@ -153,11 +153,11 @@ export function Reports({ user }: { user: UserProfile }) {
     }
   };
 
-  const fetchDailyDataByRange = async (range: {from: Date, to: Date}) => {
+  const fetchDailyDataByRange = async (range: { from: Date, to: Date }) => {
     setLoading(true);
 
     const daysCount = differenceInDays(range.to, range.from) + 1;
-    
+
     if (daysCount > 31) {
       toast.error('Período muito longo', {
         description: 'Selecione no máximo 31 dias para evitar travamentos e perda de performance.'
@@ -182,11 +182,11 @@ export function Reports({ user }: { user: UserProfile }) {
     const fetchAllData = async () => {
       const qPurchases = query(collection(db, 'purchases'), where('date', '>=', Timestamp.fromDate(overallStart)), where('date', '<=', Timestamp.fromDate(overallEnd)));
       const [transSnapshot, expSnapshot, purchaseSnapshot] = await Promise.all([
-        getDocs(qTrans), 
+        getDocs(qTrans),
         getDocs(qExp),
         getDocs(qPurchases)
       ]);
-      
+
       const allTransactions = transSnapshot.docs.map(doc => doc.data() as Transaction);
       const allExpenses = expSnapshot.docs.map(doc => ({ ...doc.data() as Transaction, id: doc.id }));
       const allPurchases = purchaseSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
@@ -195,7 +195,7 @@ export function Reports({ user }: { user: UserProfile }) {
         const midDay = new Date(targetDate);
         midDay.setHours(12, 0, 0, 0);
         const { start, end } = getShiftInterval(midDay);
-        
+
         const dayTransactions = allTransactions.filter(t => {
           const tDate = parseAsSaoPaulo(t.date);
           return tDate >= start && tDate <= end;
@@ -212,21 +212,21 @@ export function Reports({ user }: { user: UserProfile }) {
         let rawIncome = 0;
         let paymentFees = 0;
         dayTransactions.filter(t => t.type === 'income' && !t.isFiado && !t.isSaldo).forEach(t => {
-           rawIncome += t.amount;
-           let pct = 0;
-           const method = t.paymentMethod?.toUpperCase();
-           if (method === 'CRÉDITO' || method === 'CREDITO') pct = rates.credit_pct || 0;
-           else if (method === 'DÉBITO' || method === 'DEBITO') pct = rates.debit_pct || 0;
-           else if (method === 'PIX') pct = rates.pix_pct || 0;
-           paymentFees += t.feeAmount !== undefined ? t.feeAmount : ((t.amount * pct) / 100);
+          rawIncome += t.amount;
+          let pct = 0;
+          const method = t.paymentMethod?.toUpperCase();
+          if (method === 'CRÉDITO' || method === 'CREDITO') pct = rates.credit_pct || 0;
+          else if (method === 'DÉBITO' || method === 'DEBITO') pct = rates.debit_pct || 0;
+          else if (method === 'PIX') pct = rates.pix_pct || 0;
+          paymentFees += t.feeAmount !== undefined ? t.feeAmount : ((t.amount * pct) / 100);
         });
-        
+
         const totalSalesValue = dayTransactions.filter(t => t.type === 'income').reduce((s, t) => s + (t.amount || 0), 0);
         const cost = dayTransactions.filter(t => t.type === 'income').reduce((s, t) => s + (t.cost || 0), 0);
         const expenseFromTrans = dayTransactions.filter(t => t.type === 'expense').reduce((s, t) => s + (t.amount || 0), 0);
         const manualExpenses = dayExpenses.reduce((s, t) => s + (t.amount || 0), 0);
         const purchasesTotal = dayPurchases.reduce((s, p: any) => s + (p.totalAmount || 0), 0);
-        
+
         // Saída unificada: CMV + Despesas Manuais + Compras + Taxas + Despesas em Transações
         const totalDayOutflow = cost + manualExpenses + purchasesTotal + paymentFees + expenseFromTrans;
 
@@ -250,9 +250,9 @@ export function Reports({ user }: { user: UserProfile }) {
         const fromStr = getShiftDate(midDayFrom);
         const toStr = getShiftDate(midDayTo);
         const qOrders = query(
-          collection(db, 'open_orders'), 
-          where('status', '==', 'closed'), 
-          where('closedShiftDate', '>=', fromStr), 
+          collection(db, 'open_orders'),
+          where('status', '==', 'closed'),
+          where('closedShiftDate', '>=', fromStr),
           where('closedShiftDate', '<=', toStr)
         );
         const orderSnap = await getDocs(qOrders);
@@ -260,25 +260,25 @@ export function Reports({ user }: { user: UserProfile }) {
         const productMap: Record<string, { name: string, qty: number, total: number }> = {};
         const customerMap: Record<string, { name: string, total: number, visits: number }> = {};
         const hourMap: Record<number, number> = {};
-        
+
         orders.forEach(order => {
-           const cName = order.customerName || 'Cliente Avulso';
-           const cId = order.customerId || 'anonimo';
-           if (!customerMap[cId]) customerMap[cId] = { name: cName, total: 0, visits: 0 };
-           customerMap[cId].total += order.totalAmount || 0;
-           customerMap[cId].visits += 1;
-           (order.items || []).forEach((item: any) => {
-              const pName = item.productName || item.name || item.product?.name || 'Produto Desconhecido';
-              if (!productMap[pName]) productMap[pName] = { name: pName, qty: 0, total: 0 };
-              productMap[pName].qty += item.quantity || 1;
-              productMap[pName].total += item.totalPrice || ((item.price || 0) * (item.quantity || 1)) || 0;
-           });
-           if (order.closedAt) {
-             const hour = parseAsSaoPaulo(order.closedAt).getHours();
-             hourMap[hour] = (hourMap[hour] || 0) + 1;
-           }
+          const cName = order.customerName || 'Cliente Avulso';
+          const cId = order.customerId || 'anonimo';
+          if (!customerMap[cId]) customerMap[cId] = { name: cName, total: 0, visits: 0 };
+          customerMap[cId].total += order.totalAmount || 0;
+          customerMap[cId].visits += 1;
+          (order.items || []).forEach((item: any) => {
+            const pName = item.productName || item.name || item.product?.name || 'Produto Desconhecido';
+            if (!productMap[pName]) productMap[pName] = { name: pName, qty: 0, total: 0 };
+            productMap[pName].qty += item.quantity || 1;
+            productMap[pName].total += item.totalPrice || ((item.price || 0) * (item.quantity || 1)) || 0;
+          });
+          if (order.closedAt) {
+            const hour = parseAsSaoPaulo(order.closedAt).getHours();
+            hourMap[hour] = (hourMap[hour] || 0) + 1;
+          }
         });
-        
+
         setExtraData({
           popularProducts: Object.values(productMap).sort((a, b) => b.qty - a.qty).slice(0, 10),
           topCustomers: Object.values(customerMap).sort((a, b) => b.total - a.total).slice(0, 10),
@@ -291,22 +291,22 @@ export function Reports({ user }: { user: UserProfile }) {
       try {
         const sorted = products
           .map(p => {
-             let realCost = p.cost || 0;
-             if (p.isDoseControl && p.linkedProductId && p.doseSize) {
-                const parent = products.find(parentP => parentP.id === p.linkedProductId);
-                if (parent && parent.volumePerUnit && parent.cost) {
-                   realCost = (parent.cost / parent.volumePerUnit) * p.doseSize;
-                }
-             }
-             const unitProfit = p.price - realCost;
-             const margin = realCost > 0 ? (unitProfit / realCost) * 100 : (unitProfit > 0 ? 100 : 0);
-             return {
-                ...p,
-                realCost,
-                margin,
-                unitProfit,
-                potentialProfit: unitProfit * (p.stock || 0)
-             };
+            let realCost = p.cost || 0;
+            if (p.isDoseControl && p.linkedProductId && p.doseSize) {
+              const parent = products.find(parentP => parentP.id === p.linkedProductId);
+              if (parent && parent.volumePerUnit && parent.cost) {
+                realCost = (parent.cost / parent.volumePerUnit) * p.doseSize;
+              }
+            }
+            const unitProfit = p.price - realCost;
+            const margin = realCost > 0 ? (unitProfit / realCost) * 100 : (unitProfit > 0 ? 100 : 0);
+            return {
+              ...p,
+              realCost,
+              margin,
+              unitProfit,
+              potentialProfit: unitProfit * (p.stock || 0)
+            };
           })
           .filter(p => p.unitProfit > 0)
           .sort((a, b) => b.unitProfit - a.unitProfit)
@@ -372,22 +372,22 @@ export function Reports({ user }: { user: UserProfile }) {
       );
 
       const [snap, snapExp, snapPur] = await Promise.all([
-        getDocs(q), 
+        getDocs(q),
         getDocs(qExp),
         getDocs(qPurchases)
       ]);
 
       const trans = snap.docs.map(doc => ({ ...doc.data(), id: doc.id }));
       const exps = snapExp.docs.map(doc => ({ ...doc.data(), id: doc.id, type: 'expense' }));
-      const purs = snapPur.docs.map(doc => ({ 
-        ...doc.data(), 
-        id: doc.id, 
-        type: 'expense', 
+      const purs = snapPur.docs.map(doc => ({
+        ...doc.data(),
+        id: doc.id,
+        type: 'expense',
         category: 'Compra de Estoque',
         description: `Compra: ${(doc.data() as any).supplierName || 'Fornecedor'}`,
-        amount: (doc.data() as any).totalAmount 
+        amount: (doc.data() as any).totalAmount
       }));
-      
+
       setSelectedDayTransactions([...trans, ...exps, ...purs].sort((a: any, b: any) => {
         const dateA = parseAsSaoPaulo(a.date);
         const dateB = parseAsSaoPaulo(b.date);
@@ -461,12 +461,12 @@ export function Reports({ user }: { user: UserProfile }) {
           </div>
         </div>
         <div className="flex items-center gap-3 w-full md:w-auto">
-          <DateRangePicker 
+          <DateRangePicker
             onApply={(range) => range && setDateRange({ from: range.from, to: range.to })}
             initialRange={dateRange}
             className="md:w-[280px]"
           />
-          <Button 
+          <Button
             className="h-12 bg-primary/10 border-primary/20 text-primary hover:bg-primary/20 font-black uppercase tracking-widest text-[10px] gap-2 rounded-xl px-6"
             onClick={handleSmartAnalysis}
             disabled={analyzing}
@@ -478,7 +478,7 @@ export function Reports({ user }: { user: UserProfile }) {
       </div>
 
       {monthlySummary && (
-        <Card 
+        <Card
           className="bg-primary/20 border-primary/30 rounded-2xl overflow-hidden cursor-pointer relative group transition-all active:scale-[0.99]"
           onClick={() => navigate('/finances')}
         >
@@ -519,34 +519,34 @@ export function Reports({ user }: { user: UserProfile }) {
 
       {/* Performance Banner */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard 
-          title="Entradas Caixa" 
-          value={stats.income} 
-          icon={<TrendingUp className="w-8 h-8" />} 
+        <StatCard
+          title="Entradas Caixa"
+          value={stats.income}
+          icon={<TrendingUp className="w-8 h-8" />}
           variant="green"
           onClick={() => navigate('/finances')}
           subtext="REALIZADO"
         />
-        <StatCard 
-          title="Despesa Geral" 
-          value={stats.expense} 
-          icon={<TrendingDown className="w-8 h-8" />} 
+        <StatCard
+          title="Despesa Geral"
+          value={stats.expense}
+          icon={<TrendingDown className="w-8 h-8" />}
           variant="red"
           onClick={() => navigate('/finances')}
           subtext="CUSTO + TAXAS"
         />
-        <StatCard 
-          title="Lucro Operacional" 
-          value={stats.profit} 
-          icon={<DollarSign className="w-8 h-8" />} 
+        <StatCard
+          title="Lucro Operacional"
+          value={stats.profit}
+          icon={<DollarSign className="w-8 h-8" />}
           variant="blue"
           onClick={() => navigate('/finances')}
           subtext="LÍQUIDO"
         />
-        <StatCard 
-          title="Proj. Mensal (30d)" 
-          value={stats.projectedProfit30d} 
-          icon={<Zap className="w-8 h-8" />} 
+        <StatCard
+          title="Proj. Mensal (30d)"
+          value={stats.projectedProfit30d}
+          icon={<Zap className="w-8 h-8" />}
           variant="indigo"
           subtext="ESTIMATIVA"
         />
@@ -554,7 +554,7 @@ export function Reports({ user }: { user: UserProfile }) {
 
       <Card className="border-primary/30 bg-primary/5 border-dashed">
         <CardContent className="pt-6">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="bg-primary/20 p-3 rounded-full">
                 <Sparkles className="w-6 h-6 text-primary" />
@@ -601,7 +601,7 @@ export function Reports({ user }: { user: UserProfile }) {
               <div className="prose prose-invert max-w-none text-xs leading-relaxed">
                 <Markdown>{aiAnalysis}</Markdown>
               </div>
-              <button 
+              <button
                 onClick={() => setAiAnalysis(null)}
                 className="mt-4 text-[9px] font-bold text-muted-foreground hover:text-primary uppercase tracking-widest transition-colors"
               >
@@ -676,19 +676,19 @@ export function Reports({ user }: { user: UserProfile }) {
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={dailyData} onClick={handleChartClick}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1f2937" opacity={0.5} />
-                  <XAxis 
-                    dataKey="name" 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 'bold' }} 
+                  <XAxis
+                    dataKey="name"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 'bold' }}
                   />
-                  <YAxis 
-                    axisLine={false} 
-                    tickLine={false} 
+                  <YAxis
+                    axisLine={false}
+                    tickLine={false}
                     tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 'bold' }}
                     tickFormatter={(value) => `R$${value}`}
                   />
-                  <Tooltip 
+                  <Tooltip
                     cursor={{ fill: 'rgba(255,255,255,0.05)' }}
                     content={({ active, payload, label }) => {
                       if (active && payload && payload.length) {
@@ -744,12 +744,12 @@ export function Reports({ user }: { user: UserProfile }) {
               className="rounded-3xl border border-white/5 p-4 bg-black/20"
             />
             <div className="mt-8 p-4 bg-primary/5 rounded-2xl border border-primary/10 w-full">
-               <div className="flex items-center gap-3">
-                  <Info className="w-4 h-4 text-primary" />
-                  <p className="text-[10px] font-bold text-primary/80 uppercase tracking-widest leading-relaxed">
-                    Selecione um dia no calendário para auditar todas as entradas, saídas e fiados registrados naquele turno.
-                  </p>
-               </div>
+              <div className="flex items-center gap-3">
+                <Info className="w-4 h-4 text-primary" />
+                <p className="text-[10px] font-bold text-primary/80 uppercase tracking-widest leading-relaxed">
+                  Selecione um dia no calendário para auditar todas as entradas, saídas e fiados registrados naquele turno.
+                </p>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -772,23 +772,23 @@ export function Reports({ user }: { user: UserProfile }) {
           <CardContent className="p-8">
             <div className="h-[400px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart 
-                  layout="vertical" 
+                <BarChart
+                  layout="vertical"
                   data={extraData.topCustomers}
                   margin={{ left: 40, right: 40 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#1f2937" opacity={0.5} />
                   <XAxis type="number" hide />
-                  <YAxis 
-                    dataKey="name" 
-                    type="category" 
-                    axisLine={false} 
-                    tickLine={false} 
+                  <YAxis
+                    dataKey="name"
+                    type="category"
+                    axisLine={false}
+                    tickLine={false}
                     width={100}
                     tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 'bold' }}
                     tickFormatter={(val) => val.length > 12 ? val.substring(0, 12) + '...' : val}
                   />
-                  <Tooltip 
+                  <Tooltip
                     cursor={{ fill: 'rgba(255,255,255,0.05)' }}
                     content={({ active, payload }) => {
                       if (active && payload && payload.length) {
@@ -837,9 +837,9 @@ export function Reports({ user }: { user: UserProfile }) {
                     <div className="flex items-center gap-4">
                       <div className={cn(
                         "w-8 h-8 rounded-lg flex items-center justify-center font-black text-xs",
-                        idx === 0 ? "bg-amber-500 text-black shadow-[0_0_15px_rgba(245,158,11,0.5)]" : 
-                        idx === 1 ? "bg-slate-300 text-black" :
-                        idx === 2 ? "bg-amber-700 text-white" : "bg-white/10 text-muted-foreground"
+                        idx === 0 ? "bg-amber-500 text-black shadow-[0_0_15px_rgba(245,158,11,0.5)]" :
+                          idx === 1 ? "bg-slate-300 text-black" :
+                            idx === 2 ? "bg-amber-700 text-white" : "bg-white/10 text-muted-foreground"
                       )}>
                         {idx + 1}
                       </div>
@@ -909,8 +909,8 @@ export function Reports({ user }: { user: UserProfile }) {
                       <Badge className={cn(
                         "text-[10px] font-black uppercase tracking-widest px-3 py-1 border-none",
                         item.group === 'A' ? "bg-green-500/20 text-green-500" :
-                        item.group === 'B' ? "bg-yellow-500/20 text-yellow-500" :
-                        "bg-red-500/20 text-red-500"
+                          item.group === 'B' ? "bg-yellow-500/20 text-yellow-500" :
+                            "bg-red-500/20 text-red-500"
                       )}>
                         {item.group}
                       </Badge>
@@ -960,7 +960,7 @@ export function Reports({ user }: { user: UserProfile }) {
                   const diff = day.grossMarginPct - stats.grossMarginPct;
                   const isPositive = diff > 0;
                   const isNeutral = Math.abs(diff) < 0.1;
-                  
+
                   return (
                     <TableRow key={idx} className="border-border hover:bg-white/5 transition-colors">
                       <TableCell>
@@ -1024,49 +1024,49 @@ export function Reports({ user }: { user: UserProfile }) {
           </DialogHeader>
 
           <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
-             {chatHistory.length === 0 && (
-               <div className="h-full flex flex-col items-center justify-center text-center space-y-4 opacity-50">
-                 <MessageSquare className="w-12 h-12 text-primary/30" />
-                 <div className="space-y-1">
-                   <p className="text-xs font-bold uppercase tracking-widest">Inicie uma conversa estratégica</p>
-                   <p className="text-[10px] uppercase tracking-widest leading-relaxed max-w-[280px]">
-                     Pergunte sobre clientes, produtos mais vendidos ou sugestões de horários.
-                   </p>
-                 </div>
-               </div>
-             )}
-             {chatHistory.map((msg, i) => (
-               <div key={i} className={cn(
-                 "flex flex-col max-w-[85%]",
-                 msg.role === 'user' ? "ml-auto items-end" : "mr-auto items-start"
-               )}>
-                 <span className="text-[8px] font-black uppercase tracking-widest text-muted-foreground mb-1">
-                   {msg.role === 'user' ? 'Você' : 'Co-CEO'}
-                 </span>
-                 <div className={cn(
-                   "p-4 rounded-2xl text-[11px] leading-relaxed",
-                   msg.role === 'user' ? "bg-primary text-white rounded-tr-none" : "bg-white/5 border border-white/10 text-white rounded-tl-none"
-                 )}>
-                   {msg.role === 'assistant' ? (
-                     <div className="prose prose-invert prose-p:leading-relaxed prose-pre:bg-black/50">
-                       <Markdown>{msg.content}</Markdown>
-                     </div>
-                   ) : msg.content}
-                 </div>
-               </div>
-             ))}
-             {sendingChat && (
-               <div className="flex flex-col items-start mr-auto max-w-[85%]">
-                 <span className="text-[8px] font-black uppercase tracking-widest text-muted-foreground mb-1">Co-CEO</span>
-                 <div className="p-4 rounded-2xl bg-white/5 border border-white/10 rounded-tl-none flex items-center gap-2">
-                   <div className="flex gap-1">
-                     <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                     <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                     <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                   </div>
-                 </div>
-               </div>
-             )}
+            {chatHistory.length === 0 && (
+              <div className="h-full flex flex-col items-center justify-center text-center space-y-4 opacity-50">
+                <MessageSquare className="w-12 h-12 text-primary/30" />
+                <div className="space-y-1">
+                  <p className="text-xs font-bold uppercase tracking-widest">Inicie uma conversa estratégica</p>
+                  <p className="text-[10px] uppercase tracking-widest leading-relaxed max-w-[280px]">
+                    Pergunte sobre clientes, produtos mais vendidos ou sugestões de horários.
+                  </p>
+                </div>
+              </div>
+            )}
+            {chatHistory.map((msg, i) => (
+              <div key={i} className={cn(
+                "flex flex-col max-w-[85%]",
+                msg.role === 'user' ? "ml-auto items-end" : "mr-auto items-start"
+              )}>
+                <span className="text-[8px] font-black uppercase tracking-widest text-muted-foreground mb-1">
+                  {msg.role === 'user' ? 'Você' : 'Co-CEO'}
+                </span>
+                <div className={cn(
+                  "p-4 rounded-2xl text-[11px] leading-relaxed",
+                  msg.role === 'user' ? "bg-primary text-white rounded-tr-none" : "bg-white/5 border border-white/10 text-white rounded-tl-none"
+                )}>
+                  {msg.role === 'assistant' ? (
+                    <div className="prose prose-invert prose-p:leading-relaxed prose-pre:bg-black/50">
+                      <Markdown>{msg.content}</Markdown>
+                    </div>
+                  ) : msg.content}
+                </div>
+              </div>
+            ))}
+            {sendingChat && (
+              <div className="flex flex-col items-start mr-auto max-w-[85%]">
+                <span className="text-[8px] font-black uppercase tracking-widest text-muted-foreground mb-1">Co-CEO</span>
+                <div className="p-4 rounded-2xl bg-white/5 border border-white/10 rounded-tl-none flex items-center gap-2">
+                  <div className="flex gap-1">
+                    <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="p-6 bg-white/5 border-t border-white/5">
@@ -1078,7 +1078,7 @@ export function Reports({ user }: { user: UserProfile }) {
                 placeholder="Ex: Qual produto mais vendeu essa semana?"
                 className="w-full bg-[#111] border border-white/10 focus:border-primary/50 focus:ring-1 focus:ring-primary/20 rounded-xl px-4 py-3 text-xs placeholder:text-muted-foreground transition-all outline-none pr-12"
               />
-              <button 
+              <button
                 onClick={handleSendMessage}
                 disabled={!chatMessage.trim() || sendingChat}
                 className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:hover:scale-100"
@@ -1138,14 +1138,14 @@ export function Reports({ user }: { user: UserProfile }) {
                     const isIncome = t.type === 'income';
                     const isFiado = t.isFiado;
                     const method = t.paymentMethod?.toLowerCase() || 'dinheiro';
-                    
+
                     return (
                       <TableRow key={t.id} className="border-white/5 hover:bg-white/[0.03] transition-all group">
                         <TableCell className="pl-8 py-5">
                           <div className="flex items-center gap-2 text-muted-foreground group-hover:text-white transition-colors">
                             <Clock className="w-3 h-3" />
                             <span className="font-mono text-[11px] font-bold">
-                              {t.date?.toDate ? format(t.date.toDate(), 'HH:mm') : '--:--'}
+                              {t.date ? format(t.date, 'HH:mm') : '--:--'}
                             </span>
                           </div>
                         </TableCell>
@@ -1211,35 +1211,35 @@ export function Reports({ user }: { user: UserProfile }) {
             )}
           </div>
           <div className="p-8 bg-white/[0.02] border-t border-white/5 grid grid-cols-1 md:grid-cols-4 gap-6">
-             <div className="space-y-1">
-               <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Entradas (Real)</p>
-               <p className="text-xl font-black text-green-500 tabular-nums">R$ {dayModalSummary.income.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-             </div>
-             <div className="space-y-1">
-               <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Fiados (Pendente)</p>
-               <p className="text-xl font-black text-orange-500 tabular-nums">R$ {dayModalSummary.fiado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-             </div>
-             <div className="space-y-1">
-               <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Saídas (Desp + CMV)</p>
-               <p className="text-xl font-black text-red-500 tabular-nums">R$ {(dayModalSummary.expense + dayModalSummary.cmv).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-             </div>
-             <div className="flex flex-col justify-center items-end">
-               <div className="text-right mb-2">
-                 <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Saldo do Turno</p>
-                 <p className={cn(
-                   "text-2xl font-black tabular-nums",
-                   (dayModalSummary.income - dayModalSummary.expense - dayModalSummary.cmv) >= 0 ? "text-primary" : "text-red-500"
-                 )}>
-                   R$ {(dayModalSummary.income - dayModalSummary.expense - dayModalSummary.cmv).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                 </p>
-               </div>
-               <Button 
-                 className="bg-white/10 hover:bg-white/20 text-white font-black uppercase tracking-widest text-[10px] h-10 px-6 rounded-xl transition-all active:scale-95 w-full" 
-                 onClick={() => setIsDayModalOpen(false)}
-               >
-                 Fechar Auditoria
-               </Button>
-             </div>
+            <div className="space-y-1">
+              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Entradas (Real)</p>
+              <p className="text-xl font-black text-green-500 tabular-nums">R$ {dayModalSummary.income.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Fiados (Pendente)</p>
+              <p className="text-xl font-black text-orange-500 tabular-nums">R$ {dayModalSummary.fiado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Saídas (Desp + CMV)</p>
+              <p className="text-xl font-black text-red-500 tabular-nums">R$ {(dayModalSummary.expense + dayModalSummary.cmv).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+            </div>
+            <div className="flex flex-col justify-center items-end">
+              <div className="text-right mb-2">
+                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Saldo do Turno</p>
+                <p className={cn(
+                  "text-2xl font-black tabular-nums",
+                  (dayModalSummary.income - dayModalSummary.expense - dayModalSummary.cmv) >= 0 ? "text-primary" : "text-red-500"
+                )}>
+                  R$ {(dayModalSummary.income - dayModalSummary.expense - dayModalSummary.cmv).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+              <Button
+                className="bg-white/10 hover:bg-white/20 text-white font-black uppercase tracking-widest text-[10px] h-10 px-6 rounded-xl transition-all active:scale-95 w-full"
+                onClick={() => setIsDayModalOpen(false)}
+              >
+                Fechar Auditoria
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -1290,7 +1290,7 @@ function StatCard(props: { title: string; value: number; icon: React.ReactNode; 
   const style = variantStyles[variant];
 
   return (
-    <Card 
+    <Card
       className={cn(
         "bg-[#0b1224] border-white/10 overflow-hidden relative group transition-all rounded-[40px] h-[180px] shadow-2xl",
         onClick && "cursor-pointer active:scale-95 hover:border-white/20"
@@ -1312,7 +1312,7 @@ function StatCard(props: { title: string; value: number; icon: React.ReactNode; 
             </div>
           )}
         </div>
-        
+
         <div>
           <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-1">{title}</p>
           <h3 className={cn("text-3xl font-black leading-none tracking-tighter tabular-nums", style.text)}>

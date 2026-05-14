@@ -85,6 +85,15 @@ export function parseAsSaoPaulo(dateInput: any): Date {
        }
     }
 
+    // Caso DD/MM/YYYY HH:mm ou DD/MM/YYYY
+    if (/^\d{2}\/\d{2}\/\d{4}/.test(trimmed)) {
+      const [datePart, timePart] = trimmed.split(' ');
+      const [day, month, year] = datePart.split('/');
+      const isoDate = `${year}-${month}-${day}`;
+      const isoTime = timePart ? timePart : '12:00:00';
+      return new Date(`${isoDate}T${isoTime}${SP_OFFSET}`);
+    }
+
     // ISO padrão com Z ou offset
     const parsed = new Date(trimmed);
     if (!isNaN(parsed.getTime())) {

@@ -42,6 +42,13 @@ export function Customers({ user }: { user: UserProfile }) {
   const [email, setEmail] = useState('');
   const [address, setAddress] = useState('');
 
+  // Missing UI States
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [isPayModalOpen, setIsPayModalOpen] = useState(false);
+  const [selectedCustomerForPay, setSelectedCustomerForPay] = useState<Customer | null>(null);
+  const [payAmount, setPayAmount] = useState('');
+
   const handleSave = async () => {
     if (!name) return;
     setIsSaving(true);
