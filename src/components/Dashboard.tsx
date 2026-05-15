@@ -128,7 +128,7 @@ export function Dashboard({ user }: { user: UserProfile }) {
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
           <Input 
             placeholder="PESQUISAR MESA OU CLIENTE..." 
-            className="pl-12 h-14 bg-card/50 border-border rounded-xl text-xs md:text-sm font-bold tracking-widest focus:ring-primary/20 focus:border-primary transition-all uppercase"
+            className="pl-12 h-14 bg-card/50 border-border rounded-[40px] text-xs md:text-sm font-bold tracking-widest focus:ring-primary/20 focus:border-primary transition-all uppercase"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -143,7 +143,7 @@ export function Dashboard({ user }: { user: UserProfile }) {
                 setEndDate(undefined);
               }
             }}>
-              <SelectTrigger className="w-full md:w-[140px] h-12 md:h-14 px-4 rounded-xl gap-2 font-bold tracking-widest uppercase border-border hover:bg-white/5 text-[10px] bg-card/50">
+              <SelectTrigger className="w-full md:w-[140px] h-12 md:h-14 px-4 rounded-[40px] gap-2 font-bold tracking-widest uppercase border-border hover:bg-white/5 text-[10px] bg-card/50">
                 <Filter className="w-4 h-4 text-primary" />
                 <SelectValue placeholder="Period" />
               </SelectTrigger>
@@ -177,12 +177,12 @@ export function Dashboard({ user }: { user: UserProfile }) {
             isCreating={isCreatingOrder}
           />
 
-          <div className="flex bg-[#0d1117] p-1.5 rounded-2xl border border-white/5">
+          <div className="flex bg-[#0d1117] p-1.5 rounded-[40px] border border-white/5">
             <Button 
               variant="ghost" 
               size="icon" 
               onClick={() => setViewMode('grid')}
-              className={cn("rounded-xl w-12 h-12", viewMode === 'grid' ? "bg-[#0070f3]/10 text-[#0070f3]" : "text-muted-foreground")}
+              className={cn("rounded-[40px] w-12 h-12", viewMode === 'grid' ? "bg-[#0070f3]/10 text-[#0070f3]" : "text-muted-foreground")}
             >
               <LayoutGrid className="w-5 h-5" />
             </Button>
@@ -190,7 +190,7 @@ export function Dashboard({ user }: { user: UserProfile }) {
               variant="ghost" 
               size="icon" 
               onClick={() => setViewMode('list')}
-              className={cn("rounded-xl w-12 h-12", viewMode === 'list' ? "bg-[#0070f3]/10 text-[#0070f3]" : "text-muted-foreground")}
+              className={cn("rounded-[40px] w-12 h-12", viewMode === 'list' ? "bg-[#0070f3]/10 text-[#0070f3]" : "text-muted-foreground")}
             >
               <List className="w-5 h-5" />
             </Button>
@@ -217,7 +217,7 @@ export function Dashboard({ user }: { user: UserProfile }) {
           ))}
         </AnimatePresence>
         {filteredOrders.length === 0 && (
-          <div className="col-span-full py-24 text-center bg-card/30 rounded-2xl border border-dashed border-border">
+          <div className="col-span-full py-24 text-center bg-card/30 rounded-[40px] border border-dashed border-border">
             <ShoppingCart className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-10" />
             <p className="text-muted-foreground font-bold tracking-widest uppercase">Nenhuma comanda ativa</p>
           </div>
@@ -264,12 +264,29 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
   const [checkoutAmount, setCheckoutAmount] = useState(order.totalAmount);
   const [checkoutDiscount, setCheckoutDiscount] = useState(0);
   const [checkoutAdjustment, setCheckoutAdjustment] = useState(0);
-  const [checkoutPayments, setCheckoutPayments] = useState<{method: string, amount: number}[]>([]);
+  const [checkoutPayments, setCheckoutPayments] = useState<{
+    method: string, 
+    amount: number,
+    itemAssignments?: { itemIndex: number, quantity: number }[]
+  }[]>([]);
   const [checkoutDate, setCheckoutDate] = useState(getShiftDate());
   const [checkoutCustomerId, setCheckoutCustomerId] = useState(order.customerId || 'none');
+  const [isPartialCheckout, setIsPartialCheckout] = useState(false);
+
+  // Derive assigned items total for partial checkouts
+  const assignedItemsTotal = React.useMemo(() => {
+    return checkoutPayments.reduce((sum, p) => {
+      return sum + (p.itemAssignments?.reduce((iSum, a) => iSum + (order.items[a.itemIndex].price * a.quantity), 0) || 0);
+    }, 0);
+  }, [checkoutPayments, order.items]);
+
+  const totalPaid = React.useMemo(() => {
+    return checkoutPayments.reduce((sum, p) => sum + p.amount, 0);
+  }, [checkoutPayments]);
 
   useEffect(() => {
     if (isCheckoutOpen) {
+      setIsPartialCheckout(false);
       const total = order.totalAmount - checkoutDiscount + checkoutAdjustment;
       setCheckoutAmount(total);
       setCheckoutPayments([{ method: 'DINHEIRO', amount: total }]);
@@ -492,23 +509,26 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
   };
 
   const handleFinalizeCheckout = async () => {
-    const totalPaid = checkoutPayments.reduce((sum, p) => sum + p.amount, 0);
-    if (totalPaid < checkoutAmount - 0.01) {
-      toast.error('O total dos pagamentos deve ser igual ou maior ao valor a receber');
+    const targetAmount = isPartialCheckout ? assignedItemsTotal : checkoutAmount;
+    if (totalPaid < targetAmount - 0.01) {
+      toast.error(isPartialCheckout 
+        ? 'O total pago deve ser igual ao total dos itens selecionados' 
+        : 'O total dos pagamentos deve ser igual ou maior ao valor a receber');
       return;
     }
 
     const success = await finalizeCheckout(
       order,
-      checkoutAmount,
+      targetAmount,
       checkoutPayments,
       checkoutDate,
       checkoutCustomerId,
-      checkoutDiscount,
-      checkoutAdjustment,
+      isPartialCheckout ? 0 : checkoutDiscount,
+      isPartialCheckout ? 0 : checkoutAdjustment,
       user,
       products,
-      customers
+      customers,
+      isPartialCheckout
     );
 
     if (success) {
@@ -573,8 +593,8 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
               "group relative overflow-hidden transition-all duration-300 cursor-pointer border border-white/5",
               "hover:border-white/10 hover:shadow-2xl hover:shadow-[#0070f3]/5 bg-[#0d1117] hover:bg-[#161b22]",
               viewMode === 'list' 
-                ? "flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 md:p-5 rounded-2xl w-full"
-                : "flex flex-col rounded-3xl"
+                ? "flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 md:p-5 rounded-[40px] w-full"
+                : "flex flex-col rounded-[40px]"
             )}
             onClick={() => setIsDetailOpen(true)}
             >
@@ -1426,12 +1446,14 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
               {/* Main Total Display */}
               <div className="bg-[#0d1117] p-6 md:p-8 rounded-3xl border border-white/5 text-center space-y-2 shadow-inner relative overflow-hidden group">
                 <div className="absolute inset-0 bg-gradient-to-br from-[#0070f3]/5 to-transparent opacity-50" />
-                <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground relative z-10 italic">Total do Atendimento</p>
+                <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground relative z-10 italic">
+                  {isPartialCheckout ? 'Total Selecionado (Parcial)' : 'Total do Atendimento'}
+                </p>
                 <div className="flex flex-col items-center justify-center relative z-10">
                   <div className="flex items-baseline justify-center gap-2">
                     <span className="text-xl md:text-2xl font-bold text-[#0070f3]/60 italic">R$</span>
                     <span className="text-5xl md:text-7xl font-black text-[#0070f3] tracking-tighter leading-none">
-                      {checkoutAmount.toFixed(2)}
+                      {isPartialCheckout ? assignedItemsTotal.toFixed(2) : checkoutAmount.toFixed(2)}
                     </span>
                   </div>
                   {checkoutDiscount > 0 && (
@@ -1553,7 +1575,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                   <Input 
                     type="number" 
                     step="0.01"
-                    className="h-14 bg-[#0d1117] border-white/5 font-bold rounded-xl"
+                    className="h-14 bg-[#0d1117] border-white/5 font-bold rounded-[40px]"
                     value={checkoutDiscount}
                     onChange={(e) => setCheckoutDiscount(parseFloat(e.target.value) || 0)}
                     placeholder="0.00"
@@ -1564,7 +1586,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                   <Input 
                     type="number" 
                     step="0.01"
-                    className="h-14 bg-[#0d1117] border-white/5 font-bold rounded-xl"
+                    className="h-14 bg-[#0d1117] border-white/5 font-bold rounded-[40px]"
                     value={checkoutAdjustment}
                     onChange={(e) => setCheckoutAdjustment(parseFloat(e.target.value) || 0)}
                     placeholder="0.00"
@@ -1574,12 +1596,37 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
 
               <div className="space-y-4 pt-4">
                 <div className="flex items-center justify-between">
-                  <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Divisão de Pagamento</label>
+                  <div className="flex items-center gap-4">
+                    <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Divisão de Pagamento</label>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const newVal = !isPartialCheckout;
+                        setIsPartialCheckout(newVal);
+                        if (newVal) {
+                          setCheckoutPayments([]);
+                        } else {
+                          const total = order.totalAmount - checkoutDiscount + checkoutAdjustment;
+                          setCheckoutAmount(total);
+                          setCheckoutPayments([{ method: 'DINHEIRO', amount: total }]);
+                        }
+                      }}
+                      className={cn(
+                        "h-8 px-3 text-[8px] font-black uppercase tracking-widest rounded-full transition-all border-white/5",
+                        isPartialCheckout 
+                          ? "bg-orange-500/20 text-orange-400 border-orange-500/30 hover:bg-orange-500/30" 
+                          : "bg-white/5 text-muted-foreground hover:bg-white/10"
+                      )}
+                    >
+                      {isPartialCheckout ? '✓ Pagamento Parcial' : 'Pagamento Parcial'}
+                    </Button>
+                  </div>
                   <Button 
                     variant="ghost" 
                     size="sm" 
                     onClick={() => setCheckoutPayments([...checkoutPayments, { method: 'DINHEIRO', amount: 0 }])}
-                    className="h-10 text-[10px] font-black uppercase tracking-widest text-[#0070f3] hover:bg-[#0070f3]/10 rounded-xl"
+                    className="h-10 text-[10px] font-black uppercase tracking-widest text-[#0070f3] hover:bg-[#0070f3]/10 rounded-[40px]"
                   >
                     <Plus className="w-4 h-4 mr-2" /> Adicionar Método
                   </Button>
@@ -1593,7 +1640,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                       animate={{ opacity: 1, x: 0 }}
                       className="group relative"
                     >
-                      <div className="flex flex-col md:flex-row gap-3 p-4 bg-[#0d1117] rounded-2xl border border-white/5 group-hover:border-white/10 transition-all">
+                      <div className="flex flex-col md:flex-row gap-3 p-4 bg-[#0d1117] rounded-[40px] border border-white/5 group-hover:border-white/10 transition-all">
                         <div className="flex-1 space-y-2">
                           <label className="text-[9px] font-black tracking-widest uppercase text-muted-foreground flex items-center gap-2">
                             <CreditCard className="w-3 h-3" /> Método de Pagamento
@@ -1606,10 +1653,10 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                               setCheckoutPayments(newPayments);
                             }}
                           >
-                            <SelectTrigger className="h-12 bg-white/[0.02] border-white/5 font-bold text-xs uppercase rounded-xl">
+                            <SelectTrigger className="h-12 bg-white/[0.02] border-white/5 font-bold text-xs uppercase rounded-[40px]">
                               <SelectValue />
                             </SelectTrigger>
-                            <SelectContent className="bg-[#05070a] border-white/10 rounded-2xl">
+                            <SelectContent className="bg-[#05070a] border-white/10 rounded-[40px]">
                               {['DINHEIRO', 'PIX', 'CARTÃO DE CRÉDITO', 'CARTÃO DE DÉBITO', 'VALE REFEIÇÃO', 'FIADO', 'SALDO'].map(method => (
                                 <SelectItem key={method} value={method} className="font-black uppercase tracking-widest text-[10px] py-4">
                                   {method}
@@ -1626,7 +1673,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                               <Input 
                                 type="number" 
                                 step="0.01"
-                                className="h-12 pl-8 bg-white/[0.02] border-white/5 font-black text-sm rounded-xl focus:ring-[#0070f3]/20"
+                                className="h-12 pl-8 bg-white/[0.02] border-white/5 font-black text-sm rounded-[40px] focus:ring-[#0070f3]/20"
                                 value={payment.amount}
                                 onChange={(e) => {
                                   const newPayments = [...checkoutPayments];
@@ -1634,6 +1681,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                                   setCheckoutPayments(newPayments);
                                 }}
                               />
+                              </div>
                             </div>
                           </div>
                           {checkoutPayments.length > 1 && (
@@ -1650,6 +1698,165 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                           )}
                         </div>
                       </div>
+
+                      {/* Item Assignments Section */}
+                      <div className="mt-2 px-4 pb-4">
+                        <div className="bg-white/[0.01] border border-white/5 rounded-xl overflow-hidden">
+                          <div className="px-3 py-2 border-b border-white/5 bg-white/[0.02] flex items-center justify-between">
+                            <span className="text-[8px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                              <Package className="w-3 h-3" /> Itens Pagos neste Método
+                            </span>
+                            <div className="flex gap-2 items-center">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  const newPayments = [...checkoutPayments];
+                                  const currentAssignments = newPayments[index].itemAssignments || [];
+                                  
+                                  order.items.forEach((item, itemIdx) => {
+                                    const totalAssigned = checkoutPayments.reduce((sum, p) => {
+                                      const assignment = p.itemAssignments?.find(a => a.itemIndex === itemIdx);
+                                      return sum + (assignment?.quantity || 0);
+                                    }, 0);
+                                    
+                                    const remaining = item.quantity - totalAssigned;
+                                    if (remaining > 0) {
+                                      const existingIdx = currentAssignments.findIndex(a => a.itemIndex === itemIdx);
+                                      if (existingIdx > -1) {
+                                        currentAssignments[existingIdx].quantity += remaining;
+                                      } else {
+                                        currentAssignments.push({ itemIndex: itemIdx, quantity: remaining });
+                                      }
+                                    }
+                                  });
+                                  
+                                  newPayments[index].itemAssignments = currentAssignments;
+                                  const newAmount = currentAssignments.reduce((sum, a) => sum + (order.items[a.itemIndex].price * a.quantity), 0);
+                                  newPayments[index].amount = Number(newAmount.toFixed(2));
+                                  setCheckoutPayments(newPayments);
+                                }}
+                                className="h-6 px-2 text-[8px] font-black uppercase tracking-widest bg-white/5 text-white/60 hover:bg-white/10 rounded-md border border-white/10"
+                              >
+                                Vincular Restantes
+                              </Button>
+                              <div className="flex gap-2 overflow-x-auto max-w-[200px] no-scrollbar">
+                              {order.items.map((item, itemIdx) => {
+                                // Calculate total assigned quantity for this item across ALL payments
+                                const totalAssigned = checkoutPayments.reduce((sum, p) => {
+                                  const assignment = p.itemAssignments?.find(a => a.itemIndex === itemIdx);
+                                  return sum + (assignment?.quantity || 0);
+                                }, 0);
+                                
+                                const remaining = item.quantity - totalAssigned;
+                                if (remaining <= 0) return null;
+
+                                return (
+                                  <Button
+                                    key={itemIdx}
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      const newPayments = [...checkoutPayments];
+                                      const currentAssignments = newPayments[index].itemAssignments || [];
+                                      const existingAssignmentIdx = currentAssignments.findIndex(a => a.itemIndex === itemIdx);
+                                      
+                                      if (existingAssignmentIdx > -1) {
+                                        currentAssignments[existingAssignmentIdx].quantity += 1;
+                                      } else {
+                                        currentAssignments.push({ itemIndex: itemIdx, quantity: 1 });
+                                      }
+                                      
+                                      newPayments[index].itemAssignments = currentAssignments;
+                                      
+                                      // Recalculate payment amount based on items
+                                      const newAmount = currentAssignments.reduce((sum, a) => {
+                                        return sum + (order.items[a.itemIndex].price * a.quantity);
+                                      }, 0);
+                                      
+                                      newPayments[index].amount = Number(newAmount.toFixed(2));
+                                      setCheckoutPayments(newPayments);
+                                    }}
+                                    className="h-6 px-2 text-[8px] font-black uppercase tracking-widest bg-[#0070f3]/10 text-[#0070f3] hover:bg-[#0070f3]/20 rounded-md"
+                                  >
+                                    + {item.productName} ({remaining})
+                                  </Button>
+                                );
+                              })}
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {payment.itemAssignments && payment.itemAssignments.length > 0 ? (
+                            <div className="p-2 space-y-1">
+                              {payment.itemAssignments.map((assignment, aIdx) => (
+                                <div key={aIdx} className="flex items-center justify-between bg-white/[0.02] p-2 rounded-lg group/item">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-black text-white/90 uppercase">{order.items[assignment.itemIndex].productName}</span>
+                                    <Badge variant="outline" className="h-4 px-1 text-[8px] border-white/10 text-muted-foreground">
+                                      {assignment.quantity}x R$ {order.items[assignment.itemIndex].price.toFixed(2)}
+                                    </Badge>
+                                  </div>
+                                  <div className="flex items-center gap-1 opacity-0 group-hover/item:opacity-100 transition-opacity">
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-6 w-6 text-muted-foreground hover:text-white"
+                                      onClick={() => {
+                                        const newPayments = [...checkoutPayments];
+                                        const currentAssignments = [...(newPayments[index].itemAssignments || [])];
+                                        if (currentAssignments[aIdx].quantity > 1) {
+                                          currentAssignments[aIdx].quantity -= 1;
+                                        } else {
+                                          currentAssignments.splice(aIdx, 1);
+                                        }
+                                        newPayments[index].itemAssignments = currentAssignments;
+                                        
+                                        // Recalculate amount
+                                        const newAmount = currentAssignments.reduce((sum, a) => {
+                                          return sum + (order.items[a.itemIndex].price * a.quantity);
+                                        }, 0);
+                                        newPayments[index].amount = Number(newAmount.toFixed(2));
+                                        setCheckoutPayments(newPayments);
+                                      }}
+                                    >
+                                      <Minus className="w-3 h-3" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-6 w-6 text-muted-foreground hover:text-white"
+                                      disabled={checkoutPayments.reduce((sum, p) => {
+                                        const a = p.itemAssignments?.find(as => as.itemIndex === assignment.itemIndex);
+                                        return sum + (a?.quantity || 0);
+                                      }, 0) >= order.items[assignment.itemIndex].quantity}
+                                      onClick={() => {
+                                        const newPayments = [...checkoutPayments];
+                                        const currentAssignments = [...(newPayments[index].itemAssignments || [])];
+                                        currentAssignments[aIdx].quantity += 1;
+                                        newPayments[index].itemAssignments = currentAssignments;
+                                        
+                                        // Recalculate amount
+                                        const newAmount = currentAssignments.reduce((sum, a) => {
+                                          return sum + (order.items[a.itemIndex].price * a.quantity);
+                                        }, 0);
+                                        newPayments[index].amount = Number(newAmount.toFixed(2));
+                                        setCheckoutPayments(newPayments);
+                                      }}
+                                    >
+                                      <Plus className="w-3 h-3" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="p-4 text-center">
+                              <p className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground/40 italic">Nenhum item vinculado (Distribuição proporcional de custo)</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                       <div className="absolute -right-2 -top-2 opacity-0 group-hover:opacity-100 transition-opacity">
                          {calculateNet(payment.amount, payment.method).feeAmount > 0 && (
                            <Badge className="bg-red-500/20 text-red-400 border-none text-[8px] font-bold">
@@ -1662,27 +1869,27 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                 </div>
                 
                 <div className={cn(
-                  "p-5 rounded-2xl text-center text-xs font-black uppercase tracking-widest transition-all shadow-lg",
-                  checkoutPayments.reduce((sum, p) => sum + p.amount, 0).toFixed(2) >= checkoutAmount.toFixed(2) 
+                  "p-5 rounded-[40px] text-center text-xs font-black uppercase tracking-widest transition-all shadow-lg",
+                  totalPaid.toFixed(2) >= (isPartialCheckout ? assignedItemsTotal : checkoutAmount).toFixed(2) 
                     ? "bg-green-500/10 text-green-500 border border-green-500/20" 
                     : "bg-red-500/10 text-red-500 border border-red-500/20 animate-pulse"
                 )}>
-                  {checkoutPayments.reduce((sum, p) => sum + p.amount, 0).toFixed(2) >= checkoutAmount.toFixed(2) 
-                    ? (checkoutPayments.reduce((sum, p) => sum + p.amount, 0) > checkoutAmount 
-                        ? `✓ Crédito a Gerar: R$ ${(checkoutPayments.reduce((sum, p) => sum + p.amount, 0) - checkoutAmount).toFixed(2)}`
+                  {totalPaid.toFixed(2) >= (isPartialCheckout ? assignedItemsTotal : checkoutAmount).toFixed(2) 
+                    ? (totalPaid > (isPartialCheckout ? assignedItemsTotal : checkoutAmount)
+                        ? `✓ Crédito a Gerar: R$ ${(totalPaid - (isPartialCheckout ? assignedItemsTotal : checkoutAmount)).toFixed(2)}`
                         : "✓ Conferência de Valores OK")
-                    : `⚠️ Faltam R$ ${(checkoutAmount - checkoutPayments.reduce((sum, p) => sum + p.amount, 0)).toFixed(2)}`}
+                    : `⚠️ Faltam R$ ${((isPartialCheckout ? assignedItemsTotal : checkoutAmount) - totalPaid).toFixed(2)}`}
                 </div>
               </div>
             </div>
           </div>
 
           <DialogFooter className="p-6 md:p-8 border-t border-white/5 bg-[#05070a] flex-row gap-4 flex-shrink-0">
-            <Button variant="ghost" onClick={() => setIsCheckoutOpen(false)} className="flex-1 h-16 font-black uppercase tracking-widest text-muted-foreground hover:text-white rounded-2xl">Voltar</Button>
+            <Button variant="ghost" onClick={() => setIsCheckoutOpen(false)} className="flex-1 h-16 font-black uppercase tracking-widest text-muted-foreground hover:text-white rounded-[40px]">Voltar</Button>
             <Button 
               onClick={handleFinalizeCheckout} 
-              disabled={isProcessing || checkoutPayments.reduce((sum, p) => sum + p.amount, 0) < checkoutAmount - 0.01}
-              className="flex-1 h-16 font-black uppercase tracking-widest bg-green-600 hover:bg-green-700 shadow-lg shadow-green-600/20 rounded-2xl"
+              disabled={isProcessing || (isPartialCheckout && assignedItemsTotal === 0) || totalPaid < (isPartialCheckout ? assignedItemsTotal : checkoutAmount) - 0.01}
+              className="flex-1 h-16 font-black uppercase tracking-widest bg-green-600 hover:bg-green-700 shadow-lg shadow-green-600/20 rounded-[40px]"
             >
               {isProcessing ? 'Processando...' : 'Finalizar Recebimento'}
             </Button>

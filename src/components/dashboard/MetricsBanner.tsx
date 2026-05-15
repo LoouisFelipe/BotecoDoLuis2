@@ -24,7 +24,7 @@ export function MetricsBanner({ orders, onNewOrder }: MetricsBannerProps) {
       <Card className="bg-card/30 border-border/50 overflow-hidden relative group cursor-pointer" onClick={onNewOrder}>
         <div className="absolute inset-0 bg-gradient-to-br from-[#0070f3]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
         <CardContent className="p-4 md:p-6 flex items-center gap-4 md:gap-5 relative z-10">
-          <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-[#0070f3]/10 flex items-center justify-center border border-[#0070f3]/20 shadow-[0_0_20px_rgba(0,112,243,0.1)] group-hover:scale-110 transition-transform">
+          <div className="w-10 h-10 md:w-12 md:h-12 rounded-[40px] bg-[#0070f3]/10 flex items-center justify-center border border-[#0070f3]/20 shadow-[0_0_20px_rgba(0,112,243,0.1)] group-hover:scale-110 transition-transform">
             <PlusCircle className="w-5 h-5 md:w-6 md:h-6 text-[#0070f3]" />
           </div>
           <div>
@@ -37,7 +37,7 @@ export function MetricsBanner({ orders, onNewOrder }: MetricsBannerProps) {
       <Card className="bg-card/30 border-border/50 overflow-hidden relative group">
         <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
         <CardContent className="p-4 md:p-6 flex items-center gap-4 md:gap-5 relative z-10">
-          <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
+          <div className="w-10 h-10 md:w-12 md:h-12 rounded-[40px] bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
             <Clock className="w-5 h-5 md:w-6 md:h-6 text-blue-500" />
           </div>
           <div className="flex-1">
@@ -50,7 +50,7 @@ export function MetricsBanner({ orders, onNewOrder }: MetricsBannerProps) {
       <Card className="bg-card/30 border-border/50 overflow-hidden relative group cursor-pointer" onClick={() => navigate('/finances')}>
         <div className="absolute inset-0 bg-gradient-to-br from-[#0070f3]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
         <CardContent className="p-4 md:p-6 flex items-center gap-4 md:gap-5 relative z-10">
-          <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-[#0070f3]/10 flex items-center justify-center border border-[#0070f3]/20">
+          <div className="w-10 h-10 md:w-12 md:h-12 rounded-[40px] bg-[#0070f3]/10 flex items-center justify-center border border-[#0070f3]/20">
             <TrendingUp className="w-5 h-5 md:w-6 md:h-6 text-[#0070f3]" />
           </div>
           <div className="min-w-0">
@@ -65,7 +65,7 @@ export function MetricsBanner({ orders, onNewOrder }: MetricsBannerProps) {
       <Card className="bg-card/30 border-border/50 overflow-hidden relative group">
         <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
         <CardContent className="p-4 md:p-6 flex items-center gap-4 md:gap-5 relative z-10">
-          <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-green-500/10 flex items-center justify-center border border-green-500/20">
+          <div className="w-10 h-10 md:w-12 md:h-12 rounded-[40px] bg-green-500/10 flex items-center justify-center border border-green-500/20">
             <Zap className="w-5 h-5 md:w-6 md:h-6 text-green-500" />
           </div>
           <div className="min-w-0">
@@ -80,7 +80,7 @@ export function MetricsBanner({ orders, onNewOrder }: MetricsBannerProps) {
       <Card className="bg-card/30 border-border/50 overflow-hidden relative group">
         <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
         <CardContent className="p-4 md:p-6 flex items-center gap-4 md:gap-5 relative z-10">
-          <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20">
+          <div className="w-10 h-10 md:w-12 md:h-12 rounded-[40px] bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20">
             <Activity className="w-5 h-5 md:w-6 md:h-6 text-indigo-500" />
           </div>
           <div className="min-w-0">

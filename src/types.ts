@@ -122,6 +122,10 @@ export interface Order {
     method: string;
     amount: number;
     date: any;
+    itemAssignments?: {
+      itemIndex: number;
+      quantity: number;
+    }[];
   }[];
   createdAt: any;
   closedAt?: any;

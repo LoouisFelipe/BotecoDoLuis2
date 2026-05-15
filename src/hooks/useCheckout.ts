@@ -20,14 +20,19 @@ export function useCheckout() {
   const finalizeCheckout = async (
     order: Order,
     checkoutAmount: number,
-    checkoutPayments: { method: string; amount: number }[],
+    checkoutPayments: { 
+      method: string; 
+      amount: number; 
+      itemAssignments?: { itemIndex: number; quantity: number }[] 
+    }[],
     checkoutDate: string,
     checkoutCustomerId: string,
     checkoutDiscount: number,
     checkoutAdjustment: number,
     user: UserProfile,
     products: Product[],
-    customers: Customer[]
+    customers: Customer[],
+    isPartial: boolean = false
   ) => {
     setIsProcessing(true);
     const batch = writeBatch(db);
@@ -36,20 +41,83 @@ export function useCheckout() {
       const finalAmount = checkoutAmount;
       const targetCustomerId = checkoutCustomerId === 'none' ? '' : (checkoutCustomerId || order.customerId);
       
-      // 1. Close Order
+      // Items to process for inventory and cost
+      // If partial, only process items that were explicitly assigned
+      // If not partial, process all items in the order
+      const itemsToProcess: { productId: string; quantity: number; costPrice?: number; productName: string; subtotal: number }[] = [];
+      
+      if (isPartial) {
+        checkoutPayments.forEach(p => {
+          p.itemAssignments?.forEach(assignment => {
+            const originalItem = order.items[assignment.itemIndex];
+            if (originalItem) {
+              const existing = itemsToProcess.find(i => i.productId === originalItem.productId && i.costPrice === originalItem.costPrice);
+              if (existing) {
+                existing.quantity += assignment.quantity;
+                existing.subtotal += (originalItem.price * assignment.quantity);
+              } else {
+                itemsToProcess.push({
+                  productId: originalItem.productId,
+                  productName: originalItem.productName,
+                  quantity: assignment.quantity,
+                  costPrice: originalItem.costPrice,
+                  subtotal: originalItem.price * assignment.quantity
+                });
+              }
+            }
+          });
+        });
+      } else {
+        itemsToProcess.push(...order.items);
+      }
+
       const orderRef = doc(db, 'open_orders', order.id);
-      batch.update(orderRef, {
-        status: 'closed',
-        closedAt: new Date(),
-        closedShiftDate: getShiftDate(),
-        totalAmount: finalAmount,
-        payments: checkoutPayments.map(p => ({
-          method: p.method,
-          amount: p.amount,
-          date: new Date()
-        })),
-        customerId: targetCustomerId
-      });
+      
+      let shouldCloseOrder = !isPartial;
+      let remainingItems = [];
+      let newTotal = 0;
+
+      if (isPartial) {
+        remainingItems = [...order.items].map((item, idx) => {
+          const totalAssigned = checkoutPayments.reduce((sum, p) => {
+            const assignment = p.itemAssignments?.find(a => a.itemIndex === idx);
+            return sum + (assignment?.quantity || 0);
+          }, 0);
+          
+          const newQty = item.quantity - totalAssigned;
+          return {
+            ...item,
+            quantity: newQty,
+            subtotal: newQty * item.price
+          };
+        }).filter(item => item.quantity > 0);
+
+        newTotal = remainingItems.reduce((sum, item) => sum + item.subtotal, 0);
+        if (remainingItems.length === 0) {
+          shouldCloseOrder = true;
+        }
+      }
+
+      if (shouldCloseOrder) {
+        batch.update(orderRef, {
+          status: 'closed',
+          closedAt: serverTimestamp(),
+          closedShiftDate: getShiftDate(),
+          totalAmount: isPartial ? (order.totalAmount - newTotal) : finalAmount,
+          payments: checkoutPayments.map(p => ({
+            method: p.method,
+            amount: p.amount,
+            date: nowInSaoPaulo().toISOString(),
+            itemAssignments: p.itemAssignments || []
+          })),
+          customerId: targetCustomerId
+        });
+      } else {
+        batch.update(orderRef, {
+          items: remainingItems,
+          totalAmount: newTotal
+        });
+      }
 
       // 2. Update Customer Balance and Stats
       if (targetCustomerId) {
@@ -66,12 +134,14 @@ export function useCheckout() {
             .reduce((sum, p) => sum + p.amount, 0);
 
           const totalPaid = checkoutPayments.reduce((sum, p) => sum + p.amount, 0);
-          const surplus = totalPaid - finalAmount;
+          
+          // In partial checkout, surplus logic might be different, but usually we just pay exact.
+          const surplus = isPartial ? 0 : (totalPaid - finalAmount);
           const balanceImpact = surplus - fiadoAmount - saldoUsedAmount;
 
           batch.update(customerRef, {
             totalSpent: increment(finalAmount),
-            orderCount: increment(1),
+            orderCount: shouldCloseOrder ? increment(1) : 0,
             balance: increment(balanceImpact),
             lastVisit: serverTimestamp()
           });
@@ -89,7 +159,7 @@ export function useCheckout() {
         isDoseControl: boolean;
       }> = {};
 
-      for (const item of order.items) {
+      for (const item of itemsToProcess) {
         totalCost += (item.costPrice || 0) * item.quantity;
 
         if (!item.productId.startsWith('manual_') && !item.productId.startsWith('game_')) {
@@ -188,7 +258,7 @@ export function useCheckout() {
       }
 
       // 5. Game Sessions
-      for (const item of order.items) {
+      for (const item of itemsToProcess) {
         if (item.productId.startsWith('game_')) {
           const splitId = item.productId.split('_');
           const modalityId = splitId[1];
@@ -210,7 +280,19 @@ export function useCheckout() {
 
       // 6. Transactions
       for (const payment of checkoutPayments) {
-        const paymentCost = finalAmount > 0 ? (payment.amount / finalAmount) * totalCost : 0;
+        let paymentCost = 0;
+        if (payment.itemAssignments && payment.itemAssignments.length > 0) {
+          paymentCost = payment.itemAssignments.reduce((sum, assignment) => {
+            const item = order.items[assignment.itemIndex];
+            if (item) {
+              return sum + (item.costPrice || 0) * assignment.quantity;
+            }
+            return sum;
+          }, 0);
+        } else {
+          paymentCost = finalAmount > 0 ? (payment.amount / finalAmount) * totalCost : 0;
+        }
+
         const { netAmount, feeAmount } = calculateNet(payment.amount, payment.method);
 
         const transRef = doc(collection(db, 'transactions'));
@@ -221,7 +303,7 @@ export function useCheckout() {
           netAmount,
           feeAmount,
           cost: paymentCost,
-          description: `Comanda fechada: ${order.customerName} (${payment.method})${checkoutDiscount > 0 ? ` (Desc: R$ ${checkoutDiscount})` : ''}${checkoutAdjustment !== 0 ? ` (Ajuste: R$ ${checkoutAdjustment})` : ''}`,
+          description: `${isPartial ? '[PARCIAL] ' : ''}Comanda: ${order.customerName} (${payment.method})${checkoutDiscount > 0 ? ` (Desc: R$ ${checkoutDiscount})` : ''}${checkoutAdjustment !== 0 ? ` (Ajuste: R$ ${checkoutAdjustment})` : ''}`,
           date: serverTimestamp(),
           dataExpediente: getShiftDate(),
           orderId: order.id,
@@ -233,7 +315,7 @@ export function useCheckout() {
       }
 
       await batch.commit();
-      toast.success('Recebimento finalizado com sucesso');
+      toast.success(isPartial ? 'Pagamento parcial registrado' : 'Recebimento finalizado com sucesso');
       return true;
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `open_orders/${order.id}`);
