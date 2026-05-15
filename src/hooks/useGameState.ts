@@ -122,6 +122,7 @@ export function useGameState(user: UserProfile) {
         modalityName: selectedModality.name,
         amount: finalAmount,
         date: serverTimestamp(),
+        dataExpediente: getShiftDate(),
         userId: user.uid,
         userName: user.displayName || user.email
       });
@@ -133,6 +134,7 @@ export function useGameState(user: UserProfile) {
         amount: Math.abs(finalAmount),
         description: `${selectedModality.name}: ${resultType === 'debit' ? 'Entrada' : 'Saída (Prêmio)'}`,
         date: serverTimestamp(),
+        dataExpediente: getShiftDate(),
         paymentMethod: 'Dinheiro', // Default for games typically
         userId: user.uid
       });

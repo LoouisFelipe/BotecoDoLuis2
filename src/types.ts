@@ -35,6 +35,7 @@ export interface GameSession {
   date: any;
   userId: string;
   userName: string;
+  dataExpediente?: string;
 }
 
 export interface Purchase {
@@ -50,6 +51,7 @@ export interface Purchase {
   }[];
   totalAmount: number;
   date: any;
+  dataExpediente?: string;
 }
 
 export interface ExpenseCategory {
@@ -144,6 +146,7 @@ export interface Transaction {
   paymentMethod?: string;
   isFiado?: boolean;
   isSaldo?: boolean;
+  dataExpediente?: string;
   status?: 'active' | 'deleted';
 }
 

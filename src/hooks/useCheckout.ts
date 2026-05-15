@@ -40,10 +40,14 @@ export function useCheckout() {
       const orderRef = doc(db, 'open_orders', order.id);
       batch.update(orderRef, {
         status: 'closed',
-        closedAt: serverTimestamp(),
+        closedAt: new Date(),
         closedShiftDate: getShiftDate(),
         totalAmount: finalAmount,
-        payments: checkoutPayments.map(p => ({ ...p, date: serverTimestamp() })),
+        payments: checkoutPayments.map(p => ({
+          method: p.method,
+          amount: p.amount,
+          date: new Date()
+        })),
         customerId: targetCustomerId
       });
 

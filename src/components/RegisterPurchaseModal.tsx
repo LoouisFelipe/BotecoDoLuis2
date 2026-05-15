@@ -142,7 +142,7 @@ export function RegisterPurchaseModal({ suppliers }: { suppliers: Supplier[] }) 
         items: purchaseItems,
         totalAmount,
         date: firestoreTimestamp,
-        shiftDate
+        dataExpediente: shiftDate
       });
 
       // 3. Add to 'transactions' (Finance)
@@ -152,7 +152,7 @@ export function RegisterPurchaseModal({ suppliers }: { suppliers: Supplier[] }) 
         amount: totalAmount,
         description: `Compra do fornecedor: ${finalSupplierName}`,
         date: firestoreTimestamp,
-        shiftDate,
+        dataExpediente: shiftDate,
         purchaseId: purchaseRef.id,
         isPaid: true
       });

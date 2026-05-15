@@ -4,111 +4,111 @@ import { parseAsSaoPaulo, getShiftDate } from './src/lib/utils';
 import { toast } from 'sonner';
 
 /**
- * Script de Auditoria e Correção de Datas
- * Corrige transações com erro de data, converte para Timestamp do Firestore
- * e aplica a Regra de Expediente: transações após as 06:00 AM pertencem ao dia civil corrente.
+ * Script de Auditoria e Correção de Datas (Versão Gold)
+ * Resolve Timestamps vs Strings e aplica a Regra de Expediente (06h).
+ * Foco em: Resiliência total e Type-Safety.
  */
 export async function migrateLegacyDatesToTimestamp() {
     try {
-        if (typeof window !== 'undefined') {
-            toast.loading('Iniciando auditoria e correção de Datas e Expediente...');
+        const isBrowser = typeof window !== 'undefined';
+        
+        if (isBrowser) {
+            toast.loading('Iniciando auditoria e correção em massa...');
         } else {
-            console.log('⏳ Iniciando auditoria e correção de Datas e Expediente...');
+            console.log('⏳ Iniciando auditoria e correção em massa...');
         }
 
-        const snapshot = await getDocs(collection(db, 'transactions'));
-
-        let batches = [];
-        let currentBatch = writeBatch(db);
-        let opCount = 0;
+        const collectionsToFix = ['transactions', 'expenses', 'purchases', 'game_sessions', 'closed_orders'];
         let totalUpdated = 0;
 
-        snapshot.forEach((doc) => {
-            const data = doc.data();
-            let needsUpdate = false;
-            let updatePayload: any = {};
+        for (const colName of collectionsToFix) {
+            console.log(`🔍 Auditando coleção: ${colName}`);
 
-            // 1. Extração segura da data (Type-safe)
-            const dataRaw = data.closedAt || data.date;
-            let correctDate: Date;
+            const snapshot = await getDocs(collection(db, colName));
+            let batch = writeBatch(db);
+            let opCount = 0;
 
-            if (dataRaw instanceof Timestamp) {
-                correctDate = dataRaw.toDate();
-            } else if (typeof dataRaw === 'string') {
-                correctDate = parseAsSaoPaulo(dataRaw);
-            } else if (dataRaw && typeof dataRaw === 'object' && 'seconds' in dataRaw) {
-                // Objeto plano que representa um Timestamp
-                correctDate = new Date(dataRaw.seconds * 1000);
-            } else if (dataRaw?.toDate && typeof dataRaw.toDate === 'function') {
-                correctDate = dataRaw.toDate();
-            } else {
-                correctDate = parseAsSaoPaulo(dataRaw || '');
-            }
+            for (const docSnap of snapshot.docs) {
+                const data = docSnap.data();
+                let needsUpdate = false;
+                let updatePayload: any = {};
 
-            // 2. Identifica se precisa de correção (Apenas formato legado String ou erro de data)
-            const isLegacyString = typeof data.date === 'string';
-            const isMissingDataExpediente = !data.dataExpediente;
-            const shiftDateStr = getShiftDate(correctDate);
-            const isWrongShiftDate = data.dataExpediente !== shiftDateStr;
+                // 1. Extração segura da data principal
+                // Alguns documentos podem usar 'date', outros 'closedAt' ou 'createdAt'
+                const rawDate = data.date || data.closedAt || data.createdAt;
+                let dateObj: Date | null = null;
 
-            if (isLegacyString) {
-                updatePayload.date = Timestamp.fromDate(correctDate);
-                needsUpdate = true;
-            }
+                if (!rawDate) continue;
 
-            if (isMissingDataExpediente || isWrongShiftDate) {
-                updatePayload.dataExpediente = shiftDateStr;
-                needsUpdate = true;
-            }
+                // Identificar o tipo e converter para DateObj
+                if (typeof rawDate === 'string') {
+                    // FORMATO LEGADO: String - PRECISA DE CONVERSÃO
+                    try {
+                        dateObj = parseAsSaoPaulo(rawDate);
+                        updatePayload.date = Timestamp.fromDate(dateObj);
+                        needsUpdate = true;
+                    } catch (e) {
+                        console.error(`Falha ao converter string para data no doc ${docSnap.id}:`, rawDate);
+                        continue;
+                    }
+                } else if (rawDate instanceof Timestamp) {
+                    dateObj = rawDate.toDate();
+                } else if (rawDate && typeof rawDate === 'object' && 'seconds' in rawDate) {
+                    // Caso o Firebase retorne um objeto plano ou instanceof falhe por versão do SDK
+                    dateObj = new Date(rawDate.seconds * 1000);
+                    // Se não for uma instância real de Timestamp, padronizamos no banco para evitar problemas futuros
+                    if (!(rawDate instanceof Timestamp)) {
+                        updatePayload.date = Timestamp.fromDate(dateObj);
+                        needsUpdate = true;
+                    }
+                } else if (rawDate instanceof Date) {
+                    dateObj = rawDate;
+                    updatePayload.date = Timestamp.fromDate(dateObj);
+                    needsUpdate = true;
+                }
 
-            // Correção adicional: garantir que closedAt também seja Timestamp se existir como string
-            if (data.closedAt && typeof data.closedAt === 'string') {
-                updatePayload.closedAt = Timestamp.fromDate(parseAsSaoPaulo(data.closedAt));
-                needsUpdate = true;
-            }
+                // 2. Validação da Regra de Expediente (06:00 AM)
+                if (dateObj) {
+                    const shiftDate = getShiftDate(dateObj);
+                    
+                    // Definir qual campo de expediente checar baseando-se na coleção
+                    const shiftField = colName === 'closed_orders' ? 'closedShiftDate' : 'dataExpediente';
+                    const currentShiftValue = data[shiftField];
 
-            if (needsUpdate) {
-                currentBatch.update(doc.ref, updatePayload);
-                opCount++;
-                totalUpdated++;
+                    if (currentShiftValue !== shiftDate) {
+                        updatePayload[shiftField] = shiftDate;
+                        needsUpdate = true;
+                    }
+                }
 
-                // Limite rígido do Firestore de operações por Batch (Máx 500)
-                if (opCount >= 490) {
-                    batches.push(currentBatch.commit());
-                    currentBatch = writeBatch(db);
-                    opCount = 0;
+                // 3. Execução do Batch
+                if (needsUpdate) {
+                    batch.update(docSnap.ref, updatePayload);
+                    opCount++;
+                    totalUpdated++;
+
+                    if (opCount >= 450) {
+                        await batch.commit();
+                        batch = writeBatch(db);
+                        opCount = 0;
+                    }
                 }
             }
-        });
 
-        // Executa o que sobrou no último lote
-        if (opCount > 0) {
-            batches.push(currentBatch.commit());
+            if (opCount > 0) {
+                await batch.commit();
+            }
         }
 
-        await Promise.all(batches);
-        
-        if (typeof window !== 'undefined') {
-            toast.success(`Auditoria concluída! ${totalUpdated} registros foram corrigidos.`);
+        if (isBrowser) {
+            toast.success(`Correção finalizada! ${totalUpdated} registros corrigidos.`);
         }
-        console.log(`✅ ${totalUpdated} documentos atualizados (Timestamps e dataExpediente).`);
+        console.log(`✅ Sucesso! Total de ${totalUpdated} documentos sincronizados.`);
 
     } catch (error) {
-        console.error("Erro durante a migração das datas:", error);
-        if (typeof window !== 'undefined') {
-            toast.error('Ocorreu um erro durante a migração. Verifique o console.');
+        console.error("❌ Erro fatal na migração:", error);
+        if (isBrowser) {
+            toast.error('Erro na migração. Verifique o console.');
         }
     }
-}
-
-// Auto-run if executed directly via node/tsx
-if (typeof process !== 'undefined' && process.env) {
-    // Only run if we are in a CLI context (not in a browser build)
-    // We check for a specific flag or just assume if it's the main module
-    migrateLegacyDatesToTimestamp().then(() => {
-        if (typeof window === 'undefined') process.exit(0);
-    }).catch(err => {
-        console.error(err);
-        if (typeof window === 'undefined') process.exit(1);
-    });
 }

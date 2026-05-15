@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, query, addDoc, serverTimestamp, orderBy, limit, getDocs, where, doc, getDoc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { collection, query, addDoc, serverTimestamp, orderBy, limit, getDocs, where, doc, getDoc, deleteDoc, updateDoc, Timestamp } from 'firebase/firestore';
 import { Transaction, UserProfile, Customer, Order, ExpenseCategory, RecurringExpense, InstallmentExpense } from '../types';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -270,7 +270,8 @@ export function Finances({ user }: { user: UserProfile }) {
           category: selectedCat?.name || category,
           amount: installmentValue,
           description: `${description} (Entrada/Parcela 1/${count})`,
-          date: nowInSaoPaulo() // Always use São Paulo for current entry
+          date: serverTimestamp(),
+          dataExpediente: getShiftDate()
         });
         
         toast.success('Compra parcelada registrada');
@@ -281,7 +282,8 @@ export function Finances({ user }: { user: UserProfile }) {
           category: selectedCat?.name || category,
           amount: parseFloat(amount),
           description,
-          date: parseAsSaoPaulo(expenseDate) // Use utility to parse the selected date correctly
+          date: Timestamp.fromDate(parseAsSaoPaulo(expenseDate)),
+          dataExpediente: getShiftDate(parseAsSaoPaulo(expenseDate))
         });
         toast.success('Despesa registrada');
       }
