@@ -35,15 +35,15 @@ const PAYMENT_METHODS = [
 export function Finances({ user }: { user: UserProfile }) {
   const navigate = useNavigate();
   const { calculateNet } = usePaymentFees();
-  const { 
-    customers, 
-    expenseCategories, 
+  const {
+    customers,
+    expenseCategories,
     transactions: rawTransactions,
     expenses: rawExpenses,
     purchases: rawPurchases,
     recurringExpenses,
     installmentExpenses,
-    loading 
+    loading
   } = useData();
 
   const transactions = React.useMemo(() => {
@@ -80,7 +80,7 @@ export function Finances({ user }: { user: UserProfile }) {
   const [relatedOrder, setRelatedOrder] = useState<Order | null>(null);
   const [relatedPurchase, setRelatedPurchase] = useState<any | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  
+
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month' | 'custom'>('today');
   const [startDate, setStartDate] = useState<Date>();
   const [endDate, setEndDate] = useState<Date>();
@@ -142,7 +142,7 @@ export function Finances({ user }: { user: UserProfile }) {
       setRelatedPurchase(null);
     }
   }, [selectedTransaction]);
-  
+
   const [amount, setAmount] = useState('');
   const [expenseDate, setExpenseDate] = useState(getShiftDate());
   const [category, setCategory] = useState('');
@@ -233,7 +233,7 @@ export function Finances({ user }: { user: UserProfile }) {
     setIsSaving(true);
     try {
       const selectedCat = expenseCategories.find(c => c.id === category);
-      
+
       if (isRecurring) {
         await addDoc(collection(db, 'recurring_expenses'), {
           description,
@@ -249,7 +249,7 @@ export function Finances({ user }: { user: UserProfile }) {
         const total = parseFloat(amount);
         const count = parseInt(installmentsCount);
         const installmentValue = total / count;
-        
+
         await addDoc(collection(db, 'installment_expenses'), {
           description,
           totalAmount: total,
@@ -263,7 +263,7 @@ export function Finances({ user }: { user: UserProfile }) {
           createdAt: serverTimestamp(),
           active: true
         });
-        
+
         await addDoc(collection(db, 'expenses'), {
           categoryId: category,
           subCategory,
@@ -273,7 +273,7 @@ export function Finances({ user }: { user: UserProfile }) {
           date: serverTimestamp(),
           dataExpediente: getShiftDate()
         });
-        
+
         toast.success('Compra parcelada registrada');
       } else {
         await addDoc(collection(db, 'expenses'), {
@@ -287,7 +287,7 @@ export function Finances({ user }: { user: UserProfile }) {
         });
         toast.success('Despesa registrada');
       }
-      
+
       setIsExpenseModalOpen(false);
       setAmount('');
       setCategory('');
@@ -332,7 +332,7 @@ export function Finances({ user }: { user: UserProfile }) {
       if (!groups[dateKey]) groups[dateKey] = [];
       groups[dateKey].push(t);
     });
-    
+
     return Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0]));
   }, [filteredTransactions]);
 
@@ -392,7 +392,7 @@ export function Finances({ user }: { user: UserProfile }) {
     const prevTrans = transactions.filter(t => t.date >= prevStart && t.date <= prevEnd);
     const prevIncome = prevTrans.filter(t => t.type === 'income' && !t.isFiado);
     const prevGross = prevIncome.reduce((sum, t) => sum + (t.amount || 0), 0);
-    
+
     const prevNetInc = prevIncome.reduce((sum, t) => {
       const fee = t.feeAmount !== undefined && t.feeAmount > 0 ? t.feeAmount : calculateNet(t.amount, t.paymentMethod).feeAmount;
       return sum + (t.amount - fee);
@@ -425,7 +425,7 @@ export function Finances({ user }: { user: UserProfile }) {
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-        <Card 
+        <Card
           className={cn(
             "bg-[#0b1224] border-white/10 overflow-hidden relative group cursor-pointer transition-all rounded-[40px] h-[200px] hover:border-green-500/30 shadow-2xl",
             typeFilter === 'income' && "ring-2 ring-green-500/50 bg-green-500/10"
@@ -458,7 +458,7 @@ export function Finances({ user }: { user: UserProfile }) {
           </CardContent>
         </Card>
 
-        <Card 
+        <Card
           className={cn(
             "bg-[#0b1224] border-white/10 overflow-hidden relative group cursor-pointer transition-all rounded-[40px] h-[200px] hover:border-red-500/30 shadow-2xl",
             typeFilter === 'expense' && "ring-2 ring-red-500/50 bg-red-500/10"
@@ -513,7 +513,7 @@ export function Finances({ user }: { user: UserProfile }) {
           </CardContent>
         </Card>
 
-        <Card 
+        <Card
           className="bg-card/30 border-border/50 overflow-hidden relative group cursor-pointer transition-all rounded-[40px] h-[200px] hover:border-orange-500/30 shadow-2xl"
           onClick={() => setIsFiadoModalOpen(true)}
         >
@@ -560,10 +560,10 @@ export function Finances({ user }: { user: UserProfile }) {
                 <p className="text-[9px] font-black text-primary uppercase tracking-tighter">ALCANÇADO</p>
               </div>
             </div>
-            
+
             <div className="space-y-4">
               <div className="h-4 bg-white/5 rounded-full overflow-hidden border border-white/5">
-                <div 
+                <div
                   className="h-full bg-gradient-to-r from-primary to-blue-500 transition-all duration-1000 ease-out"
                   style={{ width: `${breakEvenProgress}%` }}
                 />
@@ -602,7 +602,7 @@ export function Finances({ user }: { user: UserProfile }) {
             </div>
             <div className="pt-4 border-t border-white/5">
               <p className="text-[9px] text-muted-foreground leading-relaxed uppercase font-bold tracking-tight">
-                {realNetProfit > 0 
+                {realNetProfit > 0
                   ? "Sua operação está gerando valor líquido positivo após todas as deduções de taxas, CMV e custos fixos."
                   : "O faturamento atual ainda não cobre a soma de custos fixos, variáveis e taxas operacionais."}
               </p>
@@ -624,8 +624,8 @@ export function Finances({ user }: { user: UserProfile }) {
           <div className="flex flex-wrap gap-3 w-full lg:flex-1 justify-end items-center">
             {/* Quick Filters */}
             <div className="flex bg-white/5 p-1 rounded-2xl border border-white/10 mr-auto">
-              <Button 
-                variant="ghost" 
+              <Button
+                variant="ghost"
                 size="sm"
                 onClick={() => setDateFilter('today')}
                 className={cn(
@@ -635,8 +635,8 @@ export function Finances({ user }: { user: UserProfile }) {
               >
                 Hoje
               </Button>
-              <Button 
-                variant="ghost" 
+              <Button
+                variant="ghost"
                 size="sm"
                 onClick={() => setDateFilter('week')}
                 className={cn(
@@ -646,8 +646,8 @@ export function Finances({ user }: { user: UserProfile }) {
               >
                 Semana
               </Button>
-              <Button 
-                variant="ghost" 
+              <Button
+                variant="ghost"
                 size="sm"
                 onClick={() => setDateFilter('month')}
                 className={cn(
@@ -661,14 +661,14 @@ export function Finances({ user }: { user: UserProfile }) {
 
             <div className="relative w-full md:w-64">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input 
+              <Input
                 placeholder="BUSCAR..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-12 h-14 bg-white/5 border-white/10 rounded-[24px] text-[10px] font-black tracking-widest uppercase focus:ring-2 focus:ring-primary/50"
               />
             </div>
-            
+
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
               <SelectTrigger className="w-full md:w-[180px] h-14 px-6 rounded-[24px] bg-card/50 border-white/10">
                 <SelectValue placeholder="CATEGORIA" />
@@ -693,7 +693,7 @@ export function Finances({ user }: { user: UserProfile }) {
             </Select>
 
             {dateFilter === 'custom' && (
-              <DateRangePicker 
+              <DateRangePicker
                 onApply={(range) => {
                   if (range) {
                     setStartDate(range.from);
@@ -704,7 +704,7 @@ export function Finances({ user }: { user: UserProfile }) {
                 className="w-full md:w-auto h-14"
               />
             )}
-            
+
             <Dialog open={isExpenseModalOpen} onOpenChange={setIsExpenseModalOpen}>
               <DialogTrigger asChild>
                 <Button className="h-14 px-8 rounded-[24px] bg-red-600 hover:bg-red-700 shadow-lg shadow-red-600/20 font-black uppercase tracking-widest text-xs">
@@ -755,8 +755,8 @@ export function Finances({ user }: { user: UserProfile }) {
                     </TableCell>
                   </TableRow>
                   {groupTransactions.map((t) => (
-                    <TableRow 
-                      key={t.id} 
+                    <TableRow
+                      key={t.id}
                       className="border-border hover:bg-white/5 cursor-pointer group transition-colors"
                       onClick={() => setSelectedTransaction(t)}
                     >
@@ -778,9 +778,9 @@ export function Finances({ user }: { user: UserProfile }) {
                         <div className="flex items-center gap-4">
                           <div className={cn(
                             "w-10 h-10 rounded-lg flex items-center justify-center bg-white/5 border border-white/10 group-hover:border-primary/30 transition-colors",
-                            t.paymentMethod === 'Pix' ? "text-cyan-500" : 
-                            t.paymentMethod === 'Dinheiro' ? "text-green-500" : 
-                            t.paymentMethod === 'Fiado' ? "text-orange-500" : "text-blue-500"
+                            t.paymentMethod === 'Pix' ? "text-cyan-500" :
+                              t.paymentMethod === 'Dinheiro' ? "text-green-500" :
+                                t.paymentMethod === 'Fiado' ? "text-orange-500" : "text-blue-500"
                           )}>
                             {getPaymentMethodIcon(t.paymentMethod)}
                           </div>
@@ -810,10 +810,10 @@ export function Finances({ user }: { user: UserProfile }) {
                         </div>
                       </TableCell>
                       <TableCell className="px-8 text-right">
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          onClick={(e) => handleDeleteTransaction(e, t.id, (t as any).source)} 
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => handleDeleteTransaction(e, t.id, (t as any).source)}
                           className="h-10 w-10 text-red-500/30 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -838,8 +838,8 @@ export function Finances({ user }: { user: UserProfile }) {
               </div>
               <div className="divide-y divide-white/5">
                 {transactions.map((t, idx) => (
-                  <div 
-                    key={`mobile-trans-${t.id}-${idx}`} 
+                  <div
+                    key={`mobile-trans-${t.id}-${idx}`}
                     className="p-6 space-y-4 cursor-pointer active:bg-white/5 transition-colors border-b border-white/5 last:border-0"
                     onClick={() => setSelectedTransaction(t)}
                   >
@@ -860,14 +860,14 @@ export function Finances({ user }: { user: UserProfile }) {
                       </div>
                       <div className={cn(
                         "w-10 h-10 rounded-xl flex items-center justify-center bg-white/5 border border-white/10 shadow-inner",
-                        t.paymentMethod === 'Pix' ? "text-cyan-400" : 
-                        t.paymentMethod === 'Dinheiro' ? "text-emerald-400" : 
-                        t.paymentMethod === 'Fiado' ? "text-orange-400" : "text-blue-400"
+                        t.paymentMethod === 'Pix' ? "text-cyan-400" :
+                          t.paymentMethod === 'Dinheiro' ? "text-emerald-400" :
+                            t.paymentMethod === 'Fiado' ? "text-orange-400" : "text-blue-400"
                       )}>
                         {getPaymentMethodIcon(t.paymentMethod)}
                       </div>
                     </div>
-                    
+
                     <div className="flex justify-between items-end gap-4 pl-16">
                       <div className="flex-1">
                         <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest line-clamp-2 leading-relaxed">{t.description || 'Sem observações'}</p>
@@ -904,8 +904,8 @@ export function Finances({ user }: { user: UserProfile }) {
             <Receipt className="w-16 h-16 mx-auto mb-6 opacity-10 animate-pulse" />
             <p className="font-black tracking-widest uppercase text-xs">Nenhuma transação encontrada</p>
             {(searchQuery || categoryFilter !== 'all' || methodFilter !== 'all') && (
-              <Button 
-                variant="link" 
+              <Button
+                variant="link"
                 onClick={() => {
                   setSearchQuery('');
                   setCategoryFilter('all');
@@ -948,8 +948,8 @@ export function Finances({ user }: { user: UserProfile }) {
                   .filter(c => (c.balance || 0) < 0)
                   .sort((a, b) => (a.balance || 0) - (b.balance || 0))
                   .map((customer) => (
-                    <div 
-                      key={customer.id} 
+                    <div
+                      key={customer.id}
                       className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-border/50 hover:border-orange-500/30 transition-all group"
                     >
                       <div className="flex items-center gap-4">
@@ -966,8 +966,8 @@ export function Finances({ user }: { user: UserProfile }) {
                           <p className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Saldo Devedor</p>
                           <p className="font-mono font-bold text-orange-500 text-lg">R$ {Math.abs(customer.balance || 0).toFixed(2)}</p>
                         </div>
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="icon"
                           onClick={() => {
                             setIsFiadoModalOpen(false);
@@ -1039,10 +1039,10 @@ export function Finances({ user }: { user: UserProfile }) {
             </div>
 
             {(() => {
-              const displayFee = selectedTransaction?.feeAmount !== undefined && selectedTransaction.feeAmount > 0 
-                ? selectedTransaction.feeAmount 
+              const displayFee = selectedTransaction?.feeAmount !== undefined && selectedTransaction.feeAmount > 0
+                ? selectedTransaction.feeAmount
                 : (selectedTransaction?.type === 'income' && selectedTransaction.paymentMethod ? calculateNet(selectedTransaction.amount, selectedTransaction.paymentMethod).feeAmount : 0);
-              
+
               const displayNet = selectedTransaction?.netAmount !== undefined && selectedTransaction.netAmount > 0
                 ? selectedTransaction.netAmount
                 : (selectedTransaction?.amount || 0) - displayFee;
@@ -1098,24 +1098,24 @@ export function Finances({ user }: { user: UserProfile }) {
                           R$ {(customer.balance || 0).toFixed(2)}
                         </p>
                       </div>
-                        <div>
-                          <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Gasto Total</p>
-                          <p className="font-mono font-bold text-sm text-primary">R$ {(customer.totalSpent || 0).toFixed(2)}</p>
-                        </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Gasto Total</p>
+                        <p className="font-mono font-bold text-sm text-primary">R$ {(customer.totalSpent || 0).toFixed(2)}</p>
                       </div>
                     </div>
-                    <Button 
-                      variant="outline" 
-                      className="w-full h-14 rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] border-orange-500/10 bg-orange-500/5 hover:bg-orange-500 hover:text-white transition-all mt-6 group"
-                      onClick={() => {
-                        setSelectedTransaction(null);
-                        navigate('/clients');
-                      }}
-                    >
-                      Ver Perfil Completo do Cliente
-                      <Users className="w-4 h-4 ml-2 group-hover:scale-110 transition-transform" />
-                    </Button>
                   </div>
+                  <Button
+                    variant="outline"
+                    className="w-full h-14 rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] border-orange-500/10 bg-orange-500/5 hover:bg-orange-500 hover:text-white transition-all mt-6 group"
+                    onClick={() => {
+                      setSelectedTransaction(null);
+                      navigate('/clients');
+                    }}
+                  >
+                    Ver Perfil Completo do Cliente
+                    <Users className="w-4 h-4 ml-2 group-hover:scale-110 transition-transform" />
+                  </Button>
+                </div>
               );
             })()}
 
@@ -1142,12 +1142,12 @@ export function Finances({ user }: { user: UserProfile }) {
                         <p className="text-xs font-mono font-black text-white">R$ {item.subtotal.toFixed(2)}</p>
                       </div>
                     ))}
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       className="w-full h-14 rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] border-white/10 bg-white/5 hover:bg-primary hover:text-white transition-all mt-4 group"
                       onClick={() => {
                         setSelectedTransaction(null);
-                        setActiveTab('dashboard');
+                        navigate('/');
                       }}
                     >
                       Ver Terminal de Venda
@@ -1191,8 +1191,8 @@ export function Finances({ user }: { user: UserProfile }) {
                         <Package className="w-5 h-5 text-green-500" />
                         <span className="text-[10px] font-black text-green-500 uppercase tracking-widest">Fornecedor: {relatedPurchase.supplierName}</span>
                       </div>
-                      <Button 
-                        variant="default" 
+                      <Button
+                        variant="default"
                         className="h-12 px-6 rounded-xl font-black uppercase tracking-widest text-[10px] bg-green-500 hover:bg-green-600 text-white shadow-lg shadow-green-500/20"
                         onClick={() => {
                           setSelectedTransaction(null);
@@ -1248,18 +1248,18 @@ export function Finances({ user }: { user: UserProfile }) {
                     <div className="flex items-center gap-5">
                       <p className="text-lg font-black text-white font-mono tabular-nums">R$ {expense.amount.toFixed(2)}</p>
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          onClick={() => handleEditRecurringClick(expense)} 
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleEditRecurringClick(expense)}
                           className="text-muted-foreground hover:text-primary h-8 w-8 rounded-lg hover:bg-primary/10"
                         >
                           <Settings2 className="w-4 h-4" />
                         </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          onClick={() => handleDeleteRecurring(expense.id)} 
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteRecurring(expense.id)}
                           className="text-muted-foreground hover:text-red-500 h-8 w-8 rounded-lg hover:bg-red-500/10"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -1303,10 +1303,10 @@ export function Finances({ user }: { user: UserProfile }) {
                         <p className="text-lg font-black text-white font-mono tabular-nums">R$ {expense.installmentValue.toFixed(2)}</p>
                         <p className="text-[10px] text-muted-foreground uppercase font-black tracking-tighter">Total: R$ {expense.totalAmount.toFixed(2)}</p>
                       </div>
-                        <Button variant="ghost" size="icon" onClick={async () => {
+                      <Button variant="ghost" size="icon" onClick={async () => {
                         if (confirm('Deseja desativar este parcelamento?')) {
                           try {
-                            await updateDoc(doc(db, 'installment_expenses', expense.id), { 
+                            await updateDoc(doc(db, 'installment_expenses', expense.id), {
                               active: false,
                               status: 'deleted'
                             });
@@ -1347,7 +1347,7 @@ export function Finances({ user }: { user: UserProfile }) {
             <div className="flex gap-4 items-end bg-white/5 p-6 rounded-2xl border border-border/50">
               <div className="flex-1 space-y-2">
                 <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Nova Categoria</label>
-                <Input 
+                <Input
                   value={newCatName}
                   onChange={(e) => setNewCatName(e.target.value)}
                   placeholder="Ex: Fornecedores"
@@ -1365,13 +1365,13 @@ export function Finances({ user }: { user: UserProfile }) {
                 <div key={cat.id} className="p-6 bg-card border border-border rounded-2xl space-y-6">
                   <div className="flex justify-between items-center">
                     <h4 className="text-xl font-black uppercase tracking-tight">{cat.name}</h4>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       onClick={async () => {
                         if (confirm('Deseja desativar esta categoria? (Ela será mantida no histórico como deletada)')) {
                           try {
-                            await updateDoc(doc(db, 'expense_categories', cat.id), { 
+                            await updateDoc(doc(db, 'expense_categories', cat.id), {
                               status: 'deleted'
                             });
                             toast.success('Categoria desativada');
@@ -1393,7 +1393,7 @@ export function Finances({ user }: { user: UserProfile }) {
                       {cat.subcategories?.map(sub => (
                         <Badge key={sub} variant="secondary" className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest group">
                           {sub}
-                          <button 
+                          <button
                             className="ml-2 hover:text-red-500"
                             onClick={async () => {
                               const updated = cat.subcategories.filter(s => s !== sub);
@@ -1408,14 +1408,14 @@ export function Finances({ user }: { user: UserProfile }) {
                     </div>
 
                     <div className="flex gap-2 items-center mt-4">
-                      <Input 
+                      <Input
                         placeholder="Nova subcategoria..."
                         value={newSubName}
                         onChange={(e) => setNewSubName(e.target.value)}
                         className="h-10 text-xs bg-background"
                       />
-                      <Button 
-                        size="sm" 
+                      <Button
+                        size="sm"
                         onClick={() => handleAddSubcategory(cat.id)}
                         className="h-10 font-bold uppercase tracking-widest text-[10px]"
                       >
@@ -1451,7 +1451,7 @@ export function Finances({ user }: { user: UserProfile }) {
                 <Info className="w-3 h-3" /> Guia de Lançamento
               </p>
               <p className="text-[9px] text-muted-foreground leading-tight uppercase font-bold tracking-tighter">
-                Custos Fixos são previsíveis e essenciais (Aluguel, Internet, Assinaturas). 
+                Custos Fixos são previsíveis e essenciais (Aluguel, Internet, Assinaturas).
                 Não use para compras sazonais ou variáveis de estoque.
               </p>
             </div>
@@ -1459,9 +1459,9 @@ export function Finances({ user }: { user: UserProfile }) {
             <div className="grid grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Valor (R$)</label>
-                <Input 
-                  type="number" 
-                  step="0.01" 
+                <Input
+                  type="number"
+                  step="0.01"
                   className="h-14 bg-background border-border font-black text-xl tabular-nums focus:border-primary transition-all shadow-inner"
                   value={editRecAmount}
                   onChange={(e) => setEditRecAmount(e.target.value)}
@@ -1487,7 +1487,7 @@ export function Finances({ user }: { user: UserProfile }) {
 
             <div className="space-y-2">
               <label className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground ml-1">Identificação do Custo</label>
-              <Input 
+              <Input
                 className="h-14 bg-background border-border font-black uppercase tracking-widest text-sm focus:border-primary transition-all placeholder:text-muted-foreground/30"
                 value={editRecDescription}
                 onChange={(e) => setEditRecDescription(e.target.value)}

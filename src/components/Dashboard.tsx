@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
-import { Plus, Search, ShoppingCart, CheckCircle2, ChevronRight, LayoutGrid, List, Zap, Activity, Clock, TrendingUp, TrendingDown, Trash2, ShieldCheck, UserPlus, UserCheck, Menu, X, Receipt, Package, Calendar, Minus, Gamepad2, ArrowLeft, PlusCircle, Users, FlaskConical, Filter, DollarSign, CreditCard, Globe } from 'lucide-react';
+import { Plus, Search, ShoppingCart, CheckCircle2, ChevronRight, LayoutGrid, List, Zap, Activity, Clock, TrendingUp, TrendingDown, Trash2, ShieldCheck, UserPlus, UserCheck, Menu, X, Receipt, Package, Calendar, Minus, Gamepad2, ArrowLeft, PlusCircle, Users, FlaskConical, Filter, DollarSign, CreditCard, Globe, AlertCircle } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle, DialogTrigger, DialogFooter } from './ui/dialog';
 import { toast } from 'sonner';
 import { format } from '../lib/utils';
@@ -29,7 +29,7 @@ import { NewOrderDialog } from './dashboard/NewOrderDialog';
 export function Dashboard({ user }: { user: UserProfile }) {
   const navigate = useNavigate();
   const orderConstraints = React.useMemo(() => [where('status', '==', 'open'), orderBy('createdAt', 'desc')], []);
-  
+
   const { data: orders } = useFetchCollection<Order>('open_orders', {
     constraints: orderConstraints
   });
@@ -40,7 +40,7 @@ export function Dashboard({ user }: { user: UserProfile }) {
   const [newCustomerName, setNewCustomerName] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
-  
+
   // Date filter state
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'custom'>('today');
   const [startDate, setStartDate] = useState<Date>();
@@ -77,7 +77,7 @@ export function Dashboard({ user }: { user: UserProfile }) {
         shiftDate: getShiftDate(),
         createdBy: user.uid
       });
-      
+
       setNewCustomerName('');
       setIsNewOrderOpen(false);
       toast.success('Comanda aberta com sucesso');
@@ -104,7 +104,7 @@ export function Dashboard({ user }: { user: UserProfile }) {
     }
   };
 
-  const filteredOrders = orders.filter(o => 
+  const filteredOrders = orders.filter(o =>
     (o.customerName || '').toLowerCase().includes(search.toLowerCase())
   );
 
@@ -118,22 +118,22 @@ export function Dashboard({ user }: { user: UserProfile }) {
   return (
     <div className="space-y-8">
       {/* Digital Operations Dashboard - Metrics Banner */}
-      <MetricsBanner 
-        orders={orders} 
-        onNewOrder={() => setIsNewOrderOpen(true)} 
+      <MetricsBanner
+        orders={orders}
+        onNewOrder={() => setIsNewOrderOpen(true)}
       />
 
       <div className="flex flex-col md:flex-row justify-between items-center gap-4 md:gap-6">
         <div className="relative flex-1 w-full group">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
-          <Input 
-            placeholder="PESQUISAR MESA OU CLIENTE..." 
+          <Input
+            placeholder="PESQUISAR MESA OU CLIENTE..."
             className="pl-12 h-14 bg-card/50 border-border rounded-[40px] text-xs md:text-sm font-bold tracking-widest focus:ring-primary/20 focus:border-primary transition-all uppercase"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        
+
         <div className="flex items-center gap-3 w-full md:w-auto">
           <div className="flex items-center gap-2">
             <Select value={dateFilter} onValueChange={(val: any) => {
@@ -155,7 +155,7 @@ export function Dashboard({ user }: { user: UserProfile }) {
             </Select>
 
             {dateFilter === 'custom' && (
-              <DateRangePicker 
+              <DateRangePicker
                 onApply={(range) => {
                   if (range) {
                     setStartDate(range.from);
@@ -169,7 +169,7 @@ export function Dashboard({ user }: { user: UserProfile }) {
             )}
           </div>
 
-          <NewOrderDialog 
+          <NewOrderDialog
             isOpen={isNewOrderOpen}
             onOpenChange={setIsNewOrderOpen}
             customers={customers}
@@ -178,17 +178,17 @@ export function Dashboard({ user }: { user: UserProfile }) {
           />
 
           <div className="flex bg-[#0d1117] p-1.5 rounded-[40px] border border-white/5">
-            <Button 
-              variant="ghost" 
-              size="icon" 
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => setViewMode('grid')}
               className={cn("rounded-[40px] w-12 h-12", viewMode === 'grid' ? "bg-[#0070f3]/10 text-[#0070f3]" : "text-muted-foreground")}
             >
               <LayoutGrid className="w-5 h-5" />
             </Button>
-            <Button 
-              variant="ghost" 
-              size="icon" 
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => setViewMode('list')}
               className={cn("rounded-[40px] w-12 h-12", viewMode === 'list' ? "bg-[#0070f3]/10 text-[#0070f3]" : "text-muted-foreground")}
             >
@@ -265,7 +265,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
   const [checkoutDiscount, setCheckoutDiscount] = useState(0);
   const [checkoutAdjustment, setCheckoutAdjustment] = useState(0);
   const [checkoutPayments, setCheckoutPayments] = useState<{
-    method: string, 
+    method: string,
     amount: number,
     itemAssignments?: { itemIndex: number, quantity: number }[]
   }[]>([]);
@@ -279,19 +279,19 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
   const getItemAssignmentStatus = (itemIdx: number) => {
     const item = order.items[itemIdx];
     if (!item) return { assigned: 0, remaining: 0, status: 'none' };
-    
+
     const assignedAcrossAll = checkoutPayments.reduce((sum, p) => {
       const assignment = p.itemAssignments?.find(a => a.itemIndex === itemIdx);
       return sum + (assignment?.quantity || 0);
     }, 0);
-    
+
     const remaining = item.quantity - assignedAcrossAll;
-    
+
     let status: 'available' | 'partial' | 'paid' = 'available';
     if (assignedAcrossAll === 0) status = 'available';
     else if (remaining > 0) status = 'partial';
     else status = 'paid';
-    
+
     return { assigned: assignedAcrossAll, remaining, status };
   };
 
@@ -312,7 +312,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
       const total = order.totalAmount - checkoutDiscount + checkoutAdjustment;
       setCheckoutAmount(total);
       setCheckoutPayments([{ method: 'DINHEIRO', amount: total }]);
-      const shiftDate = order.createdAt 
+      const shiftDate = order.createdAt
         ? getShiftDate((order.createdAt as any).toDate ? (order.createdAt as any).toDate() : getSaoPauloDate(order.createdAt as any))
         : getShiftDate();
       setCheckoutDate(shiftDate);
@@ -330,7 +330,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
   const sortedCategories = categories
     .filter(c => categoryIds.includes(c.id))
     .sort((a, b) => a.name.localeCompare(b.name));
-  
+
   if (products.some(p => !p.categoryId || !categories.find(c => c.id === p.categoryId))) {
     if (!sortedCategories.find(c => c.id === 'Outros')) {
       sortedCategories.push({ id: 'Outros', name: 'Outros' } as Category);
@@ -340,7 +340,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
   const handleAddItem = async (product: Product, customPrice?: number, customCost?: number) => {
     const finalPrice = customPrice !== undefined ? customPrice : product.price;
     const finalCost = customCost !== undefined ? customCost : (product.cost || 0);
-    
+
     // Dose control warning
     if (product.isDoseControl) {
       const doses = calculateAvailableDoses(product, products);
@@ -478,7 +478,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
     const sign = entryType === 'credit' ? -1 : 1;
     const finalPrice = (customPrice !== undefined ? customPrice : game.price) * sign;
     const gameId = `game_${game.id}_${Date.now()}`; // Unique ID for each game entry
-    
+
     let newItems = [...order.items];
     newItems.push({
       productId: gameId,
@@ -533,8 +533,8 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
   const handleFinalizeCheckout = async () => {
     const targetAmount = isPartialCheckout ? assignedItemsTotal : checkoutAmount;
     if (totalPaid < targetAmount - 0.01) {
-      toast.error(isPartialCheckout 
-        ? 'O total pago deve ser igual ao total dos itens selecionados' 
+      toast.error(isPartialCheckout
+        ? 'O total pago deve ser igual ao total dos itens selecionados'
         : 'O total dos pagamentos deve ser igual ou maior ao valor a receber');
       return;
     }
@@ -610,155 +610,155 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
   return (
     <>
       <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-          <DialogTrigger nativeButton={false} render={
-            <div className={cn(
-              "group relative overflow-hidden transition-all duration-300 cursor-pointer border border-white/5",
-              "hover:border-white/10 hover:shadow-2xl hover:shadow-[#0070f3]/5 bg-[#0d1117] hover:bg-[#161b22]",
-              viewMode === 'list' 
-                ? "flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 md:p-5 rounded-[40px] w-full"
-                : "flex flex-col rounded-[40px]"
-            )}
+        <DialogTrigger nativeButton={false} render={
+          <div className={cn(
+            "group relative overflow-hidden transition-all duration-300 cursor-pointer border border-white/5",
+            "hover:border-white/10 hover:shadow-2xl hover:shadow-[#0070f3]/5 bg-[#0d1117] hover:bg-[#161b22]",
+            viewMode === 'list'
+              ? "flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 md:p-5 rounded-[40px] w-full"
+              : "flex flex-col rounded-[40px]"
+          )}
             onClick={() => setIsDetailOpen(true)}
-            >
-              {viewMode === 'grid' && (
-                <div className="p-6 border-b border-white/5 bg-white/[0.01]">
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="flex items-center gap-3 w-full">
-                      <div className="relative flex-shrink-0">
-                        <div className="w-2.5 h-2.5 rounded-full bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)] animate-pulse" />
-                      </div>
-                      <div className="min-w-0 pr-2">
-                        <h3 className="font-black text-lg uppercase tracking-tight truncate max-w-full leading-tight text-white group-hover:text-[#0070f3] transition-colors">{order.customerName}</h3>
-                        <p className="text-[10px] text-muted-foreground font-black tracking-widest uppercase mt-0.5">
-                          {order.createdAt?.toDate ? format(order.createdAt.toDate(), 'HH:mm') : 'AGORA'}
-                        </p>
-                      </div>
+          >
+            {viewMode === 'grid' && (
+              <div className="p-6 border-b border-white/5 bg-white/[0.01]">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex items-center gap-3 w-full">
+                    <div className="relative flex-shrink-0">
+                      <div className="w-2.5 h-2.5 rounded-full bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)] animate-pulse" />
                     </div>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setIsDeleteConfirmOpen(true);
-                      }}
-                      className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-all rounded-xl -mr-2 -mt-2 flex-shrink-0"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    <div className="min-w-0 pr-2">
+                      <h3 className="font-black text-lg uppercase tracking-tight truncate max-w-full leading-tight text-white group-hover:text-[#0070f3] transition-colors">{order.customerName}</h3>
+                      <p className="text-[10px] text-muted-foreground font-black tracking-widest uppercase mt-0.5">
+                        {order.createdAt?.toDate ? format(order.createdAt.toDate(), 'HH:mm') : 'AGORA'}
+                      </p>
+                    </div>
                   </div>
-                  
-                  {order.type === 'customer' ? (
-                    <Badge className="bg-[#0070f3]/10 text-[#0070f3] border-[#0070f3]/20 text-[9px] font-black tracking-widest uppercase">
-                      Cliente Fiel
-                    </Badge>
-                  ) : (
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setIsLinkCustomerOpen(true);
-                      }}
-                      className="inline-flex items-center gap-1.5 text-[9px] font-black tracking-widest uppercase text-muted-foreground hover:text-[#0070f3] bg-white/5 hover:bg-[#0070f3]/10 border border-white/5 hover:border-[#0070f3]/20 px-2.5 py-1 rounded-md transition-all"
-                    >
-                      <UserPlus className="w-3 h-3" />
-                      Vincular Fiel
-                    </button>
-                  )}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsDeleteConfirmOpen(true);
+                    }}
+                    className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-all rounded-xl -mr-2 -mt-2 flex-shrink-0"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
                 </div>
-              )}
 
-              {viewMode === 'grid' && (
-                <div className="p-6 flex flex-col gap-6">
-                  <div className="flex items-end justify-between">
-                    <div>
-                      <p className="text-[10px] text-muted-foreground font-black tracking-widest uppercase mb-1 flex items-center gap-1.5">
-                        <ShoppingCart className="w-3 h-3" />
-                        Consumo
-                      </p>
-                      <p className="text-4xl font-black tracking-tighter text-white">
-                        <span className="text-sm font-bold text-muted-foreground mr-1">R$</span>
-                        {(order.totalAmount || 0).toFixed(2)}
-                      </p>
+                {order.type === 'customer' ? (
+                  <Badge className="bg-[#0070f3]/10 text-[#0070f3] border-[#0070f3]/20 text-[9px] font-black tracking-widest uppercase">
+                    Cliente Fiel
+                  </Badge>
+                ) : (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsLinkCustomerOpen(true);
+                    }}
+                    className="inline-flex items-center gap-1.5 text-[9px] font-black tracking-widest uppercase text-muted-foreground hover:text-[#0070f3] bg-white/5 hover:bg-[#0070f3]/10 border border-white/5 hover:border-[#0070f3]/20 px-2.5 py-1 rounded-md transition-all"
+                  >
+                    <UserPlus className="w-3 h-3" />
+                    Vincular Fiel
+                  </button>
+                )}
+              </div>
+            )}
+
+            {viewMode === 'grid' && (
+              <div className="p-6 flex flex-col gap-6">
+                <div className="flex items-end justify-between">
+                  <div>
+                    <p className="text-[10px] text-muted-foreground font-black tracking-widest uppercase mb-1 flex items-center gap-1.5">
+                      <ShoppingCart className="w-3 h-3" />
+                      Consumo
+                    </p>
+                    <p className="text-4xl font-black tracking-tighter text-white">
+                      <span className="text-sm font-bold text-muted-foreground mr-1">R$</span>
+                      {(order.totalAmount || 0).toFixed(2)}
+                    </p>
+                  </div>
+                  <div className="text-right pb-1">
+                    <p className="text-[9px] text-muted-foreground font-black tracking-widest uppercase mb-0.5">Volume</p>
+                    <p className="text-xs font-black text-white/80 bg-white/5 px-2 py-1 rounded-md">
+                      {order.items.reduce((sum, i) => sum + i.quantity, 0)} ITENS
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* LIST MODE RENDER */}
+            {viewMode === 'list' && (
+              <>
+                <div className="flex items-center gap-4 w-full sm:w-auto overflow-hidden">
+                  <div className="relative flex-shrink-0 ml-1">
+                    <div className="w-3 h-3 rounded-full bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)] animate-pulse" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-3">
+                      <h3 className="font-black text-lg md:text-xl uppercase tracking-tight truncate leading-none text-white group-hover:text-[#0070f3] transition-colors">{order.customerName}</h3>
+                      {order.type === 'customer' && (
+                        <Badge className="bg-[#0070f3]/10 text-[#0070f3] border-[#0070f3]/20 text-[8px] font-black tracking-widest uppercase px-1.5 py-0 h-4 mt-0.5">
+                          Fiel
+                        </Badge>
+                      )}
                     </div>
-                    <div className="text-right pb-1">
-                      <p className="text-[9px] text-muted-foreground font-black tracking-widest uppercase mb-0.5">Volume</p>
-                      <p className="text-xs font-black text-white/80 bg-white/5 px-2 py-1 rounded-md">
+                    <div className="flex items-center gap-3 mt-2 sm:mt-1.5">
+                      <p className="text-[10px] text-muted-foreground font-black tracking-widest uppercase flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {order.createdAt?.toDate ? format(order.createdAt.toDate(), 'HH:mm') : 'AGORA'}
+                      </p>
+                      <div className="w-1 h-1 rounded-full bg-white/20" />
+                      <p className="text-[10px] text-muted-foreground font-black tracking-widest uppercase">
                         {order.items.reduce((sum, i) => sum + i.quantity, 0)} ITENS
                       </p>
                     </div>
                   </div>
                 </div>
-              )}
 
-              {/* LIST MODE RENDER */}
-              {viewMode === 'list' && (
-                <>
-                  <div className="flex items-center gap-4 w-full sm:w-auto overflow-hidden">
-                    <div className="relative flex-shrink-0 ml-1">
-                      <div className="w-3 h-3 rounded-full bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)] animate-pulse" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-3">
-                        <h3 className="font-black text-lg md:text-xl uppercase tracking-tight truncate leading-none text-white group-hover:text-[#0070f3] transition-colors">{order.customerName}</h3>
-                        {order.type === 'customer' && (
-                          <Badge className="bg-[#0070f3]/10 text-[#0070f3] border-[#0070f3]/20 text-[8px] font-black tracking-widest uppercase px-1.5 py-0 h-4 mt-0.5">
-                            Fiel
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-3 mt-2 sm:mt-1.5">
-                        <p className="text-[10px] text-muted-foreground font-black tracking-widest uppercase flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          {order.createdAt?.toDate ? format(order.createdAt.toDate(), 'HH:mm') : 'AGORA'}
-                        </p>
-                        <div className="w-1 h-1 rounded-full bg-white/20" />
-                        <p className="text-[10px] text-muted-foreground font-black tracking-widest uppercase">
-                          {order.items.reduce((sum, i) => sum + i.quantity, 0)} ITENS
-                        </p>
-                      </div>
-                    </div>
+                <div className="flex items-center justify-between sm:justify-end gap-6 w-full sm:w-auto border-t sm:border-t-0 border-white/5 pt-4 sm:pt-0 mt-2 sm:mt-0">
+                  {order.type !== 'customer' && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsLinkCustomerOpen(true);
+                      }}
+                      className="hidden md:inline-flex items-center gap-1.5 text-[9px] font-black tracking-widest uppercase text-muted-foreground hover:text-[#0070f3] bg-white/5 hover:bg-[#0070f3]/10 border border-white/5 px-3 py-2 rounded-lg transition-all"
+                    >
+                      <UserPlus className="w-3 h-3" />
+                      Vincular
+                    </button>
+                  )}
+
+                  <div className="text-left sm:text-right">
+                    <p className="text-[10px] text-muted-foreground font-black tracking-widest uppercase sm:hidden mb-1">TOTAL</p>
+                    <p className="text-2xl font-black tracking-tighter text-white">
+                      <span className="text-[10px] font-bold text-muted-foreground mr-1">R$</span>
+                      {(order.totalAmount || 0).toFixed(2)}
+                    </p>
                   </div>
 
-                  <div className="flex items-center justify-between sm:justify-end gap-6 w-full sm:w-auto border-t sm:border-t-0 border-white/5 pt-4 sm:pt-0 mt-2 sm:mt-0">
-                    {order.type !== 'customer' && (
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setIsLinkCustomerOpen(true);
-                        }}
-                        className="hidden md:inline-flex items-center gap-1.5 text-[9px] font-black tracking-widest uppercase text-muted-foreground hover:text-[#0070f3] bg-white/5 hover:bg-[#0070f3]/10 border border-white/5 px-3 py-2 rounded-lg transition-all"
-                      >
-                        <UserPlus className="w-3 h-3" />
-                        Vincular
-                      </button>
-                    )}
-                    
-                    <div className="text-left sm:text-right">
-                      <p className="text-[10px] text-muted-foreground font-black tracking-widest uppercase sm:hidden mb-1">TOTAL</p>
-                      <p className="text-2xl font-black tracking-tighter text-white">
-                        <span className="text-[10px] font-bold text-muted-foreground mr-1">R$</span>
-                        {(order.totalAmount || 0).toFixed(2)}
-                      </p>
-                    </div>
-                    
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setIsDeleteConfirmOpen(true);
-                        }}
-                        className="h-10 w-10 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-all rounded-xl"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                      <ChevronRight className="w-5 h-5 text-muted-foreground/30 group-hover:text-[#0070f3] transition-colors hidden sm:block" />
-                    </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsDeleteConfirmOpen(true);
+                      }}
+                      className="h-10 w-10 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-all rounded-xl"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                    <ChevronRight className="w-5 h-5 text-muted-foreground/30 group-hover:text-[#0070f3] transition-colors hidden sm:block" />
                   </div>
-                </>
-              )}
-            </div>
-          } />
+                </div>
+              </>
+            )}
+          </div>
+        } />
         <DialogContent className="max-w-[95vw] md:max-w-7xl bg-[#05070a] border-none text-white p-0 overflow-hidden h-[95vh] md:h-[90vh] flex flex-col shadow-2xl rounded-3xl">
           {/* Header - Optimized for all screens */}
           <div className="p-4 md:p-8 border-b border-white/5 flex flex-col sm:flex-row sm:items-center justify-between bg-[#05070a] z-20 gap-4 flex-shrink-0 relative">
@@ -780,7 +780,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                     <Clock className="w-3 h-3" /> {order.createdAt?.toDate ? format(order.createdAt.toDate(), 'HH:mm') : 'AGORA'}
                   </span>
                   {order.type === 'table' && (
-                    <button 
+                    <button
                       className="text-[10px] font-black tracking-widest uppercase text-[#0070f3] hover:underline transition-all"
                       onClick={() => setIsLinkCustomerOpen(true)}
                     >
@@ -799,8 +799,8 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
               </p>
             </div>
 
-            <button 
-              onClick={() => setIsDetailOpen(false)} 
+            <button
+              onClick={() => setIsDetailOpen(false)}
               className="absolute right-4 top-4 md:right-8 md:top-8 text-muted-foreground hover:text-white transition-colors p-2 hover:bg-white/5 rounded-full"
             >
               <X className="w-6 h-6" />
@@ -809,7 +809,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
 
           {/* Main Content Area - Split View on Desktop, Tabs on Mobile */}
           <div className="flex-1 overflow-hidden flex flex-col lg:flex-row bg-[#05070a]">
-            
+
             {/* Left Side: Menu/Catalog (Always visible on Desktop, Tabbed on Mobile) */}
             <div className={cn(
               "flex-1 flex flex-col border-r border-white/5 overflow-hidden",
@@ -817,7 +817,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
             )}>
               {/* Mobile Tabs (Only visible on Mobile) */}
               <div className="flex lg:hidden px-4 md:px-8 py-4 bg-[#05070a] border-b border-white/5 gap-8">
-                <button 
+                <button
                   onClick={() => setDetailTab('menu')}
                   className={cn(
                     "flex items-center gap-2 py-2 text-xs font-black uppercase tracking-widest transition-all relative",
@@ -830,7 +830,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                     <motion.div layoutId="detailTab" className="absolute -bottom-4 left-0 right-0 h-1 bg-[#0070f3] rounded-full" />
                   )}
                 </button>
-                <button 
+                <button
                   onClick={() => setDetailTab('cart')}
                   className={cn(
                     "flex items-center gap-2 py-2 text-xs font-black uppercase tracking-widest transition-all relative",
@@ -852,14 +852,14 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                 <div className="flex flex-col sm:flex-row gap-4">
                   <div className="relative group flex-1">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-[#0070f3] transition-colors" />
-                    <Input 
-                      placeholder="BUSCAR ITEM NO CARDÁPIO..." 
+                    <Input
+                      placeholder="BUSCAR ITEM NO CARDÁPIO..."
                       className="pl-12 h-14 bg-[#0d1117] border-white/5 rounded-2xl text-sm font-bold tracking-widest focus:ring-[#0070f3]/20 focus:border-[#0070f3] transition-all uppercase"
                       value={itemSearch}
                       onChange={(e) => setItemSearch(e.target.value)}
                     />
                   </div>
-                  <Button 
+                  <Button
                     onClick={() => setIsAvulsoModalOpen(true)}
                     className="h-14 px-6 bg-[#161b22] hover:bg-[#1d242d] border border-white/5 text-[#0070f3] rounded-2xl font-black uppercase tracking-widest text-[10px] sm:text-xs gap-2"
                   >
@@ -871,7 +871,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                 <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-4">
                   {/* Menu Sub-tabs */}
                   <div className="flex gap-2 mb-4">
-                    <button 
+                    <button
                       onClick={() => {
                         setMenuSubTab('products');
                         setSelectedMenuCategory(null);
@@ -884,7 +884,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                     >
                       Cardápio Geral
                     </button>
-                    <button 
+                    <button
                       onClick={() => {
                         setMenuSubTab('games');
                         setSelectedMenuCategory(null);
@@ -907,8 +907,8 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                           <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground mb-2">Resultados da busca</p>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             {products
-                              .filter(p => 
-                                p.name.toLowerCase().includes(itemSearch.toLowerCase()) || 
+                              .filter(p =>
+                                p.name.toLowerCase().includes(itemSearch.toLowerCase()) ||
                                 categories.find(c => c.id === p.categoryId)?.name.toLowerCase().includes(itemSearch.toLowerCase()) ||
                                 p.subcategory?.toLowerCase().includes(itemSearch.toLowerCase())
                               )
@@ -967,9 +967,9 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                           {/* Hierarchical Navigation Header */}
                           {(selectedMenuCategory || selectedMenuSubcategory) && (
                             <div className="flex items-center gap-3 bg-[#111827] p-3 rounded-2xl border border-white/5 mb-4 sticky top-0 z-10 shadow-xl">
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
+                              <Button
+                                variant="ghost"
+                                size="sm"
                                 onClick={() => {
                                   if (selectedMenuSubcategory) {
                                     setSelectedMenuSubcategory(null);
@@ -999,7 +999,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-3">
                               <AnimatePresence>
                                 {sortedCategories.map(category => (
-                                  <motion.button 
+                                  <motion.button
                                     key={`cat-${category.id}`}
                                     initial={{ opacity: 0, y: 10 }}
                                     animate={{ opacity: 1, y: 0 }}
@@ -1037,7 +1037,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                                     .filter(p => (p.categoryId || 'Outros') === selectedMenuCategory)
                                     .map(p => p.subcategory || 'Diversos')
                                 )).sort().map(subcategory => (
-                                  <motion.button 
+                                  <motion.button
                                     key={`subcat-${subcategory}`}
                                     initial={{ x: 20, opacity: 0 }}
                                     animate={{ x: 0, opacity: 1 }}
@@ -1179,7 +1179,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
               <div className="p-6 md:p-8 flex-1 flex flex-col overflow-hidden">
                 <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center gap-3">
-                    <button 
+                    <button
                       onClick={() => setDetailTab('menu')}
                       className="lg:hidden w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-muted-foreground hover:text-white transition-all mr-1"
                       title="Voltar para o Cardápio"
@@ -1196,7 +1196,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                       </p>
                     </div>
                   </div>
-                  <button 
+                  <button
                     onClick={() => setIsClearConfirmOpen(true)}
                     className="p-2 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all"
                     title="Limpar Sacola"
@@ -1208,7 +1208,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                 <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3">
                   <AnimatePresence mode="popLayout">
                     {order.items.map((item, index) => (
-                      <motion.div 
+                      <motion.div
                         key={`${item.productId}-${index}`}
                         layout
                         initial={{ opacity: 0, y: 10 }}
@@ -1229,7 +1229,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                             {(() => {
                               const product = products.find(p => p.id === item.productId.split('_')[0]);
                               if (product?.isDoseControl) {
-                                const bottle = product.linkedProductId 
+                                const bottle = product.linkedProductId
                                   ? products.find(p => p.id === product.linkedProductId)
                                   : product;
                                 return (
@@ -1246,21 +1246,21 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
 
                         <div className="flex items-center gap-3">
                           <div className="flex items-center bg-[#05070a] rounded-xl p-1 border border-white/5">
-                            <button 
+                            <button
                               onClick={() => handleUpdateQuantity(index, -1)}
                               className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-white transition-colors rounded-lg hover:bg-white/5"
                             >
                               <Minus className="w-3 h-3" />
                             </button>
                             <span className="w-8 text-center font-black text-sm">{item.quantity}</span>
-                            <button 
+                            <button
                               onClick={() => handleUpdateQuantity(index, 1)}
                               className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-white transition-colors rounded-lg hover:bg-white/5"
                             >
                               <Plus className="w-3 h-3" />
                             </button>
                           </div>
-                          <button 
+                          <button
                             onClick={() => {
                               setItemToRemoveIndex(index);
                               setIsRemoveItemConfirmOpen(true);
@@ -1300,7 +1300,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
 
               {/* Action Buttons - Sticky at bottom of cart */}
               <div className="p-6 md:p-8 bg-[#0d1117] border-t border-white/5 grid grid-cols-2 gap-3">
-                <Button 
+                <Button
                   onClick={() => setIsCheckoutOpen(true)}
                   variant="outline"
                   className="h-14 bg-transparent border-green-500/30 text-green-500 hover:bg-green-500/10 font-black uppercase tracking-widest rounded-2xl gap-2 text-xs"
@@ -1308,7 +1308,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                   <Receipt className="w-4 h-4" />
                   RECEBER
                 </Button>
-                <Button 
+                <Button
                   onClick={() => setIsDetailOpen(false)}
                   className="h-14 bg-green-600 hover:bg-green-700 text-white font-black uppercase tracking-widest rounded-2xl shadow-lg shadow-green-600/20 text-xs"
                 >
@@ -1410,22 +1410,22 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                         <div className="flex justify-between items-center w-full gap-4">
                           <span>{customer.name}</span>
                           {(customer.balance || 0) < 0 && (
-                             <span className="text-red-500 text-[10px] font-black">DÉBITO R$ {Math.abs(customer.balance || 0).toFixed(2)}</span>
+                            <span className="text-red-500 text-[10px] font-black">DÉBITO R$ {Math.abs(customer.balance || 0).toFixed(2)}</span>
                           )}
                           {(customer.balance || 0) > 0 && (
-                             <span className="text-green-500 text-[10px] font-black">CRÉDITO R$ {(customer.balance || 0).toFixed(2)}</span>
+                            <span className="text-green-500 text-[10px] font-black">CRÉDITO R$ {(customer.balance || 0).toFixed(2)}</span>
                           )}
                         </div>
                       </SelectItem>
                     ))}
                   {customers.filter(c => {
-                      if (linkBalanceFilter === 'debt' && (c.balance || 0) >= 0) return false;
-                      if (linkBalanceFilter === 'credit' && (c.balance || 0) <= 0) return false;
-                      if (linkLetterFilter === 'TODOS') return true;
-                      return c.name.toUpperCase().startsWith(linkLetterFilter);
-                    }).length === 0 && (
+                    if (linkBalanceFilter === 'debt' && (c.balance || 0) >= 0) return false;
+                    if (linkBalanceFilter === 'credit' && (c.balance || 0) <= 0) return false;
+                    if (linkLetterFilter === 'TODOS') return true;
+                    return c.name.toUpperCase().startsWith(linkLetterFilter);
+                  }).length === 0 && (
                       <div className="p-8 text-center text-muted-foreground uppercase text-[10px] font-black tracking-widest">Nenhum cliente cadastrado</div>
-                  )}
+                    )}
                 </SelectContent>
               </Select>
             </div>
@@ -1433,8 +1433,8 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
 
           <DialogFooter className="p-8 border-t border-white/5 bg-[#05070a] flex-row gap-4">
             <Button variant="ghost" onClick={() => setIsLinkCustomerOpen(false)} className="flex-1 h-14 font-black uppercase tracking-widest">Cancelar</Button>
-            <Button 
-              onClick={handleLinkCustomer} 
+            <Button
+              onClick={handleLinkCustomer}
               disabled={!linkCustomerId || isProcessing}
               className="flex-1 h-14 font-black uppercase tracking-widest bg-[#0070f3] hover:bg-[#0070f3]/90"
             >
@@ -1495,7 +1495,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                   </p>
                   <p className="text-[8px] text-muted-foreground uppercase font-bold tracking-tighter">Após taxas de operadora</p>
                 </div>
-                
+
                 {checkoutPayments.reduce((sum, p) => sum + p.amount, 0) > checkoutAmount && (
                   <div className="bg-orange-500/5 border border-orange-500/20 p-4 rounded-2xl flex flex-col justify-center animate-in zoom-in duration-300">
                     <p className="text-[9px] font-black text-orange-500 uppercase tracking-widest mb-1">Troco / Crédito</p>
@@ -1526,13 +1526,14 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                   </div>
                 </div>
                 {(customers.find(c => c.id === checkoutCustomerId)?.balance || 0) > 0 && (
-                  <Button 
-                    variant="ghost" 
+                  <Button
+                    variant="ghost"
                     size="sm"
                     onClick={() => {
                       const target = isPartialCheckout ? assignedItemsTotal : checkoutAmount;
                       const needed = target - checkoutPayments.reduce((sum, p) => sum + p.amount, 0);
-                      const use = Math.min(balance, needed);
+                      const customerBalance = customers.find(c => c.id === checkoutCustomerId)?.balance || 0;
+                      const use = Math.min(customerBalance, needed);
                       if (use > 0) {
                         setCheckoutPayments([...checkoutPayments, { method: 'SALDO', amount: use }]);
                       }
@@ -1570,8 +1571,8 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                   <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Valor do Checkout</label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">R$</span>
-                    <Input 
-                      type="number" 
+                    <Input
+                      type="number"
                       step="0.01"
                       className="h-16 pl-12 bg-[#0d1117] border-white/5 text-2xl font-black focus:ring-[#0070f3]/20 focus:border-[#0070f3] rounded-2xl"
                       value={checkoutAmount}
@@ -1582,7 +1583,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
 
                 <div className="space-y-2">
                   <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Data do Atendimento</label>
-                  <Input 
+                  <Input
                     type="date"
                     className="h-16 bg-[#0d1117] border-white/5 font-bold rounded-2xl uppercase tracking-widest text-xs"
                     value={checkoutDate}
@@ -1594,8 +1595,8 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Desconto (R$)</label>
-                  <Input 
-                    type="number" 
+                  <Input
+                    type="number"
                     step="0.01"
                     className="h-14 bg-[#0d1117] border-white/5 font-bold rounded-[40px]"
                     value={checkoutDiscount}
@@ -1605,8 +1606,8 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Ajuste (R$)</label>
-                  <Input 
-                    type="number" 
+                  <Input
+                    type="number"
                     step="0.01"
                     className="h-14 bg-[#0d1117] border-white/5 font-bold rounded-[40px]"
                     value={checkoutAdjustment}
@@ -1617,510 +1618,513 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
               </div>
 
               <div className="space-y-4 pt-4">
-                  <div className="flex items-center gap-4">
-                    <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Painel de Seleção de Itens</label>
-                    <Badge variant="outline" className="h-5 px-2 text-[8px] border-[#0070f3]/30 text-[#0070f3] bg-[#0070f3]/5 uppercase font-black">
-                      {order.items.length} ITENS NO TOTAL
-                    </Badge>
+                <div className="flex items-center gap-4">
+                  <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Painel de Seleção de Itens</label>
+                  <Badge variant="outline" className="h-5 px-2 text-[8px] border-[#0070f3]/30 text-[#0070f3] bg-[#0070f3]/5 uppercase font-black">
+                    {order.items.length} ITENS NO TOTAL
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const newVal = !isPartialCheckout;
+                      setIsPartialCheckout(newVal);
+                      if (newVal) {
+                        setCheckoutPayments([{ method: 'DINHEIRO', amount: 0, itemAssignments: [] }]);
+                        setActivePaymentIndex(0);
+                      } else {
+                        const total = order.totalAmount - checkoutDiscount + checkoutAdjustment;
+                        setCheckoutAmount(total);
+                        setCheckoutPayments([{ method: 'DINHEIRO', amount: total }]);
+                      }
+                    }}
+                    className={cn(
+                      "h-10 px-4 text-[9px] font-black uppercase tracking-widest rounded-[40px] transition-all border-white/5",
+                      isPartialCheckout
+                        ? "bg-orange-500/20 text-orange-400 border-orange-500/30 hover:bg-orange-500/30"
+                        : "bg-white/5 text-muted-foreground hover:bg-white/10"
+                    )}
+                  >
+                    {isPartialCheckout ? '✓ Modo Itens Ativo' : 'Ativar Pagto por Item'}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Central Item Selection Panel - Command Center Style */}
+              <div className="space-y-6">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-1">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
+                      <Package className="w-3 h-3" /> Distribuição de Itens
+                    </span>
+                    <p className="text-[8px] text-muted-foreground/60 uppercase font-bold tracking-widest mt-1">Vincule os itens aos pagamentos</p>
+                  </div>
+                  <div className="flex flex-1 max-w-md relative group">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground group-focus-within:text-[#0070f3] transition-colors" />
+                    <Input
+                      placeholder="BUSCAR ITEM NA COMANDA..."
+                      value={checkoutItemSearch}
+                      onChange={(e) => setCheckoutItemSearch(e.target.value)}
+                      className="h-10 pl-10 bg-white/[0.02] border-white/5 rounded-2xl text-[10px] font-bold uppercase tracking-widest focus:ring-[#0070f3]/20 focus:border-[#0070f3]/40"
+                    />
+                    {checkoutItemSearch && (
+                      <button
+                        onClick={() => setCheckoutItemSearch('')}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-white"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        const newVal = !isPartialCheckout;
-                        setIsPartialCheckout(newVal);
-                        if (newVal) {
-                          setCheckoutPayments([]);
-                          setActivePaymentIndex(0);
-                        } else {
-                          const total = order.totalAmount - checkoutDiscount + checkoutAdjustment;
-                          setCheckoutAmount(total);
-                          setCheckoutPayments([{ method: 'DINHEIRO', amount: total }]);
-                        }
-                      }}
-                      className={cn(
-                        "h-10 px-4 text-[9px] font-black uppercase tracking-widest rounded-[40px] transition-all border-white/5",
-                        isPartialCheckout 
-                          ? "bg-orange-500/20 text-orange-400 border-orange-500/30 hover:bg-orange-500/30" 
-                          : "bg-white/5 text-muted-foreground hover:bg-white/10"
-                      )}
-                    >
-                      {isPartialCheckout ? '✓ Modo Itens Ativo' : 'Ativar Pagto por Item'}
-                    </Button>
+                    <Badge className="bg-[#0070f3]/10 text-[#0070f3] border border-[#0070f3]/20 text-[8px] font-black uppercase tracking-widest px-3 h-6 rounded-lg">
+                      {order.items.length} TOTAL
+                    </Badge>
+                    {activePaymentIndex !== -1 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          const newPayments = [...checkoutPayments];
+                          newPayments[activePaymentIndex].itemAssignments = [];
+                          newPayments[activePaymentIndex].amount = 0;
+                          setCheckoutPayments(newPayments);
+                        }}
+                        className="h-6 px-2 text-[8px] font-black uppercase tracking-widest text-red-400 hover:text-red-500 hover:bg-red-500/10"
+                      >
+                        Limpar Ativo
+                      </Button>
+                    )}
                   </div>
                 </div>
 
-                {/* Central Item Selection Panel - Command Center Style */}
-                <div className="space-y-6">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-1">
-                    <div className="flex flex-col">
-                      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
-                        <Package className="w-3 h-3" /> Distribuição de Itens
-                      </span>
-                      <p className="text-[8px] text-muted-foreground/60 uppercase font-bold tracking-widest mt-1">Vincule os itens aos pagamentos</p>
-                    </div>
-                    <div className="flex flex-1 max-w-md relative group">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground group-focus-within:text-[#0070f3] transition-colors" />
-                      <Input 
-                        placeholder="BUSCAR ITEM NA COMANDA..."
-                        value={checkoutItemSearch}
-                        onChange={(e) => setCheckoutItemSearch(e.target.value)}
-                        className="h-10 pl-10 bg-white/[0.02] border-white/5 rounded-2xl text-[10px] font-bold uppercase tracking-widest focus:ring-[#0070f3]/20 focus:border-[#0070f3]/40"
-                      />
-                      {checkoutItemSearch && (
-                        <button 
-                          onClick={() => setCheckoutItemSearch('')}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-white"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge className="bg-[#0070f3]/10 text-[#0070f3] border border-[#0070f3]/20 text-[8px] font-black uppercase tracking-widest px-3 h-6 rounded-lg">
-                        {order.items.length} TOTAL
-                      </Badge>
-                      {activePaymentIndex !== -1 && (
-                         <Button
-                          variant="ghost"
-                          size="sm"
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar p-1">
+                  {order.items
+                    .map((item, originalIdx) => ({ item, originalIdx }))
+                    .filter(({ item }) => item.productName.toLowerCase().includes(checkoutItemSearch.toLowerCase()))
+                    .map(({ item, originalIdx: idx }) => {
+                      const { assigned, remaining, status } = getItemAssignmentStatus(idx);
+                      const progress = (assigned / item.quantity) * 100;
+                      const assignedToActive = checkoutPayments[activePaymentIndex]?.itemAssignments?.find(a => a.itemIndex === idx)?.quantity || 0;
+
+                      return (
+                        <motion.div
+                          key={`select-item-${idx}`}
+                          layout
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          whileHover={status !== 'paid' && activePaymentIndex !== -1 ? { y: -2, borderColor: '#0070f3' } : {}}
                           onClick={() => {
+                            if (status === 'paid' || activePaymentIndex === -1) return;
                             const newPayments = [...checkoutPayments];
-                            newPayments[activePaymentIndex].itemAssignments = [];
-                            newPayments[activePaymentIndex].amount = 0;
+                            const currentAssignments = [...(newPayments[activePaymentIndex].itemAssignments || [])];
+                            const existingIdx = currentAssignments.findIndex(a => a.itemIndex === idx);
+
+                            if (existingIdx > -1) {
+                              currentAssignments[existingIdx].quantity += 1;
+                            } else {
+                              currentAssignments.push({ itemIndex: idx, quantity: 1 });
+                            }
+
+                            newPayments[activePaymentIndex].itemAssignments = currentAssignments;
+                            const newAmount = currentAssignments.reduce((sum, a) => sum + (order.items[a.itemIndex].price * a.quantity), 0);
+                            newPayments[activePaymentIndex].amount = Number(newAmount.toFixed(2));
                             setCheckoutPayments(newPayments);
                           }}
-                          className="h-6 px-2 text-[8px] font-black uppercase tracking-widest text-red-400 hover:text-red-500 hover:bg-red-500/10"
+                          className={cn(
+                            "relative flex flex-col justify-between p-5 rounded-[32px] border transition-all duration-300 group overflow-hidden cursor-pointer h-32",
+                            status === 'paid'
+                              ? "bg-emerald-500/5 border-emerald-500/20 opacity-60 cursor-default"
+                              : activePaymentIndex === -1
+                                ? "bg-white/[0.02] border-white/5 opacity-40 cursor-not-allowed"
+                                : assignedToActive > 0
+                                  ? "bg-[#0070f3]/10 border-[#0070f3] shadow-[0_0_20px_rgba(0,112,243,0.15)]"
+                                  : "bg-white/[0.03] border-white/10 hover:bg-white/[0.05]"
+                          )}
                         >
-                          Limpar Ativo
-                        </Button>
-                      )}
-                    </div>
-                  </div>
+                          {/* Progress Indicator */}
+                          <div className="absolute bottom-0 left-0 h-1 bg-emerald-500/30 transition-all duration-500" style={{ width: `${progress}%` }} />
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar p-1">
-                    {order.items
-                      .map((item, originalIdx) => ({ item, originalIdx }))
-                      .filter(({ item }) => item.productName.toLowerCase().includes(checkoutItemSearch.toLowerCase()))
-                      .map(({ item, originalIdx: idx }) => {
-                        const { assigned, remaining, status } = getItemAssignmentStatus(idx);
-                        const progress = (assigned / item.quantity) * 100;
-                        const assignedToActive = checkoutPayments[activePaymentIndex]?.itemAssignments?.find(a => a.itemIndex === idx)?.quantity || 0;
-
-                        return (
-                          <motion.div
-                            key={`select-item-${idx}`}
-                            layout
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            whileHover={status !== 'paid' && activePaymentIndex !== -1 ? { y: -2, borderColor: '#0070f3' } : {}}
-                            onClick={() => {
-                              if (status === 'paid' || activePaymentIndex === -1) return;
-                              const newPayments = [...checkoutPayments];
-                              const currentAssignments = [...(newPayments[activePaymentIndex].itemAssignments || [])];
-                              const existingIdx = currentAssignments.findIndex(a => a.itemIndex === idx);
-                              
-                              if (existingIdx > -1) {
-                                currentAssignments[existingIdx].quantity += 1;
-                              } else {
-                                currentAssignments.push({ itemIndex: idx, quantity: 1 });
-                              }
-                              
-                              newPayments[activePaymentIndex].itemAssignments = currentAssignments;
-                              const newAmount = currentAssignments.reduce((sum, a) => sum + (order.items[a.itemIndex].price * a.quantity), 0);
-                              newPayments[activePaymentIndex].amount = Number(newAmount.toFixed(2));
-                              setCheckoutPayments(newPayments);
-                            }}
-                            className={cn(
-                              "relative flex flex-col justify-between p-5 rounded-[32px] border transition-all duration-300 group overflow-hidden cursor-pointer h-32",
-                              status === 'paid' 
-                                ? "bg-emerald-500/5 border-emerald-500/20 opacity-60 cursor-default" 
-                                : activePaymentIndex === -1
-                                  ? "bg-white/[0.02] border-white/5 opacity-40 cursor-not-allowed"
-                                  : assignedToActive > 0
-                                    ? "bg-[#0070f3]/10 border-[#0070f3] shadow-[0_0_20px_rgba(0,112,243,0.15)]"
-                                    : "bg-white/[0.03] border-white/10 hover:bg-white/[0.05]"
-                            )}
-                          >
-                            {/* Progress Indicator */}
-                            <div className="absolute bottom-0 left-0 h-1 bg-emerald-500/30 transition-all duration-500" style={{ width: `${progress}%` }} />
-                            
-                            <div className="flex justify-between items-start gap-3 relative z-10">
-                              <div className="flex-1 min-w-0">
-                                <h4 className="text-xs font-black uppercase tracking-widest text-white/90 truncate mb-1">
-                                  {item.productName}
-                                </h4>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-[14px] font-black text-[#0070f3] tabular-nums">
-                                    R$ {item.price.toFixed(2)}
-                                  </span>
-                                  <span className="text-[9px] text-muted-foreground font-bold uppercase tracking-widest">
-                                    / {item.unit || 'UN'}
-                                  </span>
-                                </div>
+                          <div className="flex justify-between items-start gap-3 relative z-10">
+                            <div className="flex-1 min-w-0">
+                              <h4 className="text-xs font-black uppercase tracking-widest text-white/90 truncate mb-1">
+                                {item.productName}
+                              </h4>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[14px] font-black text-[#0070f3] tabular-nums">
+                                  R$ {item.price.toFixed(2)}
+                                </span>
+                                <span className="text-[9px] text-muted-foreground font-bold uppercase tracking-widest">
+                                  / {item.unit || 'UN'}
+                                </span>
                               </div>
-                              <Badge className={cn(
-                                "text-[8px] font-black px-2 py-0.5 rounded-lg border-none shadow-sm",
-                                status === 'paid' ? "bg-emerald-500 text-white" :
+                            </div>
+                            <Badge className={cn(
+                              "text-[8px] font-black px-2 py-0.5 rounded-lg border-none shadow-sm",
+                              status === 'paid' ? "bg-emerald-500 text-white" :
                                 status === 'partial' ? "bg-amber-500 text-black" : "bg-white/10 text-muted-foreground"
-                              )}>
-                                {status === 'paid' ? 'PAGO' : status === 'partial' ? 'PARCIAL' : 'PENDENTE'}
-                              </Badge>
+                            )}>
+                              {status === 'paid' ? 'PAGO' : status === 'partial' ? 'PARCIAL' : 'PENDENTE'}
+                            </Badge>
+                          </div>
+
+                          <div className="flex items-end justify-between relative z-10 mt-auto">
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-baseline gap-1">
+                                <span className={cn(
+                                  "text-2xl font-black tabular-nums leading-none",
+                                  remaining === 0 ? "text-emerald-500" : "text-white"
+                                )}>
+                                  {remaining}
+                                </span>
+                                <span className="text-[9px] text-muted-foreground font-bold uppercase tracking-widest">
+                                  restante de {item.quantity}
+                                </span>
+                              </div>
                             </div>
 
-                            <div className="flex items-end justify-between relative z-10 mt-auto">
-                              <div className="flex flex-col gap-1">
-                                <div className="flex items-baseline gap-1">
-                                  <span className={cn(
-                                    "text-2xl font-black tabular-nums leading-none",
-                                    remaining === 0 ? "text-emerald-500" : "text-white"
-                                  )}>
-                                    {remaining}
-                                  </span>
-                                  <span className="text-[9px] text-muted-foreground font-bold uppercase tracking-widest">
-                                    restante de {item.quantity}
-                                  </span>
-                                </div>
-                              </div>
-
-                              <div className="flex items-center gap-2">
-                                {assignedToActive > 0 && (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      const newPayments = [...checkoutPayments];
-                                      const currentAssignments = [...(newPayments[activePaymentIndex].itemAssignments || [])];
-                                      const existingIdx = currentAssignments.findIndex(a => a.itemIndex === idx);
-                                      if (existingIdx > -1) {
-                                        if (currentAssignments[existingIdx].quantity > 1) {
-                                          currentAssignments[existingIdx].quantity -= 1;
-                                        } else {
-                                          currentAssignments.splice(existingIdx, 1);
-                                        }
-                                        newPayments[activePaymentIndex].itemAssignments = currentAssignments;
-                                        const newAmount = currentAssignments.reduce((sum, a) => sum + (order.items[a.itemIndex].price * a.quantity), 0);
-                                        newPayments[activePaymentIndex].amount = Number(newAmount.toFixed(2));
-                                        setCheckoutPayments(newPayments);
-                                      }
-                                    }}
-                                    className="w-8 h-8 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-lg shadow-red-500/10"
-                                  >
-                                    <Minus className="w-4 h-4" />
-                                  </button>
-                                )}
-                                
-                                {remaining > 0 && activePaymentIndex !== -1 && (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      const newPayments = [...checkoutPayments];
-                                      const currentAssignments = [...(newPayments[activePaymentIndex].itemAssignments || [])];
-                                      const existingIdx = currentAssignments.findIndex(a => a.itemIndex === idx);
-                                      if (existingIdx > -1) {
-                                        currentAssignments[existingIdx].quantity += 1;
+                            <div className="flex items-center gap-2">
+                              {assignedToActive > 0 && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const newPayments = [...checkoutPayments];
+                                    const currentAssignments = [...(newPayments[activePaymentIndex].itemAssignments || [])];
+                                    const existingIdx = currentAssignments.findIndex(a => a.itemIndex === idx);
+                                    if (existingIdx > -1) {
+                                      if (currentAssignments[existingIdx].quantity > 1) {
+                                        currentAssignments[existingIdx].quantity -= 1;
                                       } else {
-                                        currentAssignments.push({ itemIndex: idx, quantity: 1 });
+                                        currentAssignments.splice(existingIdx, 1);
                                       }
                                       newPayments[activePaymentIndex].itemAssignments = currentAssignments;
                                       const newAmount = currentAssignments.reduce((sum, a) => sum + (order.items[a.itemIndex].price * a.quantity), 0);
                                       newPayments[activePaymentIndex].amount = Number(newAmount.toFixed(2));
                                       setCheckoutPayments(newPayments);
-                                    }}
-                                    className="w-10 h-10 rounded-xl bg-[#0070f3] flex items-center justify-center text-white hover:scale-105 active:scale-95 transition-all shadow-lg shadow-[#0070f3]/20"
-                                  >
-                                    <Plus className="w-5 h-5" />
-                                  </button>
-                                )}
+                                    }
+                                  }}
+                                  className="w-8 h-8 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-lg shadow-red-500/10"
+                                >
+                                  <Minus className="w-4 h-4" />
+                                </button>
+                              )}
+
+                              {remaining > 0 && activePaymentIndex !== -1 && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const newPayments = [...checkoutPayments];
+                                    const currentAssignments = [...(newPayments[activePaymentIndex].itemAssignments || [])];
+                                    const existingIdx = currentAssignments.findIndex(a => a.itemIndex === idx);
+                                    if (existingIdx > -1) {
+                                      currentAssignments[existingIdx].quantity += 1;
+                                    } else {
+                                      currentAssignments.push({ itemIndex: idx, quantity: 1 });
+                                    }
+                                    newPayments[activePaymentIndex].itemAssignments = currentAssignments;
+                                    const newAmount = currentAssignments.reduce((sum, a) => sum + (order.items[a.itemIndex].price * a.quantity), 0);
+                                    newPayments[activePaymentIndex].amount = Number(newAmount.toFixed(2));
+                                    setCheckoutPayments(newPayments);
+                                  }}
+                                  className="w-10 h-10 rounded-xl bg-[#0070f3] flex items-center justify-center text-white hover:scale-105 active:scale-95 transition-all shadow-lg shadow-[#0070f3]/20"
+                                >
+                                  <Plus className="w-5 h-5" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Selection Overlay */}
+                          {assignedToActive > 0 && (
+                            <div className="absolute top-2 right-2 flex gap-1">
+                              <div className="bg-[#0070f3] text-white text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-tighter shadow-lg">
+                                {assignedToActive}x Vinculado
                               </div>
                             </div>
-
-                            {/* Selection Overlay */}
-                            {assignedToActive > 0 && (
-                              <div className="absolute top-2 right-2 flex gap-1">
-                                <div className="bg-[#0070f3] text-white text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-tighter shadow-lg">
-                                  {assignedToActive}x Vinculado
-                                </div>
-                              </div>
-                            )}
-                          </motion.div>
-                        );
-                      })}
-                  </div>
-
+                          )}
+                        </motion.div>
+                      );
+                    })}
                 </div>
 
-                <div className="flex items-center justify-between pt-4 border-t border-white/5">
-                  <div className="flex items-center gap-4">
-                    <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Métodos de Recebimento</label>
-                  </div>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => {
-                      const newPayments = [...checkoutPayments, { method: 'DINHEIRO', amount: 0 }];
-                      setCheckoutPayments(newPayments);
-                      setActivePaymentIndex(newPayments.length - 1);
-                    }}
-                    className="h-10 text-[10px] font-black uppercase tracking-widest text-[#0070f3] hover:bg-[#0070f3]/10 rounded-[40px]"
+              </div>
+
+              <div className="flex items-center justify-between pt-4 border-t border-white/5">
+                <div className="flex items-center gap-4">
+                  <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Métodos de Recebimento</label>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    const newPayments = [...checkoutPayments, { method: 'DINHEIRO', amount: 0, itemAssignments: [] }];
+                    setCheckoutPayments(newPayments);
+                    setActivePaymentIndex(newPayments.length - 1);
+                  }}
+                  className="h-10 text-[10px] font-black uppercase tracking-widest text-[#0070f3] hover:bg-[#0070f3]/10 rounded-[40px]"
+                >
+                  <Plus className="w-4 h-4 mr-2" /> Novo Método
+                </Button>
+              </div>
+
+              <div className="space-y-4">
+                {checkoutPayments.map((payment, index) => (
+                  <motion.div
+                    key={index}
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className={cn(
+                      "relative p-5 rounded-[32px] border transition-all duration-500 group cursor-pointer",
+                      activePaymentIndex === index
+                        ? "bg-[#0070f3]/5 border-[#0070f3] shadow-[0_0_30px_rgba(0,112,243,0.1)] ring-1 ring-[#0070f3]/50"
+                        : "bg-white/[0.02] border-white/5 hover:border-white/10"
+                    )}
+                    onClick={() => setActivePaymentIndex(index)}
                   >
-                    <Plus className="w-4 h-4 mr-2" /> Novo Método
-                  </Button>
-                </div>
-                
-                <div className="space-y-4">
-                  {checkoutPayments.map((payment, index) => (
-                    <motion.div 
-                      key={index}
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      className={cn(
-                        "relative p-5 rounded-[32px] border transition-all duration-500 group cursor-pointer",
-                        activePaymentIndex === index 
-                          ? "bg-[#0070f3]/5 border-[#0070f3] shadow-[0_0_30px_rgba(0,112,243,0.1)] ring-1 ring-[#0070f3]/50" 
-                          : "bg-white/[0.02] border-white/5 hover:border-white/10"
-                      )}
-                      onClick={() => setActivePaymentIndex(index)}
-                    >
-                      <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
-                        <div className="flex-1 w-full space-y-2">
-                          <div className="flex items-center justify-between">
-                            <label className="text-[9px] font-black tracking-widest uppercase text-muted-foreground flex items-center gap-1">
-                              {activePaymentIndex === index && <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 2 }} className="w-1.5 h-1.5 rounded-full bg-[#0070f3]" />}
-                              Forma de Pagamento
-                            </label>
-                            {activePaymentIndex === index && (
-                              <span className="text-[8px] font-black text-[#0070f3] uppercase tracking-widest">Ativo para Vinculação</span>
-                            )}
-                          </div>
-                          <Select 
-                            value={payment.method} 
-                            onValueChange={(val) => {
+                    <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
+                      <div className="flex-1 w-full space-y-2">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[9px] font-black tracking-widest uppercase text-muted-foreground flex items-center gap-1">
+                            {activePaymentIndex === index && <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 2 }} className="w-1.5 h-1.5 rounded-full bg-[#0070f3]" />}
+                            Forma de Pagamento
+                          </label>
+                          {activePaymentIndex === index && (
+                            <span className="text-[8px] font-black text-[#0070f3] uppercase tracking-widest">Ativo para Vinculação</span>
+                          )}
+                        </div>
+                        <Select
+                          value={payment.method}
+                          onValueChange={(val) => {
+                            const newPayments = [...checkoutPayments];
+                            newPayments[index].method = val;
+                            setCheckoutPayments(newPayments);
+                          }}
+                        >
+                          <SelectTrigger className="h-14 bg-[#05070a] border-white/10 font-black text-xs uppercase rounded-[20px] focus:ring-[#0070f3]/40">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="bg-[#05070a] border-white/10 rounded-[20px]">
+                            {['DINHEIRO', 'PIX', 'CARTÃO DE CRÉDITO', 'CARTÃO DE DÉBITO', 'VALE REFEIÇÃO', 'FIADO', 'SALDO'].map(method => (
+                              <SelectItem key={method} value={method} className="font-black uppercase tracking-widest text-[10px] py-4 focus:bg-[#0070f3]/10">
+                                {method}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="w-full md:w-40 space-y-2">
+                        <label className="text-[9px] font-black tracking-widest uppercase text-muted-foreground">Valor (R$)</label>
+                        <div className="relative">
+                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-black">R$</span>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            className="h-14 pl-10 bg-[#05070a] border-white/10 font-black text-lg tabular-nums rounded-[20px] focus:ring-[#0070f3]/40"
+                            value={payment.amount}
+                            onChange={(e) => {
                               const newPayments = [...checkoutPayments];
-                              newPayments[index].method = val;
+                              newPayments[index].amount = parseFloat(e.target.value) || 0;
                               setCheckoutPayments(newPayments);
                             }}
+                          />
+                        </div>
+                      </div>
+                      {checkoutPayments.length > 1 && (
+                        <div className="h-14 flex items-end">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const remaining = checkoutPayments.filter((_, i) => i !== index);
+                              setCheckoutPayments(remaining);
+                              if (activePaymentIndex === index) setActivePaymentIndex(remaining.length > 0 ? 0 : -1);
+                              else if (activePaymentIndex > index) setActivePaymentIndex(activePaymentIndex - 1);
+                            }}
+                            className="w-14 h-14 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-2xl border border-transparent hover:border-red-500/20"
                           >
-                            <SelectTrigger className="h-14 bg-[#05070a] border-white/10 font-black text-xs uppercase rounded-[20px] focus:ring-[#0070f3]/40">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent className="bg-[#05070a] border-white/10 rounded-[20px]">
-                              {['DINHEIRO', 'PIX', 'CARTÃO DE CRÉDITO', 'CARTÃO DE DÉBITO', 'VALE REFEIÇÃO', 'FIADO', 'SALDO'].map(method => (
-                                <SelectItem key={method} value={method} className="font-black uppercase tracking-widest text-[10px] py-4 focus:bg-[#0070f3]/10">
-                                  {method}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                            <X className="w-5 h-5" />
+                          </Button>
                         </div>
-                        <div className="w-full md:w-40 space-y-2">
-                          <label className="text-[9px] font-black tracking-widest uppercase text-muted-foreground">Valor (R$)</label>
-                          <div className="relative">
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-black">R$</span>
-                            <Input 
-                              type="number" 
-                              step="0.01"
-                              className="h-14 pl-10 bg-[#05070a] border-white/10 font-black text-lg tabular-nums rounded-[20px] focus:ring-[#0070f3]/40"
-                              value={payment.amount}
-                              onChange={(e) => {
-                                const newPayments = [...checkoutPayments];
-                                newPayments[index].amount = parseFloat(e.target.value) || 0;
-                                setCheckoutPayments(newPayments);
-                              }}
-                            />
-                          </div>
-                        </div>
-                        {checkoutPayments.length > 1 && (
-                          <div className="h-14 flex items-end">
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
+                      )}
+                    </div>
+
+                    {/* Item Assignments Section */}
+                    <div className="mt-2 px-4 pb-4">
+                      <div className="bg-white/[0.01] border border-white/5 rounded-xl overflow-hidden">
+                        <div className="px-3 py-2 border-b border-white/5 bg-white/[0.02] flex items-center justify-between">
+                          <span className="text-[8px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                            <Package className="w-3 h-3" /> Itens Atribuídos
+                          </span>
+                          <div className="flex gap-2 items-center">
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setCheckoutPayments(checkoutPayments.filter((_, i) => i !== index));
-                                if (activePaymentIndex === index) setActivePaymentIndex(0);
+                                const newPayments = [...checkoutPayments];
+                                const currentAssignments = newPayments[index].itemAssignments || [];
+
+                                order.items.forEach((item, itemIdx) => {
+                                  const { remaining } = getItemAssignmentStatus(itemIdx);
+                                  if (remaining > 0) {
+                                    const existingIdx = currentAssignments.findIndex(a => a.itemIndex === itemIdx);
+                                    if (existingIdx > -1) {
+                                      currentAssignments[existingIdx].quantity += remaining;
+                                    } else {
+                                      currentAssignments.push({ itemIndex: itemIdx, quantity: remaining });
+                                    }
+                                  }
+                                });
+
+                                newPayments[index].itemAssignments = currentAssignments;
+                                const newAmount = currentAssignments.reduce((sum, a) => sum + (order.items[a.itemIndex].price * a.quantity), 0);
+                                newPayments[index].amount = Number(newAmount.toFixed(2));
+                                setCheckoutPayments(newPayments);
                               }}
-                              className="w-14 h-14 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-2xl border border-transparent hover:border-red-500/20"
+                              className="h-6 px-2 text-[8px] font-black uppercase tracking-widest bg-white/5 text-white/60 hover:bg-white/10 rounded-md border border-white/10"
                             >
-                              <X className="w-5 h-5" />
+                              Vincular Tudo que Resta
                             </Button>
+                          </div>
+                        </div>
+
+                        {payment.itemAssignments && payment.itemAssignments.length > 0 ? (
+                          <div className="p-2 space-y-1">
+                            {payment.itemAssignments.map((assignment, aIdx) => (
+                              <div key={aIdx} className="flex items-center justify-between bg-white/[0.02] p-2 rounded-lg group/item">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[10px] font-black text-white/90 uppercase">{order.items[assignment.itemIndex].productName}</span>
+                                  <Badge variant="outline" className="h-4 px-1 text-[8px] border-white/10 text-muted-foreground">
+                                    {assignment.quantity}x R$ {order.items[assignment.itemIndex].price.toFixed(2)}
+                                  </Badge>
+                                </div>
+                                <div className="flex items-center gap-1 opacity-0 group-hover/item:opacity-100 transition-opacity">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 text-muted-foreground hover:text-white"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const newPayments = [...checkoutPayments];
+                                      const currentAssignments = [...(newPayments[index].itemAssignments || [])];
+                                      if (currentAssignments[aIdx].quantity > 1) {
+                                        currentAssignments[aIdx].quantity -= 1;
+                                      } else {
+                                        currentAssignments.splice(aIdx, 1);
+                                      }
+                                      newPayments[index].itemAssignments = currentAssignments;
+                                      const newAmount = currentAssignments.reduce((sum, a) => sum + (order.items[a.itemIndex].price * a.quantity), 0);
+                                      newPayments[index].amount = Number(newAmount.toFixed(2));
+                                      setCheckoutPayments(newPayments);
+                                    }}
+                                  >
+                                    <Minus className="w-3 h-3" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 text-muted-foreground hover:text-white"
+                                    disabled={checkoutPayments.reduce((sum, p) => {
+                                      const a = p.itemAssignments?.find(as => as.itemIndex === assignment.itemIndex);
+                                      return sum + (a?.quantity || 0);
+                                    }, 0) >= order.items[assignment.itemIndex].quantity}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const newPayments = [...checkoutPayments];
+                                      const currentAssignments = [...(newPayments[index].itemAssignments || [])];
+                                      currentAssignments[aIdx].quantity += 1;
+                                      newPayments[index].itemAssignments = currentAssignments;
+                                      const newAmount = currentAssignments.reduce((sum, a) => sum + (order.items[a.itemIndex].price * a.quantity), 0);
+                                      newPayments[index].amount = Number(newAmount.toFixed(2));
+                                      setCheckoutPayments(newPayments);
+                                    }}
+                                  >
+                                    <Plus className="w-3 h-3" />
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="p-4 text-center">
+                            <p className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground/40 italic">Nenhum item vinculado (Distribuição proporcional de custo)</p>
                           </div>
                         )}
                       </div>
-
-                      {/* Item Assignments Section */}
-                      <div className="mt-2 px-4 pb-4">
-                        <div className="bg-white/[0.01] border border-white/5 rounded-xl overflow-hidden">
-                          <div className="px-3 py-2 border-b border-white/5 bg-white/[0.02] flex items-center justify-between">
-                            <span className="text-[8px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
-                              <Package className="w-3 h-3" /> Itens Atribuídos
-                            </span>
-                            <div className="flex gap-2 items-center">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  const newPayments = [...checkoutPayments];
-                                  const currentAssignments = newPayments[index].itemAssignments || [];
-                                  
-                                  order.items.forEach((item, itemIdx) => {
-                                    const { remaining } = getItemAssignmentStatus(itemIdx);
-                                    if (remaining > 0) {
-                                      const existingIdx = currentAssignments.findIndex(a => a.itemIndex === itemIdx);
-                                      if (existingIdx > -1) {
-                                        currentAssignments[existingIdx].quantity += remaining;
-                                      } else {
-                                        currentAssignments.push({ itemIndex: itemIdx, quantity: remaining });
-                                      }
-                                    }
-                                  });
-                                  
-                                  newPayments[index].itemAssignments = currentAssignments;
-                                  const newAmount = currentAssignments.reduce((sum, a) => sum + (order.items[a.itemIndex].price * a.quantity), 0);
-                                  newPayments[index].amount = Number(newAmount.toFixed(2));
-                                  setCheckoutPayments(newPayments);
-                                }}
-                                className="h-6 px-2 text-[8px] font-black uppercase tracking-widest bg-white/5 text-white/60 hover:bg-white/10 rounded-md border border-white/10"
-                              >
-                                Vincular Tudo que Resta
-                              </Button>
-                            </div>
-                          </div>
-                          
-                          {payment.itemAssignments && payment.itemAssignments.length > 0 ? (
-                            <div className="p-2 space-y-1">
-                              {payment.itemAssignments.map((assignment, aIdx) => (
-                                <div key={aIdx} className="flex items-center justify-between bg-white/[0.02] p-2 rounded-lg group/item">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-[10px] font-black text-white/90 uppercase">{order.items[assignment.itemIndex].productName}</span>
-                                    <Badge variant="outline" className="h-4 px-1 text-[8px] border-white/10 text-muted-foreground">
-                                      {assignment.quantity}x R$ {order.items[assignment.itemIndex].price.toFixed(2)}
-                                    </Badge>
-                                  </div>
-                                  <div className="flex items-center gap-1 opacity-0 group-hover/item:opacity-100 transition-opacity">
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-6 w-6 text-muted-foreground hover:text-white"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        const newPayments = [...checkoutPayments];
-                                        const currentAssignments = [...(newPayments[index].itemAssignments || [])];
-                                        if (currentAssignments[aIdx].quantity > 1) {
-                                          currentAssignments[aIdx].quantity -= 1;
-                                        } else {
-                                          currentAssignments.splice(aIdx, 1);
-                                        }
-                                        newPayments[index].itemAssignments = currentAssignments;
-                                        const newAmount = currentAssignments.reduce((sum, a) => sum + (order.items[a.itemIndex].price * a.quantity), 0);
-                                        newPayments[index].amount = Number(newAmount.toFixed(2));
-                                        setCheckoutPayments(newPayments);
-                                      }}
-                                    >
-                                      <Minus className="w-3 h-3" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-6 w-6 text-muted-foreground hover:text-white"
-                                      disabled={checkoutPayments.reduce((sum, p) => {
-                                        const a = p.itemAssignments?.find(as => as.itemIndex === assignment.itemIndex);
-                                        return sum + (a?.quantity || 0);
-                                      }, 0) >= order.items[assignment.itemIndex].quantity}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        const newPayments = [...checkoutPayments];
-                                        const currentAssignments = [...(newPayments[index].itemAssignments || [])];
-                                        currentAssignments[aIdx].quantity += 1;
-                                        newPayments[index].itemAssignments = currentAssignments;
-                                        const newAmount = currentAssignments.reduce((sum, a) => sum + (order.items[a.itemIndex].price * a.quantity), 0);
-                                        newPayments[index].amount = Number(newAmount.toFixed(2));
-                                        setCheckoutPayments(newPayments);
-                                      }}
-                                    >
-                                      <Plus className="w-3 h-3" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="p-4 text-center">
-                              <p className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground/40 italic">Nenhum item vinculado (Distribuição proporcional de custo)</p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <div className="absolute -right-2 -top-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                         {calculateNet(payment.amount, payment.method).feeAmount > 0 && (
-                           <Badge className="bg-red-500/20 text-red-400 border-none text-[8px] font-bold">
-                             -R$ {calculateNet(payment.amount, payment.method).feeAmount.toFixed(2)} Taxa
-                           </Badge>
-                         )}
-                      </div>
-                    </motion.div>
-                  ))}
-                </div>
-                
-                <motion.div 
-                  layout
-                  className={cn(
-                    "p-8 rounded-[40px] flex flex-col items-center justify-center gap-2 transition-all duration-500",
-                    totalPaid.toFixed(2) >= (isPartialCheckout ? assignedItemsTotal : checkoutAmount).toFixed(2) 
-                      ? "bg-emerald-500/10 border border-emerald-500/30 shadow-[0_0_40px_rgba(16,185,129,0.1)]" 
-                      : "bg-red-500/10 border border-red-500/30 shadow-[0_0_40px_rgba(239,68,68,0.1)]"
-                  )}
-                >
-                  <div className="flex flex-col items-center gap-1">
-                    <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">Status do Recebimento</span>
-                    <h3 className={cn(
-                      "text-3xl font-black tabular-nums tracking-tighter",
-                      totalPaid.toFixed(2) >= (isPartialCheckout ? assignedItemsTotal : checkoutAmount).toFixed(2) ? "text-emerald-500" : "text-red-500"
-                    )}>
-                      {totalPaid.toFixed(2) >= (isPartialCheckout ? assignedItemsTotal : checkoutAmount).toFixed(2) 
-                        ? (totalPaid > (isPartialCheckout ? assignedItemsTotal : checkoutAmount)
-                            ? `+ R$ ${(totalPaid - (isPartialCheckout ? assignedItemsTotal : checkoutAmount)).toFixed(2)}`
-                            : "R$ 0.00")
-                        : `- R$ ${((isPartialCheckout ? assignedItemsTotal : checkoutAmount) - totalPaid).toFixed(2)}`}
-                    </h3>
-                  </div>
-
-                  <div className="flex items-center gap-3 mt-2">
-                    {totalPaid.toFixed(2) >= (isPartialCheckout ? assignedItemsTotal : checkoutAmount).toFixed(2) ? (
-                      <div className="flex items-center gap-2 px-4 py-2 bg-emerald-500 rounded-full text-black text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20">
-                        <CheckCircle2 className="w-4 h-4" />
-                        Conferência OK
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2 px-4 py-2 bg-red-500 rounded-full text-white text-[10px] font-black uppercase tracking-widest animate-pulse shadow-lg shadow-red-500/20">
-                        <AlertCircle className="w-4 h-4" />
-                        Aguardando Valores
-                      </div>
-                    )}
-                    
-                    {totalPaid > (isPartialCheckout ? assignedItemsTotal : checkoutAmount) && (
-                      <div className="px-4 py-2 bg-[#0070f3] rounded-full text-white text-[10px] font-black uppercase tracking-widest">
-                        Crédito Pendente
-                      </div>
-                    )}
-                  </div>
-                </motion.div>
+                    </div>
+                    <div className="absolute -right-2 -top-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {calculateNet(payment.amount, payment.method).feeAmount > 0 && (
+                        <Badge className="bg-red-500/20 text-red-400 border-none text-[8px] font-bold">
+                          -R$ {calculateNet(payment.amount, payment.method).feeAmount.toFixed(2)} Taxa
+                        </Badge>
+                      )}
+                    </div>
+                  </motion.div>
+                ))}
               </div>
-            </div>
-          </div>          <DialogFooter className="p-6 md:p-8 border-t border-white/5 bg-[#05070a] flex-row gap-4 flex-shrink-0">
 
-            <Button variant="ghost" onClick={() => setIsCheckoutOpen(false)} className="flex-1 h-16 font-black uppercase tracking-widest text-muted-foreground hover:text-white rounded-[40px]">Voltar</Button>
-            <Button 
-              onClick={handleFinalizeCheckout} 
-              disabled={isProcessing || (isPartialCheckout && assignedItemsTotal === 0) || totalPaid < (isPartialCheckout ? assignedItemsTotal : checkoutAmount) - 0.01}
-              className="flex-1 h-16 font-black uppercase tracking-widest bg-green-600 hover:bg-green-700 shadow-lg shadow-green-600/20 rounded-[40px]"
-            >
-              {isProcessing ? 'Processando...' : 'Finalizar Recebimento'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              <motion.div
+                layout
+                className={cn(
+                  "p-8 rounded-[40px] flex flex-col items-center justify-center gap-2 transition-all duration-500",
+                  totalPaid.toFixed(2) >= (isPartialCheckout ? assignedItemsTotal : checkoutAmount).toFixed(2)
+                    ? "bg-emerald-500/10 border border-emerald-500/30 shadow-[0_0_40px_rgba(16,185,129,0.1)]"
+                    : "bg-red-500/10 border border-red-500/30 shadow-[0_0_40px_rgba(239,68,68,0.1)]"
+                )}
+              >
+                <div className="flex flex-col items-center gap-1">
+                  <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">Status do Recebimento</span>
+                  <h3 className={cn(
+                    "text-3xl font-black tabular-nums tracking-tighter",
+                    totalPaid.toFixed(2) >= (isPartialCheckout ? assignedItemsTotal : checkoutAmount).toFixed(2) ? "text-emerald-500" : "text-red-500"
+                  )}>
+                    {totalPaid.toFixed(2) >= (isPartialCheckout ? assignedItemsTotal : checkoutAmount).toFixed(2)
+                      ? (totalPaid > (isPartialCheckout ? assignedItemsTotal : checkoutAmount)
+                        ? `+ R$ ${(totalPaid - (isPartialCheckout ? assignedItemsTotal : checkoutAmount)).toFixed(2)}`
+                        : "R$ 0.00")
+                      : `- R$ ${((isPartialCheckout ? assignedItemsTotal : checkoutAmount) - totalPaid).toFixed(2)}`}
+                  </h3>
+                </div>
+
+                <div className="flex items-center gap-3 mt-2">
+                  {totalPaid.toFixed(2) >= (isPartialCheckout ? assignedItemsTotal : checkoutAmount).toFixed(2) ? (
+                    <div className="flex items-center gap-2 px-4 py-2 bg-emerald-500 rounded-full text-black text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20">
+                      <CheckCircle2 className="w-4 h-4" />
+                      Conferência OK
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 px-4 py-2 bg-red-500 rounded-full text-white text-[10px] font-black uppercase tracking-widest animate-pulse shadow-lg shadow-red-500/20">
+                      <AlertCircle className="w-4 h-4" />
+                      Aguardando Valores
+                    </div>
+                  )}
+
+                  {totalPaid > (isPartialCheckout ? assignedItemsTotal : checkoutAmount) && (
+                    <div className="px-4 py-2 bg-[#0070f3] rounded-full text-white text-[10px] font-black uppercase tracking-widest">
+                      Crédito Pendente
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            </div>
+          </div>
+        </div>
+        <DialogFooter className="p-6 md:p-8 border-t border-white/5 bg-[#05070a] flex-row gap-4 flex-shrink-0">
+
+          <Button variant="ghost" onClick={() => setIsCheckoutOpen(false)} className="flex-1 h-16 font-black uppercase tracking-widest text-muted-foreground hover:text-white rounded-[40px]">Voltar</Button>
+          <Button
+            onClick={handleFinalizeCheckout}
+            disabled={isProcessing || (isPartialCheckout && assignedItemsTotal === 0) || totalPaid < (isPartialCheckout ? assignedItemsTotal : checkoutAmount) - 0.01}
+            className="flex-1 h-16 font-black uppercase tracking-widest bg-green-600 hover:bg-green-700 shadow-lg shadow-green-600/20 rounded-[40px]"
+          >
+            {isProcessing ? 'Processando...' : 'Finalizar Recebimento'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog >
 
       <ConfirmDialog
         isOpen={isDeleteConfirmOpen}
@@ -2146,282 +2150,282 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
         description="Deseja remover este item da comanda?"
       />
 
-      {/* Game Value Modal */}
-      <Dialog open={isGameValueModalOpen} onOpenChange={setIsGameValueModalOpen}>
-        <DialogContent className="bg-[#05070a] border-none max-w-md text-white p-0 overflow-hidden shadow-2xl rounded-3xl">
-          <div className="p-8 border-b border-white/5 relative bg-[#05070a]">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-[#0070f3]/10 flex items-center justify-center border border-[#0070f3]/20 shadow-lg">
-                <Gamepad2 className="w-7 h-7 text-[#0070f3]" />
-              </div>
-              <div>
-                <DialogTitle className="text-2xl font-black uppercase tracking-tighter leading-none mb-1">{selectedGame?.name}</DialogTitle>
-                <p className="text-[10px] font-bold tracking-widest uppercase text-[#0070f3]/60">Defina o valor do jogo</p>
-              </div>
-            </div>
+  {/* Game Value Modal */ }
+  <Dialog open={isGameValueModalOpen} onOpenChange={setIsGameValueModalOpen}>
+    <DialogContent className="bg-[#05070a] border-none max-w-md text-white p-0 overflow-hidden shadow-2xl rounded-3xl">
+      <div className="p-8 border-b border-white/5 relative bg-[#05070a]">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-[#0070f3]/10 flex items-center justify-center border border-[#0070f3]/20 shadow-lg">
+            <Gamepad2 className="w-7 h-7 text-[#0070f3]" />
           </div>
-          <div className="p-8 space-y-6">
-            <div className="flex bg-[#0d1117] p-1.5 rounded-2xl border border-white/5">
-              <Button 
-                variant="ghost" 
-                onClick={() => setEntryType('debit')}
-                className={cn(
-                  "flex-1 h-12 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
-                  entryType === 'debit' ? "bg-[#0070f3] text-white" : "text-muted-foreground hover:text-white"
-                )}
-              >
-                Débito (Gasto)
-              </Button>
-              <Button 
-                variant="ghost" 
-                onClick={() => setEntryType('credit')}
-                className={cn(
-                  "flex-1 h-12 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
-                  entryType === 'credit' ? "bg-green-500 text-white" : "text-muted-foreground hover:text-white"
-                )}
-              >
-                Crédito (Prêmio)
-              </Button>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Valor do Lançamento (R$)</label>
-              <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">R$</span>
-                <Input 
-                  type="number" 
-                  step="0.01"
-                  autoFocus
-                  className="h-20 pl-12 bg-[#0d1117] border-white/5 text-3xl font-black focus:ring-[#0070f3]/20 focus:border-[#0070f3] rounded-2xl"
-                  value={gameValue}
-                  onChange={(e) => setGameValue(e.target.value)}
-                  placeholder="0.00"
-                />
-              </div>
-            </div>
+          <div>
+            <DialogTitle className="text-2xl font-black uppercase tracking-tighter leading-none mb-1">{selectedGame?.name}</DialogTitle>
+            <p className="text-[10px] font-bold tracking-widest uppercase text-[#0070f3]/60">Defina o valor do jogo</p>
           </div>
-          <DialogFooter className="p-8 border-t border-white/5 bg-[#05070a] flex-row gap-4">
-            <Button variant="ghost" onClick={() => setIsGameValueModalOpen(false)} className="flex-1 h-14 font-black uppercase tracking-widest text-muted-foreground hover:text-white rounded-xl">Cancelar</Button>
-            <Button 
-              onClick={() => handleAddGame(selectedGame!, parseFloat(gameValue) || 0)} 
-              disabled={!gameValue || isProcessing}
-              className="flex-1 h-14 font-black uppercase tracking-widest bg-[#0070f3] hover:bg-[#0070f3]/90 rounded-xl shadow-lg shadow-[#0070f3]/20"
-            >
-              Confirmar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Product Value Modal (Dose Personalizada) */}
-      <Dialog open={isProductValueModalOpen} onOpenChange={setIsProductValueModalOpen}>
-        <DialogContent className="bg-[#05070a] border-none max-w-md text-white p-0 overflow-hidden shadow-2xl rounded-3xl">
-          <div className="p-8 border-b border-white/5 relative bg-[#05070a]">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-[#0070f3]/10 flex items-center justify-center border border-[#0070f3]/20 shadow-lg">
-                <Package className="w-7 h-7 text-[#0070f3]" />
-              </div>
-              <div>
-                <DialogTitle className="text-2xl font-black uppercase tracking-tighter leading-none mb-1">{selectedProduct?.name}</DialogTitle>
-                <p className="text-[10px] font-bold tracking-widest uppercase text-[#0070f3]/60">Defina o valor do item</p>
-              </div>
-            </div>
-            {selectedProduct?.isDoseControl && (
-              <div className="mt-4 p-4 bg-[#0070f3]/5 border border-[#0070f3]/10 rounded-2xl">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-[#0070f3]/10 flex items-center justify-center text-[#0070f3]">
-                    <FlaskConical className="w-5 h-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground">Garrafa Vinculada</p>
-                    <p className="text-xs font-bold text-white truncate">
-                      {selectedProduct.linkedProductId ? (
-                        <>
-                          {products.find(p => p.id === selectedProduct.linkedProductId)?.name || 'Garrafa não encontrada'}
-                          <span className="text-[#0070f3] ml-2 font-black">
-                            ({products.find(p => p.id === selectedProduct.linkedProductId)?.currentBottleVolume || 0}ml rest.)
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          Controle Próprio
-                          <span className="text-[#0070f3] ml-2 font-black">
-                            ({selectedProduct.currentBottleVolume || 0}ml rest.)
-                          </span>
-                        </>
-                      )}
-                    </p>
-                  </div>
-                </div>
-              </div>
+        </div>
+      </div>
+      <div className="p-8 space-y-6">
+        <div className="flex bg-[#0d1117] p-1.5 rounded-2xl border border-white/5">
+          <Button
+            variant="ghost"
+            onClick={() => setEntryType('debit')}
+            className={cn(
+              "flex-1 h-12 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+              entryType === 'debit' ? "bg-[#0070f3] text-white" : "text-muted-foreground hover:text-white"
             )}
+          >
+            Débito (Gasto)
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={() => setEntryType('credit')}
+            className={cn(
+              "flex-1 h-12 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+              entryType === 'credit' ? "bg-green-500 text-white" : "text-muted-foreground hover:text-white"
+            )}
+          >
+            Crédito (Prêmio)
+          </Button>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Valor do Lançamento (R$)</label>
+          <div className="relative">
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">R$</span>
+            <Input
+              type="number"
+              step="0.01"
+              autoFocus
+              className="h-20 pl-12 bg-[#0d1117] border-white/5 text-3xl font-black focus:ring-[#0070f3]/20 focus:border-[#0070f3] rounded-2xl"
+              value={gameValue}
+              onChange={(e) => setGameValue(e.target.value)}
+              placeholder="0.00"
+            />
           </div>
-          <div className="p-8 space-y-6">
-            <div className="space-y-2">
-              <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Valor do Lançamento (R$)</label>
-              <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">R$</span>
-                <Input 
-                  type="number" 
-                  step="0.01"
-                  autoFocus
-                  className="h-20 pl-12 bg-[#0d1117] border-white/5 text-3xl font-black focus:ring-[#0070f3]/20 focus:border-[#0070f3] rounded-2xl"
-                  value={productValue}
-                  onChange={(e) => setProductValue(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && productValue) {
-                      handleAddItem(selectedProduct!, parseFloat(productValue));
-                      setIsProductValueModalOpen(false);
-                      setProductValue('');
-                    }
-                  }}
-                  placeholder="0.00"
-                />
+        </div>
+      </div>
+      <DialogFooter className="p-8 border-t border-white/5 bg-[#05070a] flex-row gap-4">
+        <Button variant="ghost" onClick={() => setIsGameValueModalOpen(false)} className="flex-1 h-14 font-black uppercase tracking-widest text-muted-foreground hover:text-white rounded-xl">Cancelar</Button>
+        <Button
+          onClick={() => handleAddGame(selectedGame!, parseFloat(gameValue) || 0)}
+          disabled={!gameValue || isProcessing}
+          className="flex-1 h-14 font-black uppercase tracking-widest bg-[#0070f3] hover:bg-[#0070f3]/90 rounded-xl shadow-lg shadow-[#0070f3]/20"
+        >
+          Confirmar
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
+
+  {/* Product Value Modal (Dose Personalizada) */ }
+  <Dialog open={isProductValueModalOpen} onOpenChange={setIsProductValueModalOpen}>
+    <DialogContent className="bg-[#05070a] border-none max-w-md text-white p-0 overflow-hidden shadow-2xl rounded-3xl">
+      <div className="p-8 border-b border-white/5 relative bg-[#05070a]">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-[#0070f3]/10 flex items-center justify-center border border-[#0070f3]/20 shadow-lg">
+            <Package className="w-7 h-7 text-[#0070f3]" />
+          </div>
+          <div>
+            <DialogTitle className="text-2xl font-black uppercase tracking-tighter leading-none mb-1">{selectedProduct?.name}</DialogTitle>
+            <p className="text-[10px] font-bold tracking-widest uppercase text-[#0070f3]/60">Defina o valor do item</p>
+          </div>
+        </div>
+        {selectedProduct?.isDoseControl && (
+          <div className="mt-4 p-4 bg-[#0070f3]/5 border border-[#0070f3]/10 rounded-2xl">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-[#0070f3]/10 flex items-center justify-center text-[#0070f3]">
+                <FlaskConical className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-black tracking-widest uppercase text-muted-foreground">Garrafa Vinculada</p>
+                <p className="text-xs font-bold text-white truncate">
+                  {selectedProduct.linkedProductId ? (
+                    <>
+                      {products.find(p => p.id === selectedProduct.linkedProductId)?.name || 'Garrafa não encontrada'}
+                      <span className="text-[#0070f3] ml-2 font-black">
+                        ({products.find(p => p.id === selectedProduct.linkedProductId)?.currentBottleVolume || 0}ml rest.)
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      Controle Próprio
+                      <span className="text-[#0070f3] ml-2 font-black">
+                        ({selectedProduct.currentBottleVolume || 0}ml rest.)
+                      </span>
+                    </>
+                  )}
+                </p>
               </div>
             </div>
           </div>
-          <DialogFooter className="p-8 border-t border-white/5 bg-[#05070a] flex-row gap-4">
-            <Button variant="ghost" onClick={() => setIsProductValueModalOpen(false)} className="flex-1 h-14 font-black uppercase tracking-widest text-muted-foreground hover:text-white rounded-xl">Cancelar</Button>
-            <Button 
-              onClick={() => {
-                if (productValue) {
+        )}
+      </div>
+      <div className="p-8 space-y-6">
+        <div className="space-y-2">
+          <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Valor do Lançamento (R$)</label>
+          <div className="relative">
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">R$</span>
+            <Input
+              type="number"
+              step="0.01"
+              autoFocus
+              className="h-20 pl-12 bg-[#0d1117] border-white/5 text-3xl font-black focus:ring-[#0070f3]/20 focus:border-[#0070f3] rounded-2xl"
+              value={productValue}
+              onChange={(e) => setProductValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && productValue) {
                   handleAddItem(selectedProduct!, parseFloat(productValue));
                   setIsProductValueModalOpen(false);
                   setProductValue('');
                 }
               }}
-              disabled={!productValue || isProcessing}
-              className="flex-1 h-14 font-black uppercase tracking-widest bg-[#0070f3] hover:bg-[#0070f3]/90 rounded-xl shadow-lg shadow-[#0070f3]/20"
-            >
-              Confirmar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              placeholder="0.00"
+            />
+          </div>
+        </div>
+      </div>
+      <DialogFooter className="p-8 border-t border-white/5 bg-[#05070a] flex-row gap-4">
+        <Button variant="ghost" onClick={() => setIsProductValueModalOpen(false)} className="flex-1 h-14 font-black uppercase tracking-widest text-muted-foreground hover:text-white rounded-xl">Cancelar</Button>
+        <Button
+          onClick={() => {
+            if (productValue) {
+              handleAddItem(selectedProduct!, parseFloat(productValue));
+              setIsProductValueModalOpen(false);
+              setProductValue('');
+            }
+          }}
+          disabled={!productValue || isProcessing}
+          className="flex-1 h-14 font-black uppercase tracking-widest bg-[#0070f3] hover:bg-[#0070f3]/90 rounded-xl shadow-lg shadow-[#0070f3]/20"
+        >
+          Confirmar
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 
-      {/* Avulso Modal */}
-      <Dialog open={isAvulsoModalOpen} onOpenChange={(open) => {
-        setIsAvulsoModalOpen(open);
-        if (open) setEntryType('debit');
-      }}>
-        <DialogContent className="bg-[#05070a] border-none max-w-md text-white p-0 overflow-hidden shadow-2xl rounded-3xl">
-          <div className="p-8 border-b border-white/5 relative bg-[#05070a]">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-[#0070f3]/10 flex items-center justify-center border border-[#0070f3]/20 shadow-lg">
-                <PlusCircle className="w-7 h-7 text-[#0070f3]" />
+  {/* Avulso Modal */ }
+  <Dialog open={isAvulsoModalOpen} onOpenChange={(open) => {
+    setIsAvulsoModalOpen(open);
+    if (open) setEntryType('debit');
+  }}>
+    <DialogContent className="bg-[#05070a] border-none max-w-md text-white p-0 overflow-hidden shadow-2xl rounded-3xl">
+      <div className="p-8 border-b border-white/5 relative bg-[#05070a]">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-[#0070f3]/10 flex items-center justify-center border border-[#0070f3]/20 shadow-lg">
+            <PlusCircle className="w-7 h-7 text-[#0070f3]" />
+          </div>
+          <div>
+            <DialogTitle className="text-2xl font-black uppercase tracking-tighter leading-none mb-1">Lançamento Avulso</DialogTitle>
+            <p className="text-[10px] font-bold tracking-widest uppercase text-[#0070f3]/60">Adicione qualquer item com valor aberto</p>
+          </div>
+        </div>
+      </div>
+      <div className="p-8 space-y-6">
+        <div className="flex bg-[#0d1117] p-1.5 rounded-2xl border border-white/5">
+          <Button
+            variant="ghost"
+            onClick={() => setEntryType('debit')}
+            className={cn(
+              "flex-1 h-12 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+              entryType === 'debit' ? "bg-[#0070f3] text-white" : "text-muted-foreground hover:text-white"
+            )}
+          >
+            Débito (Gasto)
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={() => setEntryType('credit')}
+            className={cn(
+              "flex-1 h-12 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+              entryType === 'credit' ? "bg-green-500 text-white" : "text-muted-foreground hover:text-white"
+            )}
+          >
+            Crédito (Prêmio)
+          </Button>
+        </div>
+        <div className="space-y-2">
+          <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Buscar Produto ou Digitar Nome</label>
+          <div className="relative">
+            <Input
+              placeholder="NOME DO ITEM..."
+              value={avulsoSearch}
+              onChange={(e) => {
+                setAvulsoSearch(e.target.value);
+                const found = products.find(p => p.name.toLowerCase() === e.target.value.toLowerCase());
+                if (found) {
+                  setSelectedAvulsoProduct(found);
+                  setAvulsoPrice((found.price || 0).toString());
+                  setAvulsoCost((found.cost || 0).toString());
+                } else {
+                  setSelectedAvulsoProduct(null);
+                }
+              }}
+              className="h-14 bg-[#0d1117] border-white/5 rounded-2xl text-sm font-bold focus:ring-[#0070f3]/20 focus:border-[#0070f3]"
+            />
+            {avulsoSearch && !selectedAvulsoProduct && (
+              <div className="absolute z-10 w-full mt-2 bg-[#0d1117] border border-white/5 rounded-2xl overflow-hidden shadow-2xl">
+                {products.filter(p => p.name.toLowerCase().includes(avulsoSearch.toLowerCase())).slice(0, 5).map(p => (
+                  <button
+                    key={p.id}
+                    onClick={() => {
+                      setSelectedAvulsoProduct(p);
+                      setAvulsoSearch(p.name);
+                      setAvulsoPrice((p.price || 0).toString());
+                      setAvulsoCost((p.cost || 0).toString());
+                    }}
+                    className="w-full p-4 text-left hover:bg-white/5 text-xs font-bold uppercase tracking-widest border-b border-white/5 last:border-0 transition-colors"
+                  >
+                    {p.name} - R$ {p.price.toFixed(2)}
+                  </button>
+                ))}
               </div>
-              <div>
-                <DialogTitle className="text-2xl font-black uppercase tracking-tighter leading-none mb-1">Lançamento Avulso</DialogTitle>
-                <p className="text-[10px] font-bold tracking-widest uppercase text-[#0070f3]/60">Adicione qualquer item com valor aberto</p>
-              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Preço Venda (R$)</label>
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold text-xs">R$</span>
+              <Input
+                type="number"
+                step="0.01"
+                value={avulsoPrice}
+                onChange={(e) => setAvulsoPrice(e.target.value)}
+                className="h-14 pl-10 bg-[#0d1117] border-white/5 rounded-xl text-sm font-bold focus:ring-[#0070f3]/20 focus:border-[#0070f3]"
+                placeholder="0.00"
+              />
             </div>
           </div>
-          <div className="p-8 space-y-6">
-            <div className="flex bg-[#0d1117] p-1.5 rounded-2xl border border-white/5">
-              <Button 
-                variant="ghost" 
-                onClick={() => setEntryType('debit')}
-                className={cn(
-                  "flex-1 h-12 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
-                  entryType === 'debit' ? "bg-[#0070f3] text-white" : "text-muted-foreground hover:text-white"
-                )}
-              >
-                Débito (Gasto)
-              </Button>
-              <Button 
-                variant="ghost" 
-                onClick={() => setEntryType('credit')}
-                className={cn(
-                  "flex-1 h-12 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
-                  entryType === 'credit' ? "bg-green-500 text-white" : "text-muted-foreground hover:text-white"
-                )}
-              >
-                Crédito (Prêmio)
-              </Button>
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Buscar Produto ou Digitar Nome</label>
-              <div className="relative">
-                <Input 
-                  placeholder="NOME DO ITEM..."
-                  value={avulsoSearch}
-                  onChange={(e) => {
-                    setAvulsoSearch(e.target.value);
-                    const found = products.find(p => p.name.toLowerCase() === e.target.value.toLowerCase());
-                    if (found) {
-                      setSelectedAvulsoProduct(found);
-                      setAvulsoPrice((found.price || 0).toString());
-                      setAvulsoCost((found.cost || 0).toString());
-                    } else {
-                      setSelectedAvulsoProduct(null);
-                    }
-                  }}
-                  className="h-14 bg-[#0d1117] border-white/5 rounded-2xl text-sm font-bold focus:ring-[#0070f3]/20 focus:border-[#0070f3]"
-                />
-                {avulsoSearch && !selectedAvulsoProduct && (
-                  <div className="absolute z-10 w-full mt-2 bg-[#0d1117] border border-white/5 rounded-2xl overflow-hidden shadow-2xl">
-                    {products.filter(p => p.name.toLowerCase().includes(avulsoSearch.toLowerCase())).slice(0, 5).map(p => (
-                      <button
-                        key={p.id}
-                        onClick={() => {
-                          setSelectedAvulsoProduct(p);
-                          setAvulsoSearch(p.name);
-                          setAvulsoPrice((p.price || 0).toString());
-                          setAvulsoCost((p.cost || 0).toString());
-                        }}
-                        className="w-full p-4 text-left hover:bg-white/5 text-xs font-bold uppercase tracking-widest border-b border-white/5 last:border-0 transition-colors"
-                      >
-                        {p.name} - R$ {p.price.toFixed(2)}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Preço Venda (R$)</label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold text-xs">R$</span>
-                  <Input 
-                    type="number"
-                    step="0.01"
-                    value={avulsoPrice}
-                    onChange={(e) => setAvulsoPrice(e.target.value)}
-                    className="h-14 pl-10 bg-[#0d1117] border-white/5 rounded-xl text-sm font-bold focus:ring-[#0070f3]/20 focus:border-[#0070f3]"
-                    placeholder="0.00"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Preço Custo (R$)</label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold text-xs">R$</span>
-                  <Input 
-                    type="number"
-                    step="0.01"
-                    value={avulsoCost}
-                    onChange={(e) => setAvulsoCost(e.target.value)}
-                    className="h-14 pl-10 bg-[#0d1117] border-white/5 rounded-xl text-sm font-bold focus:ring-[#0070f3]/20 focus:border-[#0070f3]"
-                    placeholder="0.00"
-                  />
-                </div>
-              </div>
+          <div className="space-y-2">
+            <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Preço Custo (R$)</label>
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold text-xs">R$</span>
+              <Input
+                type="number"
+                step="0.01"
+                value={avulsoCost}
+                onChange={(e) => setAvulsoCost(e.target.value)}
+                className="h-14 pl-10 bg-[#0d1117] border-white/5 rounded-xl text-sm font-bold focus:ring-[#0070f3]/20 focus:border-[#0070f3]"
+                placeholder="0.00"
+              />
             </div>
           </div>
-          <DialogFooter className="p-8 border-t border-white/5 bg-[#05070a] flex-row gap-4">
-            <Button variant="ghost" onClick={() => setIsAvulsoModalOpen(false)} className="flex-1 h-14 font-black uppercase tracking-widest text-muted-foreground hover:text-white rounded-xl">Cancelar</Button>
-            <Button 
-              onClick={() => handleManualAdd(avulsoSearch, parseFloat(avulsoPrice) || 0, parseFloat(avulsoCost) || 0, selectedAvulsoProduct || undefined)}
-              disabled={!avulsoSearch || !avulsoPrice || isProcessing}
-              className="flex-1 h-14 font-black uppercase tracking-widest bg-[#0070f3] hover:bg-[#0070f3]/90 rounded-xl shadow-lg shadow-[#0070f3]/20"
-            >
-              {isProcessing ? 'Adicionando...' : 'Confirmar'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </div>
+      </div>
+      <DialogFooter className="p-8 border-t border-white/5 bg-[#05070a] flex-row gap-4">
+        <Button variant="ghost" onClick={() => setIsAvulsoModalOpen(false)} className="flex-1 h-14 font-black uppercase tracking-widest text-muted-foreground hover:text-white rounded-xl">Cancelar</Button>
+        <Button
+          onClick={() => handleManualAdd(avulsoSearch, parseFloat(avulsoPrice) || 0, parseFloat(avulsoCost) || 0, selectedAvulsoProduct || undefined)}
+          disabled={!avulsoSearch || !avulsoPrice || isProcessing}
+          className="flex-1 h-14 font-black uppercase tracking-widest bg-[#0070f3] hover:bg-[#0070f3]/90 rounded-xl shadow-lg shadow-[#0070f3]/20"
+        >
+          {isProcessing ? 'Adicionando...' : 'Confirmar'}
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
     </>
   );
 };
