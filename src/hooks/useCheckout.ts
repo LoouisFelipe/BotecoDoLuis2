@@ -41,6 +41,9 @@ export function useCheckout() {
       const finalAmount = checkoutAmount;
       const targetCustomerId = checkoutCustomerId === 'none' ? '' : (checkoutCustomerId || order.customerId);
       
+      // Get the shift date from when the order was created
+      const orderShiftDate = checkoutDate || getShiftDate(order.createdAt);
+      
       // Items to process for inventory and cost
       // If partial, only process items that were explicitly assigned
       // If not partial, process all items in the order
@@ -101,8 +104,8 @@ export function useCheckout() {
       if (shouldCloseOrder) {
         batch.update(orderRef, {
           status: 'closed',
-          closedAt: serverTimestamp(),
-          closedShiftDate: getShiftDate(),
+          closedAt: new Date(),
+          closedShiftDate: orderShiftDate,
           totalAmount: isPartial ? (order.totalAmount - newTotal) : finalAmount,
           payments: checkoutPayments.map(p => ({
             method: p.method,
@@ -135,15 +138,15 @@ export function useCheckout() {
 
           const totalPaid = checkoutPayments.reduce((sum, p) => sum + p.amount, 0);
           
-          // In partial checkout, surplus logic might be different, but usually we just pay exact.
-          const surplus = isPartial ? 0 : (totalPaid - finalAmount);
+          // In partial checkout, if totalPaid > finalAmount, it should still generate surplus credit
+          const surplus = Math.max(0, totalPaid - finalAmount);
           const balanceImpact = surplus - fiadoAmount - saldoUsedAmount;
 
           batch.update(customerRef, {
             totalSpent: increment(finalAmount),
             orderCount: shouldCloseOrder ? increment(1) : 0,
             balance: increment(balanceImpact),
-            lastVisit: serverTimestamp()
+            lastVisit: new Date()
           });
         }
       }
@@ -270,7 +273,7 @@ export function useCheckout() {
             modalityName,
             amount: item.subtotal,
             date: serverTimestamp(),
-            dataExpediente: getShiftDate(),
+            dataExpediente: orderShiftDate,
             userId: user.uid,
             userName: user.displayName || user.email,
             orderId: order.id
@@ -305,7 +308,7 @@ export function useCheckout() {
           cost: paymentCost,
           description: `${isPartial ? '[PARCIAL] ' : ''}Comanda: ${order.customerName} (${payment.method})${checkoutDiscount > 0 ? ` (Desc: R$ ${checkoutDiscount})` : ''}${checkoutAdjustment !== 0 ? ` (Ajuste: R$ ${checkoutAdjustment})` : ''}`,
           date: serverTimestamp(),
-          dataExpediente: getShiftDate(),
+          dataExpediente: orderShiftDate,
           orderId: order.id,
           customerId: targetCustomerId,
           paymentMethod: payment.method,

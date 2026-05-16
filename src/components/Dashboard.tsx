@@ -272,6 +272,28 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
   const [checkoutDate, setCheckoutDate] = useState(getShiftDate());
   const [checkoutCustomerId, setCheckoutCustomerId] = useState(order.customerId || 'none');
   const [isPartialCheckout, setIsPartialCheckout] = useState(false);
+  const [activePaymentIndex, setActivePaymentIndex] = useState(0);
+  const [checkoutItemSearch, setCheckoutItemSearch] = useState('');
+
+  // Helper to calculate item status for checkout
+  const getItemAssignmentStatus = (itemIdx: number) => {
+    const item = order.items[itemIdx];
+    if (!item) return { assigned: 0, remaining: 0, status: 'none' };
+    
+    const assignedAcrossAll = checkoutPayments.reduce((sum, p) => {
+      const assignment = p.itemAssignments?.find(a => a.itemIndex === itemIdx);
+      return sum + (assignment?.quantity || 0);
+    }, 0);
+    
+    const remaining = item.quantity - assignedAcrossAll;
+    
+    let status: 'available' | 'partial' | 'paid' = 'available';
+    if (assignedAcrossAll === 0) status = 'available';
+    else if (remaining > 0) status = 'partial';
+    else status = 'paid';
+    
+    return { assigned: assignedAcrossAll, remaining, status };
+  };
 
   // Derive assigned items total for partial checkouts
   const assignedItemsTotal = React.useMemo(() => {
@@ -1508,8 +1530,8 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                     variant="ghost" 
                     size="sm"
                     onClick={() => {
-                      const balance = customers.find(c => c.id === checkoutCustomerId)?.balance || 0;
-                      const needed = checkoutAmount - checkoutPayments.reduce((sum, p) => sum + p.amount, 0);
+                      const target = isPartialCheckout ? assignedItemsTotal : checkoutAmount;
+                      const needed = target - checkoutPayments.reduce((sum, p) => sum + p.amount, 0);
                       const use = Math.min(balance, needed);
                       if (use > 0) {
                         setCheckoutPayments([...checkoutPayments, { method: 'SALDO', amount: use }]);
@@ -1595,9 +1617,13 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
               </div>
 
               <div className="space-y-4 pt-4">
-                <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Divisão de Pagamento</label>
+                    <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Painel de Seleção de Itens</label>
+                    <Badge variant="outline" className="h-5 px-2 text-[8px] border-[#0070f3]/30 text-[#0070f3] bg-[#0070f3]/5 uppercase font-black">
+                      {order.items.length} ITENS NO TOTAL
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-2">
                     <Button
                       variant="outline"
                       size="sm"
@@ -1606,6 +1632,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                         setIsPartialCheckout(newVal);
                         if (newVal) {
                           setCheckoutPayments([]);
+                          setActivePaymentIndex(0);
                         } else {
                           const total = order.totalAmount - checkoutDiscount + checkoutAdjustment;
                           setCheckoutAmount(total);
@@ -1613,22 +1640,231 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                         }
                       }}
                       className={cn(
-                        "h-8 px-3 text-[8px] font-black uppercase tracking-widest rounded-full transition-all border-white/5",
+                        "h-10 px-4 text-[9px] font-black uppercase tracking-widest rounded-[40px] transition-all border-white/5",
                         isPartialCheckout 
                           ? "bg-orange-500/20 text-orange-400 border-orange-500/30 hover:bg-orange-500/30" 
                           : "bg-white/5 text-muted-foreground hover:bg-white/10"
                       )}
                     >
-                      {isPartialCheckout ? '✓ Pagamento Parcial' : 'Pagamento Parcial'}
+                      {isPartialCheckout ? '✓ Modo Itens Ativo' : 'Ativar Pagto por Item'}
                     </Button>
+                  </div>
+                </div>
+
+                {/* Central Item Selection Panel - Command Center Style */}
+                <div className="space-y-6">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-1">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
+                        <Package className="w-3 h-3" /> Distribuição de Itens
+                      </span>
+                      <p className="text-[8px] text-muted-foreground/60 uppercase font-bold tracking-widest mt-1">Vincule os itens aos pagamentos</p>
+                    </div>
+                    <div className="flex flex-1 max-w-md relative group">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground group-focus-within:text-[#0070f3] transition-colors" />
+                      <Input 
+                        placeholder="BUSCAR ITEM NA COMANDA..."
+                        value={checkoutItemSearch}
+                        onChange={(e) => setCheckoutItemSearch(e.target.value)}
+                        className="h-10 pl-10 bg-white/[0.02] border-white/5 rounded-2xl text-[10px] font-bold uppercase tracking-widest focus:ring-[#0070f3]/20 focus:border-[#0070f3]/40"
+                      />
+                      {checkoutItemSearch && (
+                        <button 
+                          onClick={() => setCheckoutItemSearch('')}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-white"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-[#0070f3]/10 text-[#0070f3] border border-[#0070f3]/20 text-[8px] font-black uppercase tracking-widest px-3 h-6 rounded-lg">
+                        {order.items.length} TOTAL
+                      </Badge>
+                      {activePaymentIndex !== -1 && (
+                         <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const newPayments = [...checkoutPayments];
+                            newPayments[activePaymentIndex].itemAssignments = [];
+                            newPayments[activePaymentIndex].amount = 0;
+                            setCheckoutPayments(newPayments);
+                          }}
+                          className="h-6 px-2 text-[8px] font-black uppercase tracking-widest text-red-400 hover:text-red-500 hover:bg-red-500/10"
+                        >
+                          Limpar Ativo
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar p-1">
+                    {order.items
+                      .map((item, originalIdx) => ({ item, originalIdx }))
+                      .filter(({ item }) => item.productName.toLowerCase().includes(checkoutItemSearch.toLowerCase()))
+                      .map(({ item, originalIdx: idx }) => {
+                        const { assigned, remaining, status } = getItemAssignmentStatus(idx);
+                        const progress = (assigned / item.quantity) * 100;
+                        const assignedToActive = checkoutPayments[activePaymentIndex]?.itemAssignments?.find(a => a.itemIndex === idx)?.quantity || 0;
+
+                        return (
+                          <motion.div
+                            key={`select-item-${idx}`}
+                            layout
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            whileHover={status !== 'paid' && activePaymentIndex !== -1 ? { y: -2, borderColor: '#0070f3' } : {}}
+                            onClick={() => {
+                              if (status === 'paid' || activePaymentIndex === -1) return;
+                              const newPayments = [...checkoutPayments];
+                              const currentAssignments = [...(newPayments[activePaymentIndex].itemAssignments || [])];
+                              const existingIdx = currentAssignments.findIndex(a => a.itemIndex === idx);
+                              
+                              if (existingIdx > -1) {
+                                currentAssignments[existingIdx].quantity += 1;
+                              } else {
+                                currentAssignments.push({ itemIndex: idx, quantity: 1 });
+                              }
+                              
+                              newPayments[activePaymentIndex].itemAssignments = currentAssignments;
+                              const newAmount = currentAssignments.reduce((sum, a) => sum + (order.items[a.itemIndex].price * a.quantity), 0);
+                              newPayments[activePaymentIndex].amount = Number(newAmount.toFixed(2));
+                              setCheckoutPayments(newPayments);
+                            }}
+                            className={cn(
+                              "relative flex flex-col justify-between p-5 rounded-[32px] border transition-all duration-300 group overflow-hidden cursor-pointer h-32",
+                              status === 'paid' 
+                                ? "bg-emerald-500/5 border-emerald-500/20 opacity-60 cursor-default" 
+                                : activePaymentIndex === -1
+                                  ? "bg-white/[0.02] border-white/5 opacity-40 cursor-not-allowed"
+                                  : assignedToActive > 0
+                                    ? "bg-[#0070f3]/10 border-[#0070f3] shadow-[0_0_20px_rgba(0,112,243,0.15)]"
+                                    : "bg-white/[0.03] border-white/10 hover:bg-white/[0.05]"
+                            )}
+                          >
+                            {/* Progress Indicator */}
+                            <div className="absolute bottom-0 left-0 h-1 bg-emerald-500/30 transition-all duration-500" style={{ width: `${progress}%` }} />
+                            
+                            <div className="flex justify-between items-start gap-3 relative z-10">
+                              <div className="flex-1 min-w-0">
+                                <h4 className="text-xs font-black uppercase tracking-widest text-white/90 truncate mb-1">
+                                  {item.productName}
+                                </h4>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[14px] font-black text-[#0070f3] tabular-nums">
+                                    R$ {item.price.toFixed(2)}
+                                  </span>
+                                  <span className="text-[9px] text-muted-foreground font-bold uppercase tracking-widest">
+                                    / {item.unit || 'UN'}
+                                  </span>
+                                </div>
+                              </div>
+                              <Badge className={cn(
+                                "text-[8px] font-black px-2 py-0.5 rounded-lg border-none shadow-sm",
+                                status === 'paid' ? "bg-emerald-500 text-white" :
+                                status === 'partial' ? "bg-amber-500 text-black" : "bg-white/10 text-muted-foreground"
+                              )}>
+                                {status === 'paid' ? 'PAGO' : status === 'partial' ? 'PARCIAL' : 'PENDENTE'}
+                              </Badge>
+                            </div>
+
+                            <div className="flex items-end justify-between relative z-10 mt-auto">
+                              <div className="flex flex-col gap-1">
+                                <div className="flex items-baseline gap-1">
+                                  <span className={cn(
+                                    "text-2xl font-black tabular-nums leading-none",
+                                    remaining === 0 ? "text-emerald-500" : "text-white"
+                                  )}>
+                                    {remaining}
+                                  </span>
+                                  <span className="text-[9px] text-muted-foreground font-bold uppercase tracking-widest">
+                                    restante de {item.quantity}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                {assignedToActive > 0 && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const newPayments = [...checkoutPayments];
+                                      const currentAssignments = [...(newPayments[activePaymentIndex].itemAssignments || [])];
+                                      const existingIdx = currentAssignments.findIndex(a => a.itemIndex === idx);
+                                      if (existingIdx > -1) {
+                                        if (currentAssignments[existingIdx].quantity > 1) {
+                                          currentAssignments[existingIdx].quantity -= 1;
+                                        } else {
+                                          currentAssignments.splice(existingIdx, 1);
+                                        }
+                                        newPayments[activePaymentIndex].itemAssignments = currentAssignments;
+                                        const newAmount = currentAssignments.reduce((sum, a) => sum + (order.items[a.itemIndex].price * a.quantity), 0);
+                                        newPayments[activePaymentIndex].amount = Number(newAmount.toFixed(2));
+                                        setCheckoutPayments(newPayments);
+                                      }
+                                    }}
+                                    className="w-8 h-8 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-lg shadow-red-500/10"
+                                  >
+                                    <Minus className="w-4 h-4" />
+                                  </button>
+                                )}
+                                
+                                {remaining > 0 && activePaymentIndex !== -1 && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const newPayments = [...checkoutPayments];
+                                      const currentAssignments = [...(newPayments[activePaymentIndex].itemAssignments || [])];
+                                      const existingIdx = currentAssignments.findIndex(a => a.itemIndex === idx);
+                                      if (existingIdx > -1) {
+                                        currentAssignments[existingIdx].quantity += 1;
+                                      } else {
+                                        currentAssignments.push({ itemIndex: idx, quantity: 1 });
+                                      }
+                                      newPayments[activePaymentIndex].itemAssignments = currentAssignments;
+                                      const newAmount = currentAssignments.reduce((sum, a) => sum + (order.items[a.itemIndex].price * a.quantity), 0);
+                                      newPayments[activePaymentIndex].amount = Number(newAmount.toFixed(2));
+                                      setCheckoutPayments(newPayments);
+                                    }}
+                                    className="w-10 h-10 rounded-xl bg-[#0070f3] flex items-center justify-center text-white hover:scale-105 active:scale-95 transition-all shadow-lg shadow-[#0070f3]/20"
+                                  >
+                                    <Plus className="w-5 h-5" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Selection Overlay */}
+                            {assignedToActive > 0 && (
+                              <div className="absolute top-2 right-2 flex gap-1">
+                                <div className="bg-[#0070f3] text-white text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-tighter shadow-lg">
+                                  {assignedToActive}x Vinculado
+                                </div>
+                              </div>
+                            )}
+                          </motion.div>
+                        );
+                      })}
+                  </div>
+
+                </div>
+
+                <div className="flex items-center justify-between pt-4 border-t border-white/5">
+                  <div className="flex items-center gap-4">
+                    <label className="text-[10px] font-black tracking-widest uppercase text-muted-foreground ml-1">Métodos de Recebimento</label>
                   </div>
                   <Button 
                     variant="ghost" 
                     size="sm" 
-                    onClick={() => setCheckoutPayments([...checkoutPayments, { method: 'DINHEIRO', amount: 0 }])}
+                    onClick={() => {
+                      const newPayments = [...checkoutPayments, { method: 'DINHEIRO', amount: 0 }];
+                      setCheckoutPayments(newPayments);
+                      setActivePaymentIndex(newPayments.length - 1);
+                    }}
                     className="h-10 text-[10px] font-black uppercase tracking-widest text-[#0070f3] hover:bg-[#0070f3]/10 rounded-[40px]"
                   >
-                    <Plus className="w-4 h-4 mr-2" /> Adicionar Método
+                    <Plus className="w-4 h-4 mr-2" /> Novo Método
                   </Button>
                 </div>
                 
@@ -1636,15 +1872,27 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                   {checkoutPayments.map((payment, index) => (
                     <motion.div 
                       key={index}
-                      initial={{ opacity: 0, x: -10 }}
+                      initial={{ opacity: 0, x: 20 }}
                       animate={{ opacity: 1, x: 0 }}
-                      className="group relative"
+                      className={cn(
+                        "relative p-5 rounded-[32px] border transition-all duration-500 group cursor-pointer",
+                        activePaymentIndex === index 
+                          ? "bg-[#0070f3]/5 border-[#0070f3] shadow-[0_0_30px_rgba(0,112,243,0.1)] ring-1 ring-[#0070f3]/50" 
+                          : "bg-white/[0.02] border-white/5 hover:border-white/10"
+                      )}
+                      onClick={() => setActivePaymentIndex(index)}
                     >
-                      <div className="flex flex-col md:flex-row gap-3 p-4 bg-[#0d1117] rounded-[40px] border border-white/5 group-hover:border-white/10 transition-all">
-                        <div className="flex-1 space-y-2">
-                          <label className="text-[9px] font-black tracking-widest uppercase text-muted-foreground flex items-center gap-2">
-                            <CreditCard className="w-3 h-3" /> Método de Pagamento
-                          </label>
+                      <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
+                        <div className="flex-1 w-full space-y-2">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[9px] font-black tracking-widest uppercase text-muted-foreground flex items-center gap-1">
+                              {activePaymentIndex === index && <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 2 }} className="w-1.5 h-1.5 rounded-full bg-[#0070f3]" />}
+                              Forma de Pagamento
+                            </label>
+                            {activePaymentIndex === index && (
+                              <span className="text-[8px] font-black text-[#0070f3] uppercase tracking-widest">Ativo para Vinculação</span>
+                            )}
+                          </div>
                           <Select 
                             value={payment.method} 
                             onValueChange={(val) => {
@@ -1653,50 +1901,51 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                               setCheckoutPayments(newPayments);
                             }}
                           >
-                            <SelectTrigger className="h-12 bg-white/[0.02] border-white/5 font-bold text-xs uppercase rounded-[40px]">
+                            <SelectTrigger className="h-14 bg-[#05070a] border-white/10 font-black text-xs uppercase rounded-[20px] focus:ring-[#0070f3]/40">
                               <SelectValue />
                             </SelectTrigger>
-                            <SelectContent className="bg-[#05070a] border-white/10 rounded-[40px]">
+                            <SelectContent className="bg-[#05070a] border-white/10 rounded-[20px]">
                               {['DINHEIRO', 'PIX', 'CARTÃO DE CRÉDITO', 'CARTÃO DE DÉBITO', 'VALE REFEIÇÃO', 'FIADO', 'SALDO'].map(method => (
-                                <SelectItem key={method} value={method} className="font-black uppercase tracking-widest text-[10px] py-4">
+                                <SelectItem key={method} value={method} className="font-black uppercase tracking-widest text-[10px] py-4 focus:bg-[#0070f3]/10">
                                   {method}
                                 </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
                         </div>
-                        <div className="flex gap-2">
-                          <div className="flex-1 md:w-32 space-y-2">
-                            <label className="text-[9px] font-black tracking-widest uppercase text-muted-foreground">Valor (R$)</label>
-                            <div className="relative">
-                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground font-bold italic">R$</span>
-                              <Input 
-                                type="number" 
-                                step="0.01"
-                                className="h-12 pl-8 bg-white/[0.02] border-white/5 font-black text-sm rounded-[40px] focus:ring-[#0070f3]/20"
-                                value={payment.amount}
-                                onChange={(e) => {
-                                  const newPayments = [...checkoutPayments];
-                                  newPayments[index].amount = parseFloat(e.target.value) || 0;
-                                  setCheckoutPayments(newPayments);
-                                }}
-                              />
-                              </div>
-                            </div>
+                        <div className="w-full md:w-40 space-y-2">
+                          <label className="text-[9px] font-black tracking-widest uppercase text-muted-foreground">Valor (R$)</label>
+                          <div className="relative">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-black">R$</span>
+                            <Input 
+                              type="number" 
+                              step="0.01"
+                              className="h-14 pl-10 bg-[#05070a] border-white/10 font-black text-lg tabular-nums rounded-[20px] focus:ring-[#0070f3]/40"
+                              value={payment.amount}
+                              onChange={(e) => {
+                                const newPayments = [...checkoutPayments];
+                                newPayments[index].amount = parseFloat(e.target.value) || 0;
+                                setCheckoutPayments(newPayments);
+                              }}
+                            />
                           </div>
-                          {checkoutPayments.length > 1 && (
-                            <div className="flex items-end">
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                onClick={() => setCheckoutPayments(checkoutPayments.filter((_, i) => i !== index))}
-                                className="h-12 w-12 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-xl"
-                              >
-                                <X className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          )}
                         </div>
+                        {checkoutPayments.length > 1 && (
+                          <div className="h-14 flex items-end">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setCheckoutPayments(checkoutPayments.filter((_, i) => i !== index));
+                                if (activePaymentIndex === index) setActivePaymentIndex(0);
+                              }}
+                              className="w-14 h-14 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-2xl border border-transparent hover:border-red-500/20"
+                            >
+                              <X className="w-5 h-5" />
+                            </Button>
+                          </div>
+                        )}
                       </div>
 
                       {/* Item Assignments Section */}
@@ -1704,23 +1953,19 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                         <div className="bg-white/[0.01] border border-white/5 rounded-xl overflow-hidden">
                           <div className="px-3 py-2 border-b border-white/5 bg-white/[0.02] flex items-center justify-between">
                             <span className="text-[8px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
-                              <Package className="w-3 h-3" /> Itens Pagos neste Método
+                              <Package className="w-3 h-3" /> Itens Atribuídos
                             </span>
                             <div className="flex gap-2 items-center">
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => {
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   const newPayments = [...checkoutPayments];
                                   const currentAssignments = newPayments[index].itemAssignments || [];
                                   
                                   order.items.forEach((item, itemIdx) => {
-                                    const totalAssigned = checkoutPayments.reduce((sum, p) => {
-                                      const assignment = p.itemAssignments?.find(a => a.itemIndex === itemIdx);
-                                      return sum + (assignment?.quantity || 0);
-                                    }, 0);
-                                    
-                                    const remaining = item.quantity - totalAssigned;
+                                    const { remaining } = getItemAssignmentStatus(itemIdx);
                                     if (remaining > 0) {
                                       const existingIdx = currentAssignments.findIndex(a => a.itemIndex === itemIdx);
                                       if (existingIdx > -1) {
@@ -1738,52 +1983,8 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                                 }}
                                 className="h-6 px-2 text-[8px] font-black uppercase tracking-widest bg-white/5 text-white/60 hover:bg-white/10 rounded-md border border-white/10"
                               >
-                                Vincular Restantes
+                                Vincular Tudo que Resta
                               </Button>
-                              <div className="flex gap-2 overflow-x-auto max-w-[200px] no-scrollbar">
-                              {order.items.map((item, itemIdx) => {
-                                // Calculate total assigned quantity for this item across ALL payments
-                                const totalAssigned = checkoutPayments.reduce((sum, p) => {
-                                  const assignment = p.itemAssignments?.find(a => a.itemIndex === itemIdx);
-                                  return sum + (assignment?.quantity || 0);
-                                }, 0);
-                                
-                                const remaining = item.quantity - totalAssigned;
-                                if (remaining <= 0) return null;
-
-                                return (
-                                  <Button
-                                    key={itemIdx}
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => {
-                                      const newPayments = [...checkoutPayments];
-                                      const currentAssignments = newPayments[index].itemAssignments || [];
-                                      const existingAssignmentIdx = currentAssignments.findIndex(a => a.itemIndex === itemIdx);
-                                      
-                                      if (existingAssignmentIdx > -1) {
-                                        currentAssignments[existingAssignmentIdx].quantity += 1;
-                                      } else {
-                                        currentAssignments.push({ itemIndex: itemIdx, quantity: 1 });
-                                      }
-                                      
-                                      newPayments[index].itemAssignments = currentAssignments;
-                                      
-                                      // Recalculate payment amount based on items
-                                      const newAmount = currentAssignments.reduce((sum, a) => {
-                                        return sum + (order.items[a.itemIndex].price * a.quantity);
-                                      }, 0);
-                                      
-                                      newPayments[index].amount = Number(newAmount.toFixed(2));
-                                      setCheckoutPayments(newPayments);
-                                    }}
-                                    className="h-6 px-2 text-[8px] font-black uppercase tracking-widest bg-[#0070f3]/10 text-[#0070f3] hover:bg-[#0070f3]/20 rounded-md"
-                                  >
-                                    + {item.productName} ({remaining})
-                                  </Button>
-                                );
-                              })}
-                              </div>
                             </div>
                           </div>
                           
@@ -1802,7 +2003,8 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                                       variant="ghost"
                                       size="icon"
                                       className="h-6 w-6 text-muted-foreground hover:text-white"
-                                      onClick={() => {
+                                      onClick={(e) => {
+                                        e.stopPropagation();
                                         const newPayments = [...checkoutPayments];
                                         const currentAssignments = [...(newPayments[index].itemAssignments || [])];
                                         if (currentAssignments[aIdx].quantity > 1) {
@@ -1811,11 +2013,7 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                                           currentAssignments.splice(aIdx, 1);
                                         }
                                         newPayments[index].itemAssignments = currentAssignments;
-                                        
-                                        // Recalculate amount
-                                        const newAmount = currentAssignments.reduce((sum, a) => {
-                                          return sum + (order.items[a.itemIndex].price * a.quantity);
-                                        }, 0);
+                                        const newAmount = currentAssignments.reduce((sum, a) => sum + (order.items[a.itemIndex].price * a.quantity), 0);
                                         newPayments[index].amount = Number(newAmount.toFixed(2));
                                         setCheckoutPayments(newPayments);
                                       }}
@@ -1830,16 +2028,13 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                                         const a = p.itemAssignments?.find(as => as.itemIndex === assignment.itemIndex);
                                         return sum + (a?.quantity || 0);
                                       }, 0) >= order.items[assignment.itemIndex].quantity}
-                                      onClick={() => {
+                                      onClick={(e) => {
+                                        e.stopPropagation();
                                         const newPayments = [...checkoutPayments];
                                         const currentAssignments = [...(newPayments[index].itemAssignments || [])];
                                         currentAssignments[aIdx].quantity += 1;
                                         newPayments[index].itemAssignments = currentAssignments;
-                                        
-                                        // Recalculate amount
-                                        const newAmount = currentAssignments.reduce((sum, a) => {
-                                          return sum + (order.items[a.itemIndex].price * a.quantity);
-                                        }, 0);
+                                        const newAmount = currentAssignments.reduce((sum, a) => sum + (order.items[a.itemIndex].price * a.quantity), 0);
                                         newPayments[index].amount = Number(newAmount.toFixed(2));
                                         setCheckoutPayments(newPayments);
                                       }}
@@ -1868,23 +2063,53 @@ const OrderCard: React.FC<{ order: Order; products: Product[]; customers: Custom
                   ))}
                 </div>
                 
-                <div className={cn(
-                  "p-5 rounded-[40px] text-center text-xs font-black uppercase tracking-widest transition-all shadow-lg",
-                  totalPaid.toFixed(2) >= (isPartialCheckout ? assignedItemsTotal : checkoutAmount).toFixed(2) 
-                    ? "bg-green-500/10 text-green-500 border border-green-500/20" 
-                    : "bg-red-500/10 text-red-500 border border-red-500/20 animate-pulse"
-                )}>
-                  {totalPaid.toFixed(2) >= (isPartialCheckout ? assignedItemsTotal : checkoutAmount).toFixed(2) 
-                    ? (totalPaid > (isPartialCheckout ? assignedItemsTotal : checkoutAmount)
-                        ? `✓ Crédito a Gerar: R$ ${(totalPaid - (isPartialCheckout ? assignedItemsTotal : checkoutAmount)).toFixed(2)}`
-                        : "✓ Conferência de Valores OK")
-                    : `⚠️ Faltam R$ ${((isPartialCheckout ? assignedItemsTotal : checkoutAmount) - totalPaid).toFixed(2)}`}
-                </div>
+                <motion.div 
+                  layout
+                  className={cn(
+                    "p-8 rounded-[40px] flex flex-col items-center justify-center gap-2 transition-all duration-500",
+                    totalPaid.toFixed(2) >= (isPartialCheckout ? assignedItemsTotal : checkoutAmount).toFixed(2) 
+                      ? "bg-emerald-500/10 border border-emerald-500/30 shadow-[0_0_40px_rgba(16,185,129,0.1)]" 
+                      : "bg-red-500/10 border border-red-500/30 shadow-[0_0_40px_rgba(239,68,68,0.1)]"
+                  )}
+                >
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">Status do Recebimento</span>
+                    <h3 className={cn(
+                      "text-3xl font-black tabular-nums tracking-tighter",
+                      totalPaid.toFixed(2) >= (isPartialCheckout ? assignedItemsTotal : checkoutAmount).toFixed(2) ? "text-emerald-500" : "text-red-500"
+                    )}>
+                      {totalPaid.toFixed(2) >= (isPartialCheckout ? assignedItemsTotal : checkoutAmount).toFixed(2) 
+                        ? (totalPaid > (isPartialCheckout ? assignedItemsTotal : checkoutAmount)
+                            ? `+ R$ ${(totalPaid - (isPartialCheckout ? assignedItemsTotal : checkoutAmount)).toFixed(2)}`
+                            : "R$ 0.00")
+                        : `- R$ ${((isPartialCheckout ? assignedItemsTotal : checkoutAmount) - totalPaid).toFixed(2)}`}
+                    </h3>
+                  </div>
+
+                  <div className="flex items-center gap-3 mt-2">
+                    {totalPaid.toFixed(2) >= (isPartialCheckout ? assignedItemsTotal : checkoutAmount).toFixed(2) ? (
+                      <div className="flex items-center gap-2 px-4 py-2 bg-emerald-500 rounded-full text-black text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20">
+                        <CheckCircle2 className="w-4 h-4" />
+                        Conferência OK
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 px-4 py-2 bg-red-500 rounded-full text-white text-[10px] font-black uppercase tracking-widest animate-pulse shadow-lg shadow-red-500/20">
+                        <AlertCircle className="w-4 h-4" />
+                        Aguardando Valores
+                      </div>
+                    )}
+                    
+                    {totalPaid > (isPartialCheckout ? assignedItemsTotal : checkoutAmount) && (
+                      <div className="px-4 py-2 bg-[#0070f3] rounded-full text-white text-[10px] font-black uppercase tracking-widest">
+                        Crédito Pendente
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
               </div>
             </div>
-          </div>
+          </div>          <DialogFooter className="p-6 md:p-8 border-t border-white/5 bg-[#05070a] flex-row gap-4 flex-shrink-0">
 
-          <DialogFooter className="p-6 md:p-8 border-t border-white/5 bg-[#05070a] flex-row gap-4 flex-shrink-0">
             <Button variant="ghost" onClick={() => setIsCheckoutOpen(false)} className="flex-1 h-16 font-black uppercase tracking-widest text-muted-foreground hover:text-white rounded-[40px]">Voltar</Button>
             <Button 
               onClick={handleFinalizeCheckout} 

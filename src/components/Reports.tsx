@@ -57,6 +57,11 @@ export function Reports({ user }: { user: UserProfile }) {
   const [selectedDayLabel, setSelectedDayLabel] = useState('');
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [loadingTransactions, setLoadingTransactions] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const [dateRange, setDateRange] = useState<{ from: Date, to: Date }>({
     from: subDays(nowInSaoPaulo(), 6),
@@ -672,50 +677,58 @@ export function Reports({ user }: { user: UserProfile }) {
             </div>
           </CardHeader>
           <CardContent className="p-8">
-            <div className="h-[400px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={dailyData} onClick={handleChartClick}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1f2937" opacity={0.5} />
-                  <XAxis
-                    dataKey="name"
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 'bold' }}
-                  />
-                  <YAxis
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 'bold' }}
-                    tickFormatter={(value) => `R$${value}`}
-                  />
-                  <Tooltip
-                    cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                    content={({ active, payload, label }) => {
-                      if (active && payload && payload.length) {
-                        return (
-                          <div className="bg-[#0b1224] border border-white/10 p-4 rounded-2xl shadow-2xl backdrop-blur-xl">
-                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2 pb-2 border-b border-white/5">{label}</p>
-                            <div className="space-y-2">
-                              {payload.map((entry: any, index: number) => (
-                                <div key={index} className="flex items-center justify-between gap-8">
-                                  <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: entry.color }}>{entry.name}</span>
-                                  <span className="text-xs font-black tabular-nums" style={{ color: entry.color }}>
-                                    R$ {Number(entry.value).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                  </span>
-                                </div>
-                              ))}
+            <div className="w-full h-[400px] min-h-[400px] relative border border-white/5 bg-black/20 rounded-3xl overflow-hidden flex items-center justify-center">
+              {mounted && !loading && dailyData && dailyData.length > 0 ? (
+                <ResponsiveContainer width="99%" height={380}>
+                  <BarChart data={dailyData} onClick={handleChartClick}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1f2937" opacity={0.5} />
+                    <XAxis
+                      dataKey="name"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 'bold' }}
+                    />
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 'bold' }}
+                      tickFormatter={(value) => `R$${value}`}
+                    />
+                    <Tooltip
+                      cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                      content={({ active, payload, label }) => {
+                        if (active && payload && payload.length) {
+                          return (
+                            <div className="bg-[#0b1224] border border-white/10 p-4 rounded-2xl shadow-2xl backdrop-blur-xl">
+                              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2 pb-2 border-b border-white/5">{label}</p>
+                              <div className="space-y-2">
+                                {payload.map((entry: any, index: number) => (
+                                  <div key={index} className="flex items-center justify-between gap-8">
+                                    <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: entry.color }}>{entry.name}</span>
+                                    <span className="text-xs font-black tabular-nums" style={{ color: entry.color }}>
+                                      R$ {Number(entry.value).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
                             </div>
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-                  <Bar dataKey="totalSalesValue" fill="#3b82f6" radius={[6, 6, 0, 0]} name="VENDAS TOTAIS" />
-                  <Bar dataKey="income" fill="#22c55e" radius={[6, 6, 0, 0]} name="ENTRADAS REAIS" />
-                  <Bar dataKey="expense" fill="#ef4444" radius={[6, 6, 0, 0]} name="SAÍDAS" />
-                </BarChart>
-              </ResponsiveContainer>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <Bar dataKey="totalSalesValue" fill="#3b82f6" radius={[6, 6, 0, 0]} name="VENDAS TOTAIS" />
+                    <Bar dataKey="income" fill="#22c55e" radius={[6, 6, 0, 0]} name="ENTRADAS REAIS" />
+                    <Bar dataKey="expense" fill="#ef4444" radius={[6, 6, 0, 0]} name="SAÍDAS" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center gap-4 opacity-30">
+                  <BarChart3 className="w-12 h-12 text-muted-foreground" />
+                  <p className="text-[10px] font-bold uppercase tracking-widest">Sem dados para o período</p>
+                </div>
+              )}
             </div>
             <p className="text-[9px] text-center text-muted-foreground uppercase tracking-widest mt-6 font-bold opacity-50">
               Clique em uma barra para ver o detalhamento do dia
@@ -770,53 +783,61 @@ export function Reports({ user }: { user: UserProfile }) {
             </div>
           </CardHeader>
           <CardContent className="p-8">
-            <div className="h-[400px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  layout="vertical"
-                  data={extraData.topCustomers}
-                  margin={{ left: 40, right: 40 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#1f2937" opacity={0.5} />
-                  <XAxis type="number" hide />
-                  <YAxis
-                    dataKey="name"
-                    type="category"
-                    axisLine={false}
-                    tickLine={false}
-                    width={100}
-                    tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 'bold' }}
-                    tickFormatter={(val) => val.length > 12 ? val.substring(0, 12) + '...' : val}
-                  />
-                  <Tooltip
-                    cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                    content={({ active, payload }) => {
-                      if (active && payload && payload.length) {
-                        const data = payload[0].payload;
-                        return (
-                          <div className="bg-[#0b1224] border border-white/10 p-4 rounded-2xl shadow-2xl backdrop-blur-xl">
-                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2 pb-2 border-b border-white/5">{data.name}</p>
-                            <div className="space-y-1">
-                              <p className="text-xs font-black text-amber-500 tabular-nums">
-                                TOTAL: R$ {data.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                              </p>
-                              <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">
-                                {data.visits} VISITAS REGISTRADAS
-                              </p>
+            <div className="w-full h-[400px] min-h-[400px] relative border border-white/5 bg-black/20 rounded-3xl overflow-hidden flex items-center justify-center p-4">
+              {mounted && !loading && extraData.topCustomers && extraData.topCustomers.length > 0 ? (
+                <ResponsiveContainer width="99%" height={360}>
+                  <BarChart
+                    layout="vertical"
+                    data={extraData.topCustomers}
+                    margin={{ left: 40, right: 40 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#1f2937" opacity={0.5} />
+                    <XAxis type="number" hide />
+                    <YAxis
+                      dataKey="name"
+                      type="category"
+                      axisLine={false}
+                      tickLine={false}
+                      width={100}
+                      tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 'bold' }}
+                      tickFormatter={(val) => val.length > 12 ? val.substring(0, 12) + '...' : val}
+                    />
+                    <Tooltip
+                      cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0].payload;
+                          return (
+                            <div className="bg-[#0b1224] border border-white/10 p-4 rounded-2xl shadow-2xl backdrop-blur-xl">
+                              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2 pb-2 border-b border-white/5">{data.name}</p>
+                              <div className="space-y-1">
+                                <p className="text-xs font-black text-amber-500 tabular-nums">
+                                  TOTAL: R$ {data.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                </p>
+                                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">
+                                  {data.visits} VISITAS REGISTRADAS
+                                </p>
+                              </div>
                             </div>
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-                  <Bar dataKey="total" radius={[0, 6, 6, 0]} barSize={30}>
-                    {extraData.topCustomers.map((entry: any, index: number) => (
-                      <Cell key={`cell-${index}`} fill={index === 0 ? '#f59e0b' : '#3b82f6'} opacity={1 - (index * 0.07)} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <Bar dataKey="total" radius={[0, 6, 6, 0]} barSize={30}>
+                      {extraData.topCustomers.map((entry: any, index: number) => (
+                        <Cell key={`cell-${index}`} fill={index === 0 ? '#f59e0b' : '#3b82f6'} opacity={1 - (index * 0.07)} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center gap-4 opacity-30">
+                  <Users className="w-12 h-12 text-muted-foreground" />
+                  <p className="text-[10px] font-bold uppercase tracking-widest">Sem dados de clientes</p>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
