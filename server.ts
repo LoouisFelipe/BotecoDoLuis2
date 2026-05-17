@@ -6,7 +6,7 @@ import dotenv from "dotenv";
 
 import { genkit } from "genkit";
 import { googleAI } from "@genkit-ai/google-genai";
-import { mcpClient } from "genkitx-mcp"; // Genkit MCP Client
+// import { mcpClient } from "genkitx-mcp"; // Genkit MCP Client (Incompatível com Genkit 1.34.0)
 
 // Carrega variáveis do .env em desenvolvimento
 dotenv.config();
@@ -30,6 +30,8 @@ async function startServer() {
     // Inicialização do Servidor MCP Local (ex: n8n)
     // O Genkit gerencia o ciclo de vida do cliente MCP
     if (process.env.N8N_URL && process.env.N8N_API_KEY) {
+      console.warn("⚠️ MCP Client (n8n) temporariamente desabilitado devido à incompatibilidade com o Genkit 1.34.0.");
+      /*
       const mcpPlugin = mcpClient({
         name: "n8n-mcp",
         serverProcess: {
@@ -44,6 +46,7 @@ async function startServer() {
       });
       plugins.push(mcpPlugin);
       console.log("✅ MCP Client (n8n) configurado com sucesso.");
+      */
     } else {
       console.warn("⚠️ MCP Client (n8n) ignorado: Variáveis N8N_URL e N8N_API_KEY não definidas.");
     }
