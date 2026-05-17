@@ -4,7 +4,9 @@ import { fileURLToPath } from "url";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 
-import { GoogleGenAI, ThinkingLevel } from "@google/genai";
+import { genkit } from "genkit";
+import { googleAI } from "@genkit-ai/google-genai";
+import { mcpClient } from "genkitx-mcp"; // Genkit MCP Client
 
 // Carrega variáveis do .env em desenvolvimento
 dotenv.config();
@@ -20,52 +22,69 @@ async function startServer() {
 
   console.log(`Iniciando servidor em modo: ${isProduction ? "PRODUÇÃO" : "DESENVOLVIMENTO"}`);
 
-  // Configuração da IA no Backend (Seguro, a chave fica no Server/Cloud Run)
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  // Configuração da IA no Backend via Genkit (Oficial)
+  // Configurando o MCP (Model Context Protocol)
+  let plugins: any[] = [googleAI({ apiKey: process.env.GEMINI_API_KEY })];
+
+  try {
+    // Inicialização do Servidor MCP Local (ex: n8n)
+    // O Genkit gerencia o ciclo de vida do cliente MCP
+    if (process.env.N8N_URL && process.env.N8N_API_KEY) {
+      const mcpPlugin = mcpClient({
+        name: "n8n-mcp",
+        serverProcess: {
+          command: "npx",
+          args: ["-y", "@leonardsellem/n8n-mcp-server"],
+          env: {
+            ...process.env,
+            N8N_URL: process.env.N8N_URL,
+            N8N_API_KEY: process.env.N8N_API_KEY,
+          } as NodeJS.ProcessEnv
+        }
+      });
+      plugins.push(mcpPlugin);
+      console.log("✅ MCP Client (n8n) configurado com sucesso.");
+    } else {
+      console.warn("⚠️ MCP Client (n8n) ignorado: Variáveis N8N_URL e N8N_API_KEY não definidas.");
+    }
+  } catch (mcpError) {
+    console.error("❌ Erro ao inicializar cliente MCP:", mcpError);
+  }
+
+  const ai = genkit({ plugins });
 
   app.post("/api/gemini", async (req, res) => {
     try {
       const { prompt, systemInstruction, type } = req.body;
       
-      let model = "gemini-3-flash-preview";
+      let model: any = googleAI.model('gemini-2.5-flash');
       let config: any = { systemInstruction };
 
       switch (type) {
         case "fast":
-          model = "gemini-3.1-flash-lite-preview";
-          config.systemInstruction = systemInstruction || "Você é um assistente rápido para tarefas simples.";
-          break;
         case "general":
-          model = "gemini-3-flash-preview";
+          model = googleAI.model('gemini-2.5-flash');
           config.systemInstruction = systemInstruction || "Você é um assistente inteligente para tarefas gerais.";
           break;
         case "searchGrounded":
-          model = "gemini-3-flash-preview";
-          config.tools = [{ googleSearch: {} }];
-          config.systemInstruction = systemInstruction || "Você é um assistente que utiliza dados da pesquisa Google para fornecer informações atualizadas.";
-          break;
         case "complex":
-          model = "gemini-3.1-pro-preview";
-          config.systemInstruction = systemInstruction || "Você é um assistente avançado para tarefas complexas.";
-          break;
         case "highThinking":
-          model = "gemini-3.1-pro-preview";
-          config.thinkingConfig = { thinkingLevel: ThinkingLevel.HIGH };
-          config.systemInstruction = systemInstruction || "Você é um assistente de alta performance capaz de lidar com as consultas mais complexas dos usuários através de um raciocínio profundo.";
+          model = googleAI.model('gemini-2.5-pro');
+          config.systemInstruction = systemInstruction || "Você é um assistente de alta performance capaz de lidar com tarefas complexas.";
           break;
         default:
-          model = "gemini-3-flash-preview";
+          model = googleAI.model('gemini-2.5-flash');
       }
 
-      const response = await ai.models.generateContent({
+      const response = await ai.generate({
         model,
-        contents: prompt,
+        prompt,
         config,
       });
 
       res.json({ text: response.text });
     } catch (error) {
-      console.error("Gemini API Error:", error);
+      console.error("Genkit API Error:", error);
       res.status(500).json({ error: "Failed to generate content" });
     }
   });
@@ -104,7 +123,6 @@ async function startServer() {
     }));
     
     app.get('*', (req, res) => {
-      // Se a requisição parece ser de um arquivo (tem extensão) e não foi encontrada pelo express.static
       if (req.url.includes('.') && !req.url.endsWith('.html')) {
         console.warn(`Arquivo não encontrado (404): ${req.url}`);
         return res.status(404).send('Not Found');

@@ -37,11 +37,18 @@ export function useFetchCollection<T = DocumentData>(
   // mas recomendamos o uso de useMemo no chamador.
   const constraintsKey = useMemo(() => {
     try {
-      return constraints.map(c => {
-        // Tentativa de extrair info identificadora (não oficial do SDK, mas comum na estrutura interna)
-        const anyC = c as any;
-        return `${c.type}_${anyC._field?.segments?.join('.') || ''}_${anyC._op || ''}`;
-      }).join('|');
+      // Cria uma representação segura e serializável das constraints
+      return JSON.stringify(
+        constraints.map(c => {
+          const anyC = c as any;
+          return {
+            type: c.type,
+            field: anyC._field?.segments?.join('.') || '',
+            op: anyC._op || '',
+            value: anyC._value || ''
+          };
+        })
+      );
     } catch (e) {
       return constraints.length.toString();
     }
